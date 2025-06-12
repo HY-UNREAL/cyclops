@@ -4,7 +4,7 @@
 
 namespace cyclops {
   template <typename key_t, typename value_t, typename range_t>
-  static auto make_dictionary(range_t const& range) {
+  static auto makeDictionary(range_t const& range) {
     return  //
       ranges::views::all(range) | ranges::views::transform([](auto const& _) {
         auto const& [key, value] = _;

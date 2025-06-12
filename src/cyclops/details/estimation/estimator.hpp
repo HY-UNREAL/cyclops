@@ -15,7 +15,7 @@ namespace cyclops::estimation {
     virtual bool updateEstimation() = 0;
     virtual bool sanity() const = 0;
 
-    static std::unique_ptr<EstimationFrameworkMain> create(
+    static std::unique_ptr<EstimationFrameworkMain> Create(
       std::unique_ptr<LikelihoodOptimizer> optimizer,
       std::unique_ptr<MarginalizationManager> marginalizer,
       std::unique_ptr<EstimationSanityDiscriminator> sanity_discriminator);

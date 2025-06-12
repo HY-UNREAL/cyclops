@@ -14,37 +14,37 @@ namespace cyclops::telemetry {
   }
 
   void InitializerTelemetry::onImageObservabilityPretest(
-    image_observability_pretest_t const& test) {
+    ImageObservabilityPretest const& test) {
     // TODO
   }
 
   void InitializerTelemetry::onVisionFailure(
-    vision_initialization_failure_t const& failure) {
+    VisionBootstrapFailure const& failure) {
     // TODO
   }
 
   void InitializerTelemetry::onBestTwoViewSelection(
-    best_two_view_selection_t const& selection) {
+    BestTwoViewSelection const& selection) {
     // TODO
   }
 
   void InitializerTelemetry::onTwoViewMotionHypothesis(
-    two_view_motion_hypothesis_t const& hypothesis) {
+    TwoViewMotionHypothesis const& hypothesis) {
     // TODO
   }
 
   void InitializerTelemetry::onTwoViewSolverSuccess(
-    two_view_solver_success_t const& success) {
+    TwoViewSolverSuccess const& success) {
     // TODO
   }
 
   void InitializerTelemetry::onBundleAdjustmentSuccess(
-    bundle_adjustment_solution_t const& solution) {
+    BundleAdjustmentSolution const& solution) {
     // TODO
   }
 
   void InitializerTelemetry::onBundleAdjustmentSanity(
-    bundle_adjustment_candidates_sanity_t const& sanity) {
+    BundleAdjustmentCandidatesSanity const& sanity) {
     // TODO
   }
 
@@ -68,7 +68,7 @@ namespace cyclops::telemetry {
     return ss.str();
   }
 
-  static std::string format_costpoints(
+  static std::string formatCostPoints(
     std::vector<std::tuple<double, double>> const& costs) {
     return formatlist(costs, [](auto& ss, auto const& point) {
       auto const& [scale, cost] = point;
@@ -76,14 +76,14 @@ namespace cyclops::telemetry {
     });
   }
 
-  void InitializerTelemetry::onIMUMatchAttempt(
-    imu_match_attempt_t const& argument) {
+  void InitializerTelemetry::onImuMatchAttempt(
+    ImuMatchAttempt const& argument) {
     __logger__->debug("Attempting IMU match");
-    __logger__->debug("Local minima: {}", format_costpoints(argument.minima));
+    __logger__->debug("Local minima: {}", formatCostPoints(argument.minima));
   }
 
-  static std::string format_reject_reason(
-    InitializerTelemetry::imu_match_candidate_reject_reason_t reason) {
+  static std::string formatRejectReason(
+    InitializerTelemetry::ImuMatchCandidateRejectReason reason) {
     switch (reason) {
     case InitializerTelemetry::UNCERTAINTY_EVALUATION_FAILED:
       return "Uncertainty evaluation failed";
@@ -97,33 +97,31 @@ namespace cyclops::telemetry {
     return "Unknown";
   }
 
-  void InitializerTelemetry::onIMUMatchAmbiguity(
-    imu_match_ambiguity_t const& argument) {
+  void InitializerTelemetry::onImuMatchAmbiguity(
+    ImuMatchAmbiguity const& argument) {
     __logger__->debug("IMU match solution ambiguous");
     __logger__->debug("#solutions: {}", argument.solutions.size());
   }
 
-  void InitializerTelemetry::onIMUMatchReject(
-    imu_match_reject_t const& argument) {
+  void InitializerTelemetry::onImuMatchReject(ImuMatchReject const& argument) {
     __logger__->debug(
       "Rejecting solution point: s = {}", argument.solution.scale);
-    __logger__->debug("Reason: {}", format_reject_reason(argument.reason));
+    __logger__->debug("Reason: {}", formatRejectReason(argument.reason));
   }
 
-  void InitializerTelemetry::onIMUMatchCandidateReject(
-    imu_match_reject_t const& argument) {
+  void InitializerTelemetry::onImuMatchCandidateReject(
+    ImuMatchReject const& argument) {
     __logger__->debug(
       "Rejecting candidate point: s = {}", argument.solution.scale);
-    __logger__->debug("Reason: {}", format_reject_reason(argument.reason));
+    __logger__->debug("Reason: {}", formatRejectReason(argument.reason));
   }
 
-  void InitializerTelemetry::onIMUMatchAccept(
-    imu_match_accept_t const& argument) {
+  void InitializerTelemetry::onImuMatchAccept(ImuMatchAccept const& argument) {
     __logger__->debug(
       "Accepting solution point: s = {}", argument.solution.scale);
   }
 
-  void InitializerTelemetry::onFailure(onfailure_argument_t const& argument) {
+  void InitializerTelemetry::onFailure(OnFailure const& argument) {
     __logger__->info("VIO initialization failed");
 
     if (argument.vision_solutions.empty()) {
@@ -163,12 +161,12 @@ namespace cyclops::telemetry {
     }
   }
 
-  void InitializerTelemetry::onSuccess(onsuccess_argument_t const& argument) {
+  void InitializerTelemetry::onSuccess(OnSuccess const& argument) {
     __logger__->info("VIO initialization successed");
     __logger__->debug("scale: {}", argument.scale);
   }
 
-  std::unique_ptr<InitializerTelemetry> InitializerTelemetry::createDefault() {
+  std::unique_ptr<InitializerTelemetry> InitializerTelemetry::CreateDefault() {
     return std::make_unique<InitializerTelemetry>();
   }
 }  // namespace cyclops::telemetry

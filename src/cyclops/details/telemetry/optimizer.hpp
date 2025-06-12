@@ -8,7 +8,7 @@ namespace cyclops::telemetry {
     virtual ~OptimizerTelemetry() = default;
     virtual void reset();
 
-    struct sanity_statistics_t {
+    struct SanityStatistics {
       double final_cost;
       double final_cost_significant_probability;
 
@@ -18,24 +18,24 @@ namespace cyclops::telemetry {
       double landmark_depth_threshold_failure_rate;
       double landmark_chi_square_test_failure_rate;
     };
-    virtual void onSanityStatistics(sanity_statistics_t const& statistics);
+    virtual void onSanityStatistics(SanityStatistics const& statistics);
 
-    struct bad_reason_t {
+    struct BadReason {
       bool bad_landmark_update;
       bool bad_final_cost;
     };
     virtual void onSanityBad(
-      bad_reason_t reason, sanity_statistics_t const& statistics);
+      BadReason reason, SanityStatistics const& statistics);
 
-    struct failure_reason_t {
+    struct FailureReason {
       bool continued_bad_landmark_update;
       bool continued_bad_final_cost;
     };
     virtual void onSanityFailure(
-      failure_reason_t reason, sanity_statistics_t const& statistics);
+      FailureReason reason, SanityStatistics const& statistics);
 
     virtual void onUserResetRequest();
 
-    static std::unique_ptr<OptimizerTelemetry> createDefault();
+    static std::unique_ptr<OptimizerTelemetry> CreateDefault();
   };
 }  // namespace cyclops::telemetry

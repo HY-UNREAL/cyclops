@@ -18,26 +18,26 @@ namespace cyclops {
   using telemetry::KeyframeTelemetry;
   using telemetry::OptimizerTelemetry;
 
-  struct cyclops_image_update_handle_t {
-    frame_id_t frame_id;
-    timestamp_t timestamp;
+  struct ImageUpdateHandle {
+    FrameID frame_id;
+    Timestamp timestamp;
   };
 
-  struct cyclops_keyframe_state_t {
-    timestamp_t timestamp;
+  struct KeyframeState {
+    Timestamp timestamp;
 
     Eigen::Vector3d acc_bias;
     Eigen::Vector3d gyr_bias;
-    imu_motion_state_t motion_state;
+    ImuMotionState motion_state;
   };
 
-  struct cyclops_propagation_state_t {
-    timestamp_t timestamp;
-    imu_motion_state_t motion_state;
+  struct PropagationState {
+    Timestamp timestamp;
+    ImuMotionState motion_state;
   };
 
-  struct cyclops_main_argument_t {
-    std::shared_ptr<cyclops_global_config_t const> config;
+  struct MainArgument {
+    std::shared_ptr<CyclopsConfig const> config;
     std::optional<uint32_t> seed = std::nullopt;
 
     std::shared_ptr<OptimizerTelemetry> optimizer_telemetry = nullptr;
@@ -45,9 +45,9 @@ namespace cyclops {
     std::shared_ptr<InitializerTelemetry> initializer_telemetry = nullptr;
   };
 
-  struct cyclops_estimation_update_result_t {
+  struct EstimationUpdateResult {
     bool reset;
-    std::vector<cyclops_image_update_handle_t> update_handles;
+    std::vector<ImageUpdateHandle> update_handles;
   };
 
   class CyclopsMain {
@@ -65,8 +65,8 @@ namespace cyclops {
      * consecutive IMU data updates, then t1 <= t2 must hold, and if s1, s2 are
      * timestamps of two consecutive landmark updates, then s1 <= s2.
      */
-    virtual void enqueueLandmarkData(image_data_t const& data) = 0;
-    virtual void enqueueIMUData(imu_data_t const& data) = 0;
+    virtual void enqueueLandmarkData(ImageData const& data) = 0;
+    virtual void enqueueImuData(ImuData const& data) = 0;
 
     /*
      * Enqueue external reset request. This reset request is handled in the next
@@ -77,7 +77,7 @@ namespace cyclops {
     /*
      * Get the current IMU-rate propagated motion states.
      */
-    virtual std::optional<cyclops_propagation_state_t> propagation() const = 0;
+    virtual std::optional<PropagationState> propagation() const = 0;
     /* ========================= Data thread methods ======================== */
 
     /*
@@ -86,11 +86,11 @@ namespace cyclops {
      * The following three methods are intended to be invoked in the optimizer
      * thread.
      */
-    virtual cyclops_estimation_update_result_t updateEstimation() = 0;
-    virtual landmark_positions_t mappedLandmarks() const = 0;
-    virtual std::map<frame_id_t, cyclops_keyframe_state_t> motions() const = 0;
+    virtual EstimationUpdateResult updateEstimation() = 0;
+    virtual LandmarkPositions mappedLandmarks() const = 0;
+    virtual std::map<FrameID, KeyframeState> motions() const = 0;
     /* ====================== Optimizer thread methods ====================== */
 
-    static std::unique_ptr<CyclopsMain> create(cyclops_main_argument_t args);
+    static std::unique_ptr<CyclopsMain> Create(MainArgument args);
   };
 }  // namespace cyclops

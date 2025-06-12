@@ -30,39 +30,39 @@ namespace cyclops::estimation {
 
   class MarginalizationManagerImpl: public MarginalizationManager {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<StateVariableReadAccessor const> _state;
     std::shared_ptr<MeasurementDataQueue> _data_queue;
 
-    gaussian_prior_t _prior = {};
+    GaussianPrior _prior = {};
 
-    gaussian_prior_t computePrior(
-      node_set_t drop_nodes, node_set_t keep_nodes, factor_set_t factors,
+    GaussianPrior computePrior(
+      NodeSet drop_nodes, NodeSet keep_nodes, FactorSet factors,
       FactorGraphInstance& graph);
-    set<node_t> collectLostLandmarks(FactorGraphInstance const& graph) const;
+    set<Node> collectLostLandmarks(FactorGraphInstance const& graph) const;
 
     void marginalizeKeyframe(
-      FactorGraphInstance& graph_instance, frame_id_t drop_frame,
-      frame_id_t new_frame);
+      FactorGraphInstance& graph_instance, FrameID drop_frame,
+      FrameID new_frame);
     void marginalizePendingFrame(
-      FactorGraphInstance& graph_instance, frame_id_t drop_frame,
-      frame_id_t next_frame);
+      FactorGraphInstance& graph_instance, FrameID drop_frame,
+      FrameID next_frame);
     void marginalizePastKeyframes();
 
   public:
     MarginalizationManagerImpl(
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<StateVariableReadAccessor const> state,
       std::shared_ptr<MeasurementDataQueue> data_queue);
     void reset() override;
 
     void marginalize() override;
     void marginalize(FactorGraphInstance& graph_instance) override;
-    gaussian_prior_t const& prior() const override;
+    GaussianPrior const& prior() const override;
   };
 
   MarginalizationManagerImpl::MarginalizationManagerImpl(
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<StateVariableReadAccessor const> state,
     std::shared_ptr<MeasurementDataQueue> data_queue)
       : _config(std::move(config)),
@@ -75,19 +75,19 @@ namespace cyclops::estimation {
     _data_queue->reset();
   }
 
-  gaussian_prior_t MarginalizationManagerImpl::computePrior(
-    node_set_t drop_nodes, node_set_t keep_nodes, factor_set_t factors,
+  GaussianPrior MarginalizationManagerImpl::computePrior(
+    NodeSet drop_nodes, NodeSet keep_nodes, FactorSet factors,
     FactorGraphInstance& graph) {
-    auto subgraph = marginalization_subgraph_t {
+    auto subgraph = MarginalizationSubgraph {
       .drop_nodes = std::move(drop_nodes),
       .keep_nodes = std::move(keep_nodes),
       .factors = std::move(factors),
     };
-    return evaluate_gaussian_prior(graph, *_state, subgraph);
+    return evaluateGaussianPrior(graph, *_state, subgraph);
   }
 
   template <typename value_t>
-  static set<value_t> set_difference(
+  static set<value_t> setDifference(
     set<value_t> const& a, set<value_t> const& b) {
     set<value_t> result;
     std::set_difference(
@@ -96,9 +96,9 @@ namespace cyclops::estimation {
     return result;
   }
 
-  static void drop_landmarks(set<node_t>& drop_nodes, set<node_t>& keep_nodes) {
+  static void dropLandmarks(set<Node>& drop_nodes, set<Node>& keep_nodes) {
     for (auto i = keep_nodes.begin(); i != keep_nodes.end();) {
-      if (node::is<node_t::landmark_t>(*i)) {
+      if (node::is<Node::Landmark>(*i)) {
         drop_nodes.insert(*i);
         i = keep_nodes.erase(i);
       } else {
@@ -107,17 +107,17 @@ namespace cyclops::estimation {
     }
   }
 
-  static set<landmark_id_t> as_landmark_set(node_set_t const& nodes) {
+  static set<LandmarkID> makeLandmarkSet(NodeSet const& nodes) {
     // clang-format off
     return nodes
       | views::transform([](auto const& _) {
-        return std::get<node_t::landmark_t>(_.variant).id;
+        return std::get<Node::Landmark>(_.variant).id;
       })
       | ranges::to<set>;
     // clang-format on
   }
 
-  node_set_t MarginalizationManagerImpl::collectLostLandmarks(
+  NodeSet MarginalizationManagerImpl::collectLostLandmarks(
     FactorGraphInstance const& graph) const {
     if (_data_queue->keyframes().empty())
       return {};
@@ -128,85 +128,89 @@ namespace cyclops::estimation {
     auto [pending_frame_id, __] = *_data_queue->pendingFrames().begin();
 
     auto maybe_kf_neighbors =
-      graph.queryNeighbors(node::frame(last_keyframe_id));
+      graph.queryNeighbors(node::makeFrame(last_keyframe_id));
     if (!maybe_kf_neighbors)
       return {};
     auto kf_landmarks = maybe_kf_neighbors->get() |
-      views::filter(node::is<node_t::landmark_t>) | ranges::to<set>;
+      views::filter(node::is<Node::Landmark>) | ranges::to<set>;
 
     auto maybe_pf_neighbors =
-      graph.queryNeighbors(node::frame(pending_frame_id));
+      graph.queryNeighbors(node::makeFrame(pending_frame_id));
     if (!maybe_pf_neighbors)
       return kf_landmarks;
     auto pf_landmarks = maybe_pf_neighbors->get() |
-      views::filter(node::is<node_t::landmark_t>) | ranges::to<set>;
+      views::filter(node::is<Node::Landmark>) | ranges::to<set>;
 
-    return set_difference(kf_landmarks, pf_landmarks);
+    return setDifference(kf_landmarks, pf_landmarks);
   }
 
   void MarginalizationManagerImpl::marginalizePendingFrame(
-    FactorGraphInstance& graph, frame_id_t drop_frame, frame_id_t next_frame) {
+    FactorGraphInstance& graph, FrameID drop_frame, FrameID next_frame) {
     __logger__->debug(
       "Marginalizing pending frame: {} <- {}", drop_frame, next_frame);
 
-    set<node_t> drop_nodes = {node::frame(drop_frame), node::bias(drop_frame)};
+    set<Node> drop_nodes = {
+      node::makeFrame(drop_frame), node::makeBias(drop_frame)};
 
     auto lost_landmark_nodes = collectLostLandmarks(graph);
     actions::insert(drop_nodes, lost_landmark_nodes);
 
     auto [neighbors, factors] = graph.queryNeighbors(drop_nodes);
-    auto keep_nodes = set_difference(neighbors, drop_nodes);
+    auto keep_nodes = setDifference(neighbors, drop_nodes);
 
-    // compute prior weight assuming that all the landmark nodes are also being
-    // marginalized. the resulting prior is only connected to frame nodes,
-    // enforcing the sparsity structure assumed by the Schur complement trick.
-    // even though the information to the landmark nodes contributed from the
-    // observation of `drop_frame` is lost, we correctly preserve its
+    // Compute prior factor assuming that all the landmark nodes are also being
+    // marginalized. The resulting prior factor is only connected to the frame
+    // nodes, enforcing the sparsity structure assumed by the Schur complement
+    // trick. Even though the information of the landmark nodes contributed from
+    // the observation of `drop_frame` is lost, we correctly preserve the
     // contribution to non-dropped frames up-to-linearization.
-    drop_landmarks(drop_nodes, keep_nodes);
+    dropLandmarks(drop_nodes, keep_nodes);
 
     auto maybe_previous_prior = graph.prior();
     if (maybe_previous_prior) {
       auto const& [prior_id, prior_ptr, prior_nodes] = *maybe_previous_prior;
-      factors.emplace(prior_id, std::make_tuple(prior_ptr, factor::prior()));
-      actions::insert(keep_nodes, set_difference(prior_nodes, drop_nodes));
+      factors.emplace(
+        prior_id, std::make_tuple(prior_ptr, factor::makePrior()));
+      actions::insert(keep_nodes, setDifference(prior_nodes, drop_nodes));
     }
 
     _prior = computePrior(
       std::move(drop_nodes), std::move(keep_nodes), std::move(factors), graph);
 
-    auto lost_landmarks = as_landmark_set(lost_landmark_nodes);
+    auto lost_landmarks = makeLandmarkSet(lost_landmark_nodes);
     _data_queue->marginalizePendingFrame(drop_frame, lost_landmarks);
   }
 
   void MarginalizationManagerImpl::marginalizeKeyframe(
-    FactorGraphInstance& graph, frame_id_t drop_frame, frame_id_t new_frame) {
+    FactorGraphInstance& graph, FrameID drop_frame, FrameID new_frame) {
     __logger__->debug(
       "Marginalizing keyframe: {} <- {}", drop_frame, new_frame);
 
-    set<node_t> drop_nodes = {node::frame(drop_frame), node::bias(drop_frame)};
+    set<Node> drop_nodes = {
+      node::makeFrame(drop_frame), node::makeBias(drop_frame)};
 
     auto lost_landmark_nodes = collectLostLandmarks(graph);
     actions::insert(drop_nodes, lost_landmark_nodes);
 
     auto [neighbors, factors] = graph.queryNeighbors(drop_nodes);
-    auto keep_nodes = set_difference(neighbors, drop_nodes);
+    auto keep_nodes = setDifference(neighbors, drop_nodes);
 
-    // same to the above. we compute prior weight assuming the marginalization
+    // Same to the above. We compute prior weight assuming the marginalization
     // of all landmark nodes.
-    drop_landmarks(drop_nodes, keep_nodes);
+    dropLandmarks(drop_nodes, keep_nodes);
 
     auto maybe_previous_prior = graph.prior();
     if (maybe_previous_prior) {
       auto const& [prior_id, prior_ptr, prior_nodes] = *maybe_previous_prior;
-      factors.emplace(prior_id, std::make_tuple(prior_ptr, factor::prior()));
-      actions::insert(keep_nodes, set_difference(prior_nodes, drop_nodes));
+      factors.emplace(
+        prior_id, std::make_tuple(prior_ptr, factor::makePrior()));
+      actions::insert(keep_nodes, setDifference(prior_nodes, drop_nodes));
     }
 
     _prior = computePrior(
       std::move(drop_nodes), std::move(keep_nodes), std::move(factors), graph);
 
-    auto lost_landmarks = as_landmark_set(lost_landmark_nodes);
+    auto lost_landmarks = makeLandmarkSet(lost_landmark_nodes);
     _data_queue->marginalizeKeyframe(drop_frame, lost_landmarks, new_frame);
   }
 
@@ -284,12 +288,12 @@ namespace cyclops::estimation {
     __logger__->info("Marginalization total time: {}[s]", toc(__tic__));
   }
 
-  gaussian_prior_t const& MarginalizationManagerImpl::prior() const {
+  GaussianPrior const& MarginalizationManagerImpl::prior() const {
     return _prior;
   }
 
-  std::unique_ptr<MarginalizationManager> MarginalizationManager::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<MarginalizationManager> MarginalizationManager::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<StateVariableReadAccessor const> state,
     std::shared_ptr<MeasurementDataQueue> data_queue) {
     return std::make_unique<MarginalizationManagerImpl>(

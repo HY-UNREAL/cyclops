@@ -10,7 +10,7 @@ namespace cyclops::initializer {
   using Eigen::MatrixXd;
   using Eigen::VectorXd;
 
-  struct IMUMatchTranslationAnalysisCache::Impl {
+  struct ImuTranslationMatchAnalysisCache::Impl {
     JacobiSVD<MatrixXd> _core_svd;
 
     int _n;
@@ -34,13 +34,13 @@ namespace cyclops::initializer {
     double alpha__dot__beta;
     double beta__dot__beta;
 
-    explicit Impl(imu_match_translation_analysis_t const& analysis);
-    primal_cache_inflation_t inflatePrimal(double s) const;
-    derivative_cache_inflation_t inflateDerivative(double s) const;
+    explicit Impl(ImuTranslationMatchAnalysis const& analysis);
+    PrimalCacheInflation inflatePrimal(double s) const;
+    DerivativeCacheInflation inflateDerivative(double s) const;
   };
 
-  IMUMatchTranslationAnalysisCache::Impl::Impl(
-    imu_match_translation_analysis_t const& analysis) {
+  ImuTranslationMatchAnalysisCache::Impl::Impl(
+    ImuTranslationMatchAnalysis const& analysis) {
     auto const& [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analysis;
 
 #define A_V_ (A_V.triangularView<Eigen::Upper>())
@@ -89,8 +89,8 @@ namespace cyclops::initializer {
     return r;
   }
 
-  IMUMatchTranslationAnalysisCache::primal_cache_inflation_t
-  IMUMatchTranslationAnalysisCache::Impl::inflatePrimal(double s) const {
+  ImuTranslationMatchAnalysisCache::PrimalCacheInflation
+  ImuTranslationMatchAnalysisCache::Impl::inflatePrimal(double s) const {
     auto const& U = _core_svd.matrixU();
     auto const& V = _core_svd.matrixV();
     auto const& sigma = _core_svd.singularValues();
@@ -110,7 +110,7 @@ namespace cyclops::initializer {
       A_V__inv__V_bar * diag(K_bar__sigma);
 #undef diag
 
-    return primal_cache_inflation_t {
+    return PrimalCacheInflation {
       .H_I_bar = A_I__T__U__K * A_I__T__U.transpose(),
       .b_I_bar = A_I__T__U__K * U__T__gamma,
       .F_V = A_V__inv__V_bar__K_bar__sigma * U_bar__T__A_I,
@@ -118,9 +118,9 @@ namespace cyclops::initializer {
     };
   }
 
-  IMUMatchTranslationAnalysisCache::derivative_cache_inflation_t
-  IMUMatchTranslationAnalysisCache::Impl::inflateDerivative(double s) const {
-    return derivative_cache_inflation_t {
+  ImuTranslationMatchAnalysisCache::DerivativeCacheInflation
+  ImuTranslationMatchAnalysisCache::Impl::inflateDerivative(double s) const {
+    return DerivativeCacheInflation {
       .r_s__dot = 2 * (alpha__dot__beta + beta__dot__beta * s),
       .b_I_s__dot = A_I__T__beta,
       .b_V_s__dot = B_I__T__alpha + 2 * s * B_I__T__beta,
@@ -129,21 +129,21 @@ namespace cyclops::initializer {
     };
   }
 
-  IMUMatchTranslationAnalysisCache::IMUMatchTranslationAnalysisCache(
-    imu_match_translation_analysis_t const& analysis)
+  ImuTranslationMatchAnalysisCache::ImuTranslationMatchAnalysisCache(
+    ImuTranslationMatchAnalysis const& analysis)
       : _pimpl(std::make_unique<Impl>(analysis)) {
   }
 
-  IMUMatchTranslationAnalysisCache::~IMUMatchTranslationAnalysisCache() =
+  ImuTranslationMatchAnalysisCache::~ImuTranslationMatchAnalysisCache() =
     default;
 
-  IMUMatchTranslationAnalysisCache::primal_cache_inflation_t
-  IMUMatchTranslationAnalysisCache::inflatePrimal(double s) const {
+  ImuTranslationMatchAnalysisCache::PrimalCacheInflation
+  ImuTranslationMatchAnalysisCache::inflatePrimal(double s) const {
     return _pimpl->inflatePrimal(s);
   }
 
-  IMUMatchTranslationAnalysisCache::derivative_cache_inflation_t
-  IMUMatchTranslationAnalysisCache::inflateDerivative(double s) const {
+  ImuTranslationMatchAnalysisCache::DerivativeCacheInflation
+  ImuTranslationMatchAnalysisCache::inflateDerivative(double s) const {
     return _pimpl->inflateDerivative(s);
   }
 }  // namespace cyclops::initializer

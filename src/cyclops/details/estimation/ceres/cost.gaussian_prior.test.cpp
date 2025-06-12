@@ -11,36 +11,36 @@
 #include <doctest/doctest.h>
 
 namespace cyclops::estimation {
-  using se3_parameterization_t =
+  using SE3Parameterization =
     ceres::AutoDiffLocalParameterization<ExponentialSE3Plus<false>, 10, 9>;
 
   TEST_CASE("Gaussian prior cost evaluation") {
     std::mt19937 rgen(20211104);
 
     GIVEN("Arbitrary nominal state") {
-      auto state = imu_motion_state_t {
+      auto state = ImuMotionState {
         .orientation = perturbate(Quaterniond::Identity(), 0.1, rgen),
         .position = perturbate(Vector3d::Zero().eval(), 0.1, rgen),
         .velocity = perturbate(Vector3d::Zero().eval(), 0.1, rgen),
       };
-      auto block_nominal = make_motion_frame_parameter(state);
+      auto block_nominal = makeMotionFrameParameter(state);
 
       GIVEN("A prior information of random weight") {
-        auto prior = gaussian_prior_t {
-          .jacobian = make_random_matrix(rgen, 15, 15, 100),
+        auto prior = GaussianPrior {
+          .jacobian = makeRandomMatrix(rgen, 15, 15, 100),
           .residual = VectorXd::Zero(15),
-          .input_nodes = {node::frame(0), node::bias(0)},
+          .input_nodes = {node::makeFrame(0), node::makeBias(0)},
           .nominal_parameters =
             std::vector<double>(block_nominal.begin(), block_nominal.end()),
         };
 
         WHEN("Optimized the prior cost") {
-          auto block_optimized = make_perturbated_frame_state(state, 0.1, rgen);
+          auto block_optimized = makePerturbatedFrameState(state, 0.1, rgen);
           auto x = block_optimized.data();
           auto b = block_optimized.data() + 10;
 
           ceres::Problem problem;
-          problem.AddParameterBlock(x, 10, new se3_parameterization_t);
+          problem.AddParameterBlock(x, 10, new SE3Parameterization);
           problem.AddParameterBlock(b, 6);
 
           problem.AddResidualBlock(
@@ -59,9 +59,9 @@ namespace cyclops::estimation {
             CAPTURE(summary.FullReport());
             CHECK(std::abs(summary.final_cost) < 1e-6);
 
-            auto x_got = motion_state_of_motion_frame_block(block_optimized);
-            auto b_a_got = acc_bias_of_motion_frame_block(block_optimized);
-            auto b_w_got = gyr_bias_of_motion_frame_block(block_optimized);
+            auto x_got = getMotionState(block_optimized);
+            auto b_a_got = getAccBias(block_optimized);
+            auto b_w_got = getGyrBias(block_optimized);
 
             AND_THEN("The optimized orientation is correct") {
               auto const& q_got = x_got.orientation;

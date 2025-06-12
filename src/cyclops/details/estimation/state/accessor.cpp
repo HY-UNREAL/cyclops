@@ -28,37 +28,37 @@ namespace cyclops::estimation {
     _writer->reset();
   }
 
-  StateVariableAccessor::maybe_ref_t<motion_frame_parameter_block_t>
-  StateVariableAccessor::motionFrame(frame_id_t id) {
+  StateVariableAccessor::MaybeRef<MotionFrameParameterBlock>
+  StateVariableAccessor::motionFrame(FrameID id) {
     return _writer->motionFrame(id);
   }
 
-  StateVariableAccessor::maybe_ref_t<landmark_parameter_block_t>
-  StateVariableAccessor::landmark(landmark_id_t id) {
+  StateVariableAccessor::MaybeRef<LandmarkParameterBlock>
+  StateVariableAccessor::landmark(LandmarkID id) {
     return _writer->landmark(id);
   }
 
-  motion_frame_parameter_blocks_t const& StateVariableAccessor::motionFrames()
+  MotionFrameParameterBlocks const& StateVariableAccessor::motionFrames()
     const {
     return _reader->motionFrames();
   }
 
-  landmark_parameter_blocks_t const& StateVariableAccessor::landmarks() const {
+  LandmarkParameterBlocks const& StateVariableAccessor::landmarks() const {
     return _reader->landmarks();
   }
 
-  landmark_positions_t const& StateVariableAccessor::mappedLandmarks() const {
+  LandmarkPositions const& StateVariableAccessor::mappedLandmarks() const {
     return _reader->mappedLandmarks();
   }
 
-  std::optional<std::tuple<timestamp_t, imu_motion_state_t>>
+  std::optional<std::tuple<Timestamp, ImuMotionState>>
   StateVariableAccessor::propagatedState() const {
     return _reader->propagatedState();
   }
 
-  std::unique_ptr<StateVariableAccessor> StateVariableAccessor::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
-    std::shared_ptr<IMUPropagationUpdateHandler> propagator) {
+  std::unique_ptr<StateVariableAccessor> StateVariableAccessor::Create(
+    std::shared_ptr<CyclopsConfig const> config,
+    std::shared_ptr<ImuPropagationUpdateHandler> propagator) {
     shared_ptr state_internal = std::make_shared<StateVariableInternal>();
 
     return std::make_unique<StateVariableAccessor>(

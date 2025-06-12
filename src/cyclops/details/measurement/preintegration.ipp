@@ -5,7 +5,7 @@
 
 namespace cyclops::measurement {
   template <typename T>
-  IMUPreintegration::Vector9<T> IMUPreintegration::evaluateError(
+  ImuPreintegration::Vector9<T> ImuPreintegration::evaluateError(
     Quaternion<T> const& y_q, Vector3<T> const& y_p, Vector3<T> const& y_v,
     Vector3<T> const& b_a, Vector3<T> const& b_w) const {
     using Matrix3 = Eigen::Matrix<T, 3, 3>;
@@ -22,8 +22,8 @@ namespace cyclops::measurement {
     Vector3<T> dy_p = y_q_bar.conjugate() * (y_p - y_p_bar);
     Vector3<T> dy_v = y_q_bar.conjugate() * (y_v - y_v_bar);
 
-    Vector3<T> delta_theta = so3_logmap(dy_q);
-    Matrix3 N_inv = so3_left_jacobian_inverse(delta_theta);
+    Vector3<T> delta_theta = so3Logmap(dy_q);
+    Matrix3 N_inv = so3LeftJacobianInverse(delta_theta);
 
     Vector3<T> delta_p = N_inv * dy_p;
     Vector3<T> delta_v = N_inv * dy_v;

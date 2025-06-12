@@ -84,11 +84,11 @@ namespace cyclops {
     set_log_level(log_level);
   }
 
-  void init_logger(int log_level) {
+  void initLogger(int log_level) {
     init_logger__internal__(std::nullopt, log_level);
   }
 
-  void init_logger(std::string path, int log_level) {
+  void initLogger(std::string path, int log_level) {
     init_logger__internal__(path, log_level);
   }
 }  // namespace cyclops

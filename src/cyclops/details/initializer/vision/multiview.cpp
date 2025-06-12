@@ -28,37 +28,37 @@ namespace cyclops::initializer {
       public MultiviewVisionGeometrySolver {
   private:
     std::unique_ptr<TwoViewVisionGeometrySolver> _two_view_solver;
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<InitializerTelemetry> _telemetry;
 
     void logFailure(std::string const& reason);
     void logFatal(std::string const& reason);
 
-    multiview_correspondences_t makeMultiViewCorrespondences(
-      multiview_image_data_t const& multiview_data,
-      camera_rotation_prior_lookup_t const& rotation_prior);
+    MultiViewCorrespondences makeMultiViewCorrespondences(
+      MultiViewImageData const& multiview_data,
+      CameraRotationPriorLookup const& rotation_prior);
 
     template <typename landmark_range_t>
-    landmark_positions_t triangulateUnknownLandmarks(
+    LandmarkPositions triangulateUnknownLandmarks(
       landmark_range_t const& known_landmarks,
-      std::map<landmark_id_t, two_view_feature_pair_t> const& features,
-      rotation_translation_matrix_pair_t const& camera_pose);
+      std::map<LandmarkID, TwoViewFeaturePair> const& features,
+      RotationPositionPair const& camera_pose);
 
-    std::optional<multiview_geometry_t> solveMultiview(
-      frame_id_t twoview_frame_id, two_view_geometry_t const& twoview_solution,
-      multiview_correspondences_t const& multiview_correspondences);
+    std::optional<MultiViewGeometry> solveMultiview(
+      FrameID twoview_frame_id, TwoViewGeometry const& twoview_solution,
+      MultiViewCorrespondences const& multiview_correspondences);
 
   public:
     MultiviewVisionGeometrySolverImpl(
       std::unique_ptr<TwoViewVisionGeometrySolver> two_view_solver,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<InitializerTelemetry> telemetry);
     ~MultiviewVisionGeometrySolverImpl();
     void reset() override;
 
-    std::vector<multiview_geometry_t> solve(
-      multiview_image_data_t const& multiview_image,
-      camera_rotation_prior_lookup_t const& camera_rotations) override;
+    std::vector<MultiViewGeometry> solve(
+      MultiViewImageData const& multiview_image,
+      CameraRotationPriorLookup const& camera_rotations) override;
   };
 
   void MultiviewVisionGeometrySolverImpl::logFailure(
@@ -71,12 +71,10 @@ namespace cyclops::initializer {
       "Internal error during vision initialization: {}", reason);
   }
 
-  static std::optional<two_view_imu_rotation_data_t>
-  make_two_view_rotation_prior(
-    std::map<frame_id_t, two_view_imu_rotation_constraint_t> const&
-      camera_rotations,
-    frame_id_t reference_view_frame, frame_id_t best_view_frame) {
-    frame_id_t frame_id = best_view_frame;
+  static std::optional<TwoViewImuRotationData> makeTwoViewRotationPrior(
+    std::map<FrameID, TwoViewImuRotationConstraint> const& camera_rotations,
+    FrameID reference_view_frame, FrameID best_view_frame) {
+    FrameID frame_id = best_view_frame;
 
     Quaterniond q_best_to_reference = Quaterniond::Identity();
     Matrix3d P_best_to_reference = Matrix3d::Identity();
@@ -101,25 +99,25 @@ namespace cyclops::initializer {
     }
 
     Matrix3d R_br = q_best_to_reference.matrix();
-    return two_view_imu_rotation_data_t {
+    return TwoViewImuRotationData {
       .value = q_best_to_reference.conjugate(),
       .covariance = R_br * P_best_to_reference * R_br.transpose(),
     };
   }
 
-  multiview_correspondences_t
+  MultiViewCorrespondences
   MultiviewVisionGeometrySolverImpl::makeMultiViewCorrespondences(
-    multiview_image_data_t const& multiview_data,
-    camera_rotation_prior_lookup_t const& rotation_prior) {
+    MultiViewImageData const& multiview_data,
+    CameraRotationPriorLookup const& rotation_prior) {
     auto const& [frame1_id, frame1] = *multiview_data.rbegin();
 
-    multiview_correspondences_t result;
+    MultiViewCorrespondences result;
     result.reference_frame = frame1_id;
 
     auto image_frames = multiview_data | views::drop_last(1);
     for (auto const& [frame2_id, frame2] : image_frames) {
-      auto maybe_rotation_prior = make_two_view_rotation_prior(  //
-        rotation_prior, frame1_id, frame2_id);
+      auto maybe_rotation_prior =
+        makeTwoViewRotationPrior(rotation_prior, frame1_id, frame2_id);
       if (!maybe_rotation_prior) {
         logFatal("Two view rotation prior generation failed");
         return {};
@@ -142,31 +140,31 @@ namespace cyclops::initializer {
   }
 
   template <typename landmark_range_t>
-  landmark_positions_t
+  LandmarkPositions
   MultiviewVisionGeometrySolverImpl::triangulateUnknownLandmarks(
     landmark_range_t const& known_landmarks,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& features,
-    rotation_translation_matrix_pair_t const& camera_pose) {
+    std::map<LandmarkID, TwoViewFeaturePair> const& features,
+    RotationPositionPair const& camera_pose) {
     auto unknown_landmarks =
       views::set_difference(features | views::keys, known_landmarks) |
       ranges::to<std::set>;
-    auto triangulation = triangulate_two_view_feature_pairs(
+    auto triangulation = triangulateTwoViewFeaturePairs(
       _config->initialization.vision, features, unknown_landmarks, camera_pose);
     return triangulation.landmarks;
   }
 
-  std::optional<multiview_geometry_t>
+  std::optional<MultiViewGeometry>
   MultiviewVisionGeometrySolverImpl::solveMultiview(
-    frame_id_t twoview_frame_id, two_view_geometry_t const& twoview_solution,
-    multiview_correspondences_t const& correspondences) {
-    auto motions = std::map<frame_id_t, se3_transform_t> {
-      {correspondences.reference_frame, se3_transform_t::Identity()},
+    FrameID twoview_frame_id, TwoViewGeometry const& twoview_solution,
+    MultiViewCorrespondences const& correspondences) {
+    auto motions = std::map<FrameID, SE3Transform> {
+      {correspondences.reference_frame, SE3Transform::Identity()},
       {twoview_frame_id, twoview_solution.camera_motion},
     };
     auto landmarks = twoview_solution.landmarks;
 
     auto solve_pnp = [&](auto const& view) {
-      std::map<landmark_id_t, pnp_image_point_t> pnp_image_set;
+      std::map<LandmarkID, PnpImagePoint> pnp_image_set;
       for (auto const& [feature_id, feature] : view.features) {
         auto i = landmarks.find(feature_id);
         if (i == landmarks.end())
@@ -174,9 +172,9 @@ namespace cyclops::initializer {
         auto const& [_, f] = *i;
         auto const& [u, v] = feature;
 
-        pnp_image_set.emplace(feature_id, pnp_image_point_t {f, v});
+        pnp_image_set.emplace(feature_id, PnpImagePoint {f, v});
       }
-      return solve_pnp_camera_pose(pnp_image_set);
+      return solvePnpCameraPose(pnp_image_set);
     };
 
     for (auto const& [frame_id, view_frame] : correspondences.view_frames) {
@@ -189,13 +187,13 @@ namespace cyclops::initializer {
 
       auto const& camera_pose = *maybe_camera_pose;
       auto const& [R, p] = camera_pose;
-      motions.emplace(frame_id, se3_transform_t {p, Quaterniond(R)});
+      motions.emplace(frame_id, SE3Transform {p, Quaterniond(R)});
 
       auto new_landmarks = triangulateUnknownLandmarks(
         landmarks | views::keys, view_frame.features, camera_pose);
       landmarks.insert(new_landmarks.begin(), new_landmarks.end());
     }
-    return multiview_geometry_t {
+    return MultiViewGeometry {
       .camera_motions = motions,
       .landmarks = landmarks,
     };
@@ -203,7 +201,7 @@ namespace cyclops::initializer {
 
   MultiviewVisionGeometrySolverImpl::MultiviewVisionGeometrySolverImpl(
     std::unique_ptr<TwoViewVisionGeometrySolver> two_view_solver,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<InitializerTelemetry> telemetry)
       : _two_view_solver(std::move(two_view_solver)),
         _config(config),
@@ -217,9 +215,9 @@ namespace cyclops::initializer {
     _two_view_solver->reset();
   }
 
-  std::vector<multiview_geometry_t> MultiviewVisionGeometrySolverImpl::solve(
-    multiview_image_data_t const& multiview_image,
-    camera_rotation_prior_lookup_t const& rotation_prior) {
+  std::vector<MultiViewGeometry> MultiviewVisionGeometrySolverImpl::solve(
+    MultiViewImageData const& multiview_image,
+    CameraRotationPriorLookup const& rotation_prior) {
     if (multiview_image.empty())
       return {};
     auto frame_ids = multiview_image | views::keys | ranges::to<std::set>;
@@ -227,7 +225,7 @@ namespace cyclops::initializer {
     auto correspondences =
       makeMultiViewCorrespondences(multiview_image, rotation_prior);
 
-    auto maybe_best_view = select_best_two_view_pair(correspondences);
+    auto maybe_best_view = selectBestTwoViewPair(correspondences);
     if (!maybe_best_view) {
       _telemetry->onVisionFailure({
         .frames = frame_ids,
@@ -275,11 +273,11 @@ namespace cyclops::initializer {
   }
 
   std::unique_ptr<MultiviewVisionGeometrySolver>
-  MultiviewVisionGeometrySolver::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  MultiviewVisionGeometrySolver::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<std::mt19937> rgen,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
     return std::make_unique<MultiviewVisionGeometrySolverImpl>(
-      TwoViewVisionGeometrySolver::create(config, rgen), config, telemetry);
+      TwoViewVisionGeometrySolver::Create(config, rgen), config, telemetry);
   }
 }  // namespace cyclops::initializer

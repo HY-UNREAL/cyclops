@@ -6,9 +6,9 @@ namespace cyclops::measurement {
   private:
     std::shared_ptr<telemetry::KeyframeTelemetry> _telemetry;
 
-    frame_sequence_t _keyframes;
-    frame_sequence_t _pending_frames;
-    frame_id_t _frame_id_ctr = 0;
+    FrameSequence _keyframes;
+    FrameSequence _pending_frames;
+    FrameID _frame_id_ctr = 0;
 
   public:
     explicit KeyframeManagerImpl(
@@ -18,12 +18,12 @@ namespace cyclops::measurement {
 
     void reset() override;
 
-    frame_id_t createNewFrame(timestamp_t timestamp) override;
-    void setKeyframe(frame_id_t id) override;
-    void removeFrame(frame_id_t frame) override;
+    FrameID createNewFrame(Timestamp timestamp) override;
+    void setKeyframe(FrameID id) override;
+    void removeFrame(FrameID frame) override;
 
-    frame_sequence_t const& keyframes() const override;
-    frame_sequence_t const& pendingFrames() const override;
+    FrameSequence const& keyframes() const override;
+    FrameSequence const& pendingFrames() const override;
   };
 
   void KeyframeManagerImpl::reset() {
@@ -32,7 +32,7 @@ namespace cyclops::measurement {
     _telemetry->reset();
   }
 
-  frame_id_t KeyframeManagerImpl::createNewFrame(timestamp_t timestamp) {
+  FrameID KeyframeManagerImpl::createNewFrame(Timestamp timestamp) {
     _pending_frames.emplace(_frame_id_ctr, timestamp);
     _telemetry->onNewMotionFrame({
       .frame_id = _frame_id_ctr,
@@ -42,7 +42,7 @@ namespace cyclops::measurement {
     return _frame_id_ctr++;
   }
 
-  void KeyframeManagerImpl::setKeyframe(frame_id_t id) {
+  void KeyframeManagerImpl::setKeyframe(FrameID id) {
     auto i = _pending_frames.find(id);
     if (i == _pending_frames.end())
       return;
@@ -52,22 +52,22 @@ namespace cyclops::measurement {
     _keyframes.emplace(id, timestamp);
   }
 
-  void KeyframeManagerImpl::removeFrame(frame_id_t frame) {
+  void KeyframeManagerImpl::removeFrame(FrameID frame) {
     _pending_frames.erase(frame);
     _keyframes.erase(frame);
   }
 
-  KeyframeManagerImpl::frame_sequence_t const& KeyframeManagerImpl::keyframes()
+  KeyframeManagerImpl::FrameSequence const& KeyframeManagerImpl::keyframes()
     const {
     return _keyframes;
   }
 
-  KeyframeManagerImpl::frame_sequence_t const&
-  KeyframeManagerImpl::pendingFrames() const {
+  KeyframeManagerImpl::FrameSequence const& KeyframeManagerImpl::pendingFrames()
+    const {
     return _pending_frames;
   }
 
-  std::unique_ptr<KeyframeManager> KeyframeManager::create(
+  std::unique_ptr<KeyframeManager> KeyframeManager::Create(
     std::shared_ptr<telemetry::KeyframeTelemetry> telemetry) {
     return std::make_unique<KeyframeManagerImpl>(telemetry);
   }

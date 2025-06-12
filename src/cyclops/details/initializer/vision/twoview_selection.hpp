@@ -8,10 +8,10 @@
 #include <utility>
 
 namespace cyclops::initializer {
-  struct two_view_correspondence_data_t;
-  struct multiview_correspondences_t;
+  struct TwoViewCorrespondenceData;
+  struct MultiViewCorrespondences;
 
   std::optional<std::reference_wrapper<
-    std::pair<frame_id_t const, two_view_correspondence_data_t> const>>
-  select_best_two_view_pair(multiview_correspondences_t const& multiviews);
+    std::pair<FrameID const, TwoViewCorrespondenceData> const>>
+  selectBestTwoViewPair(MultiViewCorrespondences const& multiviews);
 }  // namespace cyclops::initializer

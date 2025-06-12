@@ -16,11 +16,11 @@ namespace cyclops {
   }
 
   template <int N>
-  static double evaluate_polynomial(double const* coeffs, double x) {
+  static double evaluatePolynomial(double const* coeffs, double x) {
     if (N <= 0)
       return 0;
 
-    // use Horner's method to evaluate polynomial.
+    // Use Horner's method to evaluate polynomial.
     double r = 0;
     for (int i = N; i > 0; i--) {
       auto a = coeffs[i - 1];
@@ -29,9 +29,7 @@ namespace cyclops {
     return r;
   }
 
-  /*
-   * copied from boost/math/special_functions/detail/igamma_large.hpp
-   */
+  /* Copied from boost/math/special_functions/detail/igamma_large.hpp */
   static double igamma_temme_large(double a, double x) {
     auto sigma = (x - a) / a;
     auto phi = -log1pmx(sigma);
@@ -62,7 +60,7 @@ namespace cyclops {
       +0.91476995822367902e-9,
     };
     // clang-format on
-    workspace[0] = evaluate_polynomial<15>(C0, z);
+    workspace[0] = evaluatePolynomial<15>(C0, z);
 
     // clang-format off
     double constexpr C1[13] = {
@@ -81,7 +79,7 @@ namespace cyclops {
       +0.11951628599778147e-7,
     };
     // clang-format on
-    workspace[1] = evaluate_polynomial<13>(C1, z);
+    workspace[1] = evaluatePolynomial<13>(C1, z);
 
     // clang-format off
     double constexpr C2[11] = {
@@ -98,7 +96,7 @@ namespace cyclops {
       +0.14280614206064242e-6,
     };
     // clang-format on
-    workspace[2] = evaluate_polynomial<11>(C2, z);
+    workspace[2] = evaluatePolynomial<11>(C2, z);
 
     // clang-format off
     double constexpr C3[9] = {
@@ -113,7 +111,7 @@ namespace cyclops {
       +0.14230900732435884e-5,
     };
     // clang-format on
-    workspace[3] = evaluate_polynomial<9>(C3, z);
+    workspace[3] = evaluatePolynomial<9>(C3, z);
 
     // clang-format off
     double constexpr C4[7] = {
@@ -126,7 +124,7 @@ namespace cyclops {
       +0.11375726970678419e-4,
     };
     // clang-format on
-    workspace[4] = evaluate_polynomial<7>(C4, z);
+    workspace[4] = evaluatePolynomial<7>(C4, z);
 
     // clang-format off
     double constexpr C5[9] = {
@@ -141,7 +139,7 @@ namespace cyclops {
       -0.22914811765080952e-5,
     };
     // clang-format on
-    workspace[5] = evaluate_polynomial<9>(C5, z);
+    workspace[5] = evaluatePolynomial<9>(C5, z);
 
     // clang-format off
     double constexpr C6[7] = {
@@ -154,7 +152,7 @@ namespace cyclops {
       -0.18329116582843376e-4,
     };
     // clang-format on
-    workspace[6] = evaluate_polynomial<7>(C6, z);
+    workspace[6] = evaluatePolynomial<7>(C6, z);
 
     // clang-format off
     double constexpr C7[5] = {
@@ -165,7 +163,7 @@ namespace cyclops {
       -0.00010976582244684731,
     };
     // clang-format on
-    workspace[7] = evaluate_polynomial<5>(C7, z);
+    workspace[7] = evaluatePolynomial<5>(C7, z);
 
     // clang-format off
     double constexpr C8[3] = {
@@ -174,10 +172,10 @@ namespace cyclops {
       -0.00043829709854172101,
     };
     // clang-format on
-    workspace[8] = evaluate_polynomial<3>(C8, z);
+    workspace[8] = evaluatePolynomial<3>(C8, z);
     workspace[9] = -0.00059676129019274625;
 
-    double result = evaluate_polynomial<10>(workspace, 1 / a);
+    double result = evaluatePolynomial<10>(workspace, 1 / a);
     result *= std::exp(-y) / std::sqrt(2 * make_pi() * a);
     if (x < a)
       result = -result;
@@ -188,7 +186,7 @@ namespace cyclops {
     return 1 - result;
   }
 
-  // copied from boost/math/special_functions/gamma.hpp
+  // Copied from boost/math/special_functions/gamma.hpp
   static double finite_gamma_q(double a, double x) {
     double e = std::exp(-x);
     double sum = e;
@@ -203,7 +201,7 @@ namespace cyclops {
     return sum;
   }
 
-  // copied from boost/math/special_functions/gamma.hpp
+  // Copied from boost/math/special_functions/gamma.hpp
   static double finite_half_gamma_q(double a, double x) {
     auto e = std::erfc(std::sqrt(x));
     if ((e != 0) && (a > 1)) {
@@ -226,7 +224,7 @@ namespace cyclops {
     return std::min(ub, std::max(lb, x));
   }
 
-  static double gamma_lower_incomplete_normal(double a, double x) {
+  static double gammaLowerIncompleteNormal(double a, double x) {
     // See: https://en.wikipedia.org/wiki/Incomplete_gamma_function
     //
     // Computes regularized lower incomplete gamma function
@@ -253,9 +251,9 @@ namespace cyclops {
     return safeguard(igamma_temme_large(a, x));
   }
 
-  double chi_squared_cdf(int degrees_of_freedom, double z) {
+  double chiSquaredCdf(int degrees_of_freedom, double z) {
     auto a = degrees_of_freedom / 2.0;
     auto x = z / 2.0;
-    return gamma_lower_incomplete_normal(a, x);
+    return gammaLowerIncompleteNormal(a, x);
   }
 }  // namespace cyclops

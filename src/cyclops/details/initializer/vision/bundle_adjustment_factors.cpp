@@ -2,7 +2,7 @@
 #include "cyclops/details/utils/math.hpp"
 
 namespace cyclops::initializer {
-  LandmarkProjectionCost::LandmarkProjectionCost(feature_point_t const& feature)
+  LandmarkProjectionCost::LandmarkProjectionCost(FeaturePoint const& feature)
       : u(feature.point),
         weight_sqrt(Eigen::LLT<Eigen::Matrix2d>(feature.weight).matrixU()) {
   }

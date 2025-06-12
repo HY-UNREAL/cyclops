@@ -29,24 +29,24 @@ namespace cyclops::initializer {
   using Eigen::Quaterniond;
   using Eigen::Vector3d;
 
-  using estimation::landmark_parameter_blocks_t;
-  using estimation::motion_frame_parameter_blocks_t;
+  using estimation::LandmarkParameterBlocks;
+  using estimation::MotionFrameParameterBlocks;
 
-  static auto position_signal(timestamp_t t) {
+  static auto positionSignal(Timestamp t) {
     auto x = t - sin(2 * M_PI * t) / (4 * M_PI);
     auto y = cos(2 * M_PI * t) / 10;
     auto z = sin(2 * M_PI * t + 0.3) / 10;
     return Vector3d(x, y, z);
   }
 
-  static auto orientation_signal(timestamp_t t) {
+  static auto orientationSignal(Timestamp t) {
     auto const theta = 0.1 * std::sin(2 * M_PI * t) + M_PI_2;
     return Quaterniond(Eigen::AngleAxisd(theta, Vector3d::UnitZ()));
   }
 
-  static auto evaluate_motion_states(
-    pose_signal_t pose_signal, std::map<frame_id_t, timestamp_t> timestamps) {
-    auto velocity_signal = numeric_derivative<Vector3d>(pose_signal.position);
+  static auto evaluateMotionStates(
+    PoseSignal pose_signal, std::map<FrameID, Timestamp> timestamps) {
+    auto velocity_signal = numericDerivative<Vector3d>(pose_signal.position);
 
     return  //
       timestamps | views::transform([&](auto pair) {
@@ -54,18 +54,18 @@ namespace cyclops::initializer {
         auto [p, q] = pose_signal.evaluate(t);
         auto v = velocity_signal(t);
         auto motion =
-          imu_motion_state_t {.orientation = q, .position = p, .velocity = v};
+          ImuMotionState {.orientation = q, .position = p, .velocity = v};
         return std::make_pair(frame_id, motion);
       }) |
-      ranges::to<std::map<frame_id_t, imu_motion_state_t>>;
+      ranges::to<std::map<FrameID, ImuMotionState>>;
   }
 
-  static auto make_initializer(
-    std::shared_ptr<std::mt19937> rgen, landmark_positions_t const& landmarks,
-    pose_signal_t pose_signal, std::map<frame_id_t, timestamp_t> timestamps) {
-    auto config = make_default_config();
+  static auto makeInitializer(
+    std::shared_ptr<std::mt19937> rgen, LandmarkPositions const& landmarks,
+    PoseSignal pose_signal, std::map<FrameID, Timestamp> timestamps) {
+    auto config = makeDefaultConfig();
 
-    std::shared_ptr mprovider = measurement::make_measurement_provider_mockup(
+    std::shared_ptr mprovider = measurement::makeMeasurementProviderMockup(
       pose_signal, config->extrinsics.imu_camera_transform, landmarks,
       timestamps);
 
@@ -80,27 +80,27 @@ namespace cyclops::initializer {
     keyframe_manager->_keyframes = timestamps;
 
     std::shared_ptr telemetry =
-      telemetry::InitializerTelemetry::createDefault();
+      telemetry::InitializerTelemetry::CreateDefault();
 
     auto bootstrap_internal =
-      InitializationSolverInternal::create(rgen, config, mprovider, telemetry);
-    auto bootstrap_solver = InitializerMain::create(
+      InitializationSolverInternal::Create(rgen, config, mprovider, telemetry);
+    auto bootstrap_solver = InitializerMain::Create(
       std::move(bootstrap_internal), keyframe_manager, telemetry);
 
-    auto initializer = estimation::OptimizerSolutionGuessPredictor::create(
+    auto initializer = estimation::OptimizerSolutionGuessPredictor::Create(
       std::move(bootstrap_solver), config, state_reader, mprovider);
 
     return std::make_tuple(state_reader, state_writer, std::move(initializer));
   }
 
   static auto CHECK_MOTION_STATE_VALID(
-    se3_transform_t const& our_origin, se3_transform_t const& sol_origin,
-    motion_frame_parameter_blocks_t const& motion_ours,
-    std::map<frame_id_t, imu_motion_state_t> const& motion_sols) {
+    SE3Transform const& our_origin, SE3Transform const& sol_origin,
+    MotionFrameParameterBlocks const& motion_ours,
+    std::map<FrameID, ImuMotionState> const& motion_sols) {
     auto normalize_gauge = [](auto const& origin, auto const& motion) {
       auto const& [q, p, v] = motion;
       auto const& [p_origin, q_origin] = origin;
-      return imu_motion_state_t {
+      return ImuMotionState {
         .orientation = q_origin.conjugate() * q,
         .position = q_origin.conjugate() * (p - p_origin),
         .velocity = q_origin.conjugate() * v,
@@ -109,8 +109,7 @@ namespace cyclops::initializer {
 
     for (auto const& [frame_id, motion_our_block] : motion_ours) {
       auto x_our = normalize_gauge(
-        our_origin,
-        estimation::motion_state_of_motion_frame_block(motion_our_block));
+        our_origin, estimation::getMotionState(motion_our_block));
       auto x_sol = normalize_gauge(sol_origin, motion_sols.at(frame_id));
 
       CAPTURE(x_sol.orientation.coeffs().transpose());
@@ -128,9 +127,9 @@ namespace cyclops::initializer {
   }
 
   static auto CHECK_LANDMARK_STATE_VALID(
-    se3_transform_t const& our_origin, se3_transform_t const& sol_origin,
-    landmark_parameter_blocks_t const& landmarks_our,
-    landmark_positions_t const& landmarks_sol) {
+    SE3Transform const& our_origin, SE3Transform const& sol_origin,
+    LandmarkParameterBlocks const& landmarks_our,
+    LandmarkPositions const& landmarks_sol) {
     auto normalize_gauge = [](auto const& origin, auto const& f) {
       auto const& [p, q] = origin;
       return (q.conjugate() * (f - p)).eval();
@@ -149,16 +148,16 @@ namespace cyclops::initializer {
   TEST_CASE("Optimizer solution predictor") {
     GIVEN("Well-excited body motion") {
       auto rgen = std::make_shared<std::mt19937>(20220803);
-      auto landmarks_sol = generate_landmarks(
+      auto landmarks_sol = generateLandmarks(
         *rgen, {1000, Vector3d(0.5, 3, 0), Vector3d(0.5, 0.5, 1).asDiagonal()});
 
-      auto pose_signal = pose_signal_t {position_signal, orientation_signal};
-      auto timestamps = make_dictionary<frame_id_t, timestamp_t>(
+      auto pose_signal = PoseSignal {positionSignal, orientationSignal};
+      auto timestamps = makeDictionary<FrameID, Timestamp>(
         views::enumerate(linspace(0., 1., 10)));
       auto [state_reader, state_writer, initializer] =
-        make_initializer(rgen, landmarks_sol, pose_signal, timestamps);
+        makeInitializer(rgen, landmarks_sol, pose_signal, timestamps);
 
-      auto motions_sol = evaluate_motion_states(pose_signal, timestamps);
+      auto motions_sol = evaluateMotionStates(pose_signal, timestamps);
 
       GIVEN("Uninitialized estimator") {
         REQUIRE(state_reader->motionFrames().empty());
@@ -170,9 +169,9 @@ namespace cyclops::initializer {
           auto const& motions_our = maybe_solution->motions;
           auto const& landmarks_our = maybe_solution->landmarks;
 
-          frame_id_t init_frame_id = 0;
-          auto our_origin = estimation::se3_of_motion_frame_block(
-            motions_our.at(init_frame_id));
+          FrameID init_frame_id = 0;
+          auto our_origin =
+            estimation::getSE3Transform(motions_our.at(init_frame_id));
           auto sol_origin = pose_signal.evaluate(timestamps.at(init_frame_id));
 
           THEN("The obtained solution is not empty") {
@@ -196,7 +195,7 @@ namespace cyclops::initializer {
               views::ints(0, 9) | views::transform([&](auto frame_id) {
                 return std::make_pair(frame_id, motions_our.at(frame_id));
               }) |
-              ranges::to<motion_frame_parameter_blocks_t>);
+              ranges::to<MotionFrameParameterBlocks>);
 
             REQUIRE(state_reader->motionFrames().size() != 10);
 
@@ -207,7 +206,7 @@ namespace cyclops::initializer {
               views::transform([&](auto id) {
                 return std::make_pair(id, landmarks_our.at(id));
               }) |
-              ranges::to<landmark_parameter_blocks_t>);
+              ranges::to<LandmarkParameterBlocks>);
 
             AND_WHEN("Solved solution prediction again") {
               auto maybe_solution = initializer->solve();

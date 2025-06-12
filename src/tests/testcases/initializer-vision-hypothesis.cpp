@@ -20,9 +20,9 @@ namespace cyclops::initializer {
     return (x.head<2>() / x.z()).eval();
   }
 
-  static std::map<landmark_id_t, two_view_feature_pair_t> make_feature_pairs(
+  static std::map<LandmarkID, TwoViewFeaturePair> makeFeaturePairs(
     Matrix3d const& R, Vector3d const& p,
-    std::map<landmark_id_t, Vector3d> const& landmarks) {
+    std::map<LandmarkID, Vector3d> const& landmarks) {
     auto feature_pairs =
       views::for_each(landmarks, [&](auto const& id_landmark) {
         auto const& [id, x1] = id_landmark;
@@ -41,26 +41,24 @@ namespace cyclops::initializer {
         return ranges::yield_if(
           u1_in_fov && u2_in_fov, std::make_pair(id, std::make_tuple(u1, u2)));
       });
-    return feature_pairs |
-      ranges::to<std::map<landmark_id_t, two_view_feature_pair_t>>;
+    return feature_pairs | ranges::to<std::map<LandmarkID, TwoViewFeaturePair>>;
   }
 
   // Artificially generates landmark observation data.
-  static auto make_artificial_two_view_geometry(
+  static auto makeArtificialTwoViewGeometry(
     std::mt19937& rgen, Matrix3d const& R, Vector3d const& p,
     Vector3d const& landmark_dispersion) {
-    auto landmark_ids =
-      views::ints(0, 200) | ranges::to<std::set<landmark_id_t>>;
+    auto landmark_ids = views::ints(0, 200) | ranges::to<std::set<LandmarkID>>;
     auto uniform_distribution = std::uniform_real_distribution<>(-1, 1);
     auto rnd = [&]() { return 0.5 * uniform_distribution(rgen); };
 
-    auto landmarks = generate_landmarks(landmark_ids, [&](auto _) -> Vector3d {
+    auto landmarks = generateLandmarks(landmark_ids, [&](auto _) -> Vector3d {
       auto dx = landmark_dispersion.x() * rnd();
       auto dy = landmark_dispersion.y() * rnd();
       auto dz = landmark_dispersion.z() * rnd();
       return Vector3d(0.5, 0., 1.5) + Vector3d(dx, dy, dz);
     });
-    auto common_features = make_feature_pairs(R, p, landmarks);
+    auto common_features = makeFeaturePairs(R, p, landmarks);
 
     auto ransac_batch =
       views::ints(0, 200) | views::transform([&](auto _) {
@@ -70,14 +68,14 @@ namespace cyclops::initializer {
     return std::make_tuple(landmarks, common_features, ransac_batch);
   }
 
-  static auto test_motion_hypothesis_selection(
-    Matrix3d const& R, Vector3d const& p, landmark_positions_t const& landmarks,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& two_view_features,
-    std::vector<rotation_translation_matrix_pair_t> const& motion_hypotheses) {
-    auto config = make_default_config();
-    auto selector = TwoViewMotionHypothesisSelector::create(config);
+  static auto testMotionHypothesisSelection(
+    Matrix3d const& R, Vector3d const& p, LandmarkPositions const& landmarks,
+    std::map<LandmarkID, TwoViewFeaturePair> const& two_view_features,
+    std::vector<RotationPositionPair> const& motion_hypotheses) {
+    auto config = makeDefaultConfig();
+    auto selector = TwoViewMotionHypothesisSelector::Create(config);
 
-    auto rotation_prior = two_view_imu_rotation_data_t {
+    auto rotation_prior = TwoViewImuRotationData {
       .value = Eigen::Quaterniond(R),
       .covariance = 1e-6 * Matrix3d::Identity(),
     };
@@ -119,7 +117,7 @@ namespace cyclops::initializer {
       GIVEN("Planary distributed landmark positions") {
         auto landmark_dispersion = Vector3d(1, 1, 0);
         auto [landmarks, two_view_features, ransac_batch] =
-          make_artificial_two_view_geometry(rgen, R, p, landmark_dispersion);
+          makeArtificialTwoViewGeometry(rgen, R, p, landmark_dispersion);
 
         REQUIRE(landmarks.size() == 200);
         REQUIRE(
@@ -128,15 +126,15 @@ namespace cyclops::initializer {
 
         WHEN("Solve two-view geometry by the homography model") {
           auto geometry =
-            analyze_two_view_homography(0.001, ransac_batch, two_view_features);
+            analyzeTwoViewHomography(0.001, ransac_batch, two_view_features);
           REQUIRE(geometry.expected_inliers > 0);
           REQUIRE(geometry.inliers.size() == 200);
 
           auto motion_hypotheses =
-            solve_homography_motion_hypothesis(geometry.homography);
+            solveHomographyMotionHypothesis(geometry.homography);
           REQUIRE(motion_hypotheses.size() == 8);
 
-          test_motion_hypothesis_selection(
+          testMotionHypothesisSelection(
             R, p, landmarks, two_view_features, motion_hypotheses);
         }
       }
@@ -144,7 +142,7 @@ namespace cyclops::initializer {
       GIVEN("Cube-distributed landmark positions") {
         auto landmark_dispersion = Vector3d(1, 1, 1);
         auto [landmarks, two_view_features, ransac_batch] =
-          make_artificial_two_view_geometry(rgen, R, p, landmark_dispersion);
+          makeArtificialTwoViewGeometry(rgen, R, p, landmark_dispersion);
 
         REQUIRE(landmarks.size() == 200);
         REQUIRE(
@@ -153,15 +151,15 @@ namespace cyclops::initializer {
 
         WHEN("Solve two-view geometry by the epipolar model") {
           auto geometry =
-            analyze_two_view_epipolar(0.001, ransac_batch, two_view_features);
+            analyzeTwoViewEpipolar(0.001, ransac_batch, two_view_features);
           REQUIRE(geometry.expected_inliers > 0);
           REQUIRE(geometry.inliers.size() == 200);
 
           auto motion_hypotheses =
-            solve_epipolar_motion_hypothesis(geometry.essential_matrix);
+            solveEpipolarMotionHypothesis(geometry.essential_matrix);
           REQUIRE(motion_hypotheses.size() == 4);
 
-          test_motion_hypothesis_selection(
+          testMotionHypothesisSelection(
             R, p, landmarks, two_view_features, motion_hypotheses);
         }
       }

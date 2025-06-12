@@ -24,7 +24,7 @@ namespace cyclops::initializer {
    * p: dimension of the upper left block.
    */
   static std::optional<std::tuple<MatrixXd, MatrixXd>>
-  compute_marginal_information_pair(MatrixXd const& H, int p) {
+  computeMarginalInformationPair(MatrixXd const& H, int p) {
     __logger__->trace("Computing marginal information pair");
     __logger__->trace("Matrix size: <{}, {}>", H.rows(), H.cols());
     __logger__->trace("Partition dimension: {}", p);
@@ -73,7 +73,7 @@ namespace cyclops::initializer {
     return std::make_tuple(H_a_bar, H_b_bar);
   }
 
-  static std::optional<VectorXd> compute_positive_eigenvalues(
+  static std::optional<VectorXd> computePositiveEigenvalues(
     MatrixXd const& matrix) {
     Eigen::SelfAdjointEigenSolver<MatrixXd> eigen(matrix);
     if (eigen.info() != Eigen::Success) {
@@ -93,7 +93,7 @@ namespace cyclops::initializer {
     return lambda;
   }
 
-  static bool check_hessian_dimension(MatrixXd const& H, int frames) {
+  static bool checkHessianDimension(MatrixXd const& H, int frames) {
     if (H.rows() != H.cols()) {
       __logger__->error("IMU match hessian is not a square matrix");
       return false;
@@ -108,10 +108,10 @@ namespace cyclops::initializer {
     return true;
   }
 
-  std::optional<imu_match_translation_uncertainty_t>
-  imu_match_analyze_translation_uncertainty(
-    imu_match_translation_analysis_t const& analysis,
-    imu_match_scale_sample_solution_t const& solution) {
+  std::optional<ImuTranslationMatchUncertainty>
+  analyzeImuTranslationMatchUncertainty(
+    ImuTranslationMatchAnalysis const& analysis,
+    ImuMatchScaleSampleSolution const& solution) {
     __logger__->debug("Analyzing the uncertainty of imu match");
 
     int degrees_of_freedom =
@@ -127,7 +127,7 @@ namespace cyclops::initializer {
     auto const& x_V = solution.visual_state;
 
     auto const& H = solution.hessian;
-    if (!check_hessian_dimension(H, frames))
+    if (!checkHessianDimension(H, frames))
       return std::nullopt;
 
     auto r_I = (A_I * x_I + B_I * x_V * s + alpha + beta * s).eval();
@@ -139,10 +139,10 @@ namespace cyclops::initializer {
     __logger__->debug("r_V = {}", r_V.transpose());
 
     __logger__->debug("Degrees of freedom: {}", degrees_of_freedom);
-    auto cost_probability = 1 - chi_squared_cdf(degrees_of_freedom, cost);
+    auto cost_probability = 1 - chiSquaredCdf(degrees_of_freedom, cost);
 
     auto marginalize_or_die = [](auto const& matrix, auto dim, auto tag) {
-      auto result = compute_marginal_information_pair(matrix, dim);
+      auto result = computeMarginalInformationPair(matrix, dim);
       if (!result)
         __logger__->debug("{} marginalization failed", tag);
       return result;
@@ -176,7 +176,7 @@ namespace cyclops::initializer {
     }
 
     auto eigenvalue_or_die = [](auto const& matrix, auto tag) {
-      auto maybe_lambda = compute_positive_eigenvalues(matrix);
+      auto maybe_lambda = computePositiveEigenvalues(matrix);
       if (!maybe_lambda)
         __logger__->debug("{} eigenvalue computation failed.", tag);
       return maybe_lambda;
@@ -197,7 +197,7 @@ namespace cyclops::initializer {
     if (!maybe_lambda_p)
       return std::nullopt;
 
-    return imu_match_translation_uncertainty_t {
+    return ImuTranslationMatchUncertainty {
       .final_cost_significant_probability = cost_probability,
       .scale_log_deviation = 1 / std::sqrt(lambda_s),
       .gravity_tangent_deviation = maybe_lambda_g->cwiseSqrt().cwiseInverse(),

@@ -15,9 +15,9 @@ namespace cyclops::estimation {
     bool operator()(
       scalar_t const* x, scalar_t const* delta, scalar_t* result) const {
       using Eigen::Map;
-      using vector3_t = Eigen::Matrix<scalar_t, 3, 1>;
-      using matrix3_t = Eigen::Matrix<scalar_t, 3, 3>;
-      using quaternion_t = Eigen::Quaternion<scalar_t>;
+      using Vector3 = Eigen::Matrix<scalar_t, 3, 1>;
+      using Matrix3 = Eigen::Matrix<scalar_t, 3, 3>;
+      using Quaternion = Eigen::Quaternion<scalar_t>;
 
       auto const w_x = delta[0] / scalar_t(2);
       auto const w_y = delta[1] / scalar_t(2);
@@ -31,14 +31,14 @@ namespace cyclops::estimation {
           auto a = scalar_t(0.5);
           auto b = scalar_t(1. / 6.);
           return std::make_tuple(
-            a, b, quaternion_t(scalar_t(1.0), w_x, w_y, w_z));
+            a, b, Quaternion(scalar_t(1.0), w_x, w_y, w_z));
         }
 
         auto const theta = sqrt(squared_theta);
         auto const sin_theta_over_theta = sin(theta) / theta;
 
         // clang-format off
-        auto const q_delta = quaternion_t(
+        auto const q_delta = Quaternion(
           cos(theta),
           sin_theta_over_theta * w_x,
           sin_theta_over_theta * w_y,
@@ -65,29 +65,29 @@ namespace cyclops::estimation {
       }();
 
       // clang-format off
-      matrix3_t const S_w =
-        (matrix3_t() <<
+      Matrix3 const S_w =
+        (Matrix3() <<
           scalar_t(+0.0), -w_z, +w_y,
           +w_z, scalar_t(+0.0), -w_x,
           -w_y, +w_x, scalar_t(+0.0)
         ).finished();
       // clang-format on
 
-      matrix3_t const N = matrix3_t::Identity() + a * S_w + b * S_w * S_w;
+      Matrix3 const N = Matrix3::Identity() + a * S_w + b * S_w * S_w;
 
-      Map<quaternion_t> q_result(result);
-      Map<quaternion_t const> q(x);
+      Map<Quaternion> q_result(result);
+      Map<Quaternion const> q(x);
       q_result = q * q_delta;
 
-      Map<vector3_t> p_result(result + 4);
-      p_result = Map<vector3_t const>(x + 4);
+      Map<Vector3> p_result(result + 4);
+      p_result = Map<Vector3 const>(x + 4);
       if (!gauge_constraint)
-        p_result += q * (N * (Map<vector3_t const>(delta + 3)));
+        p_result += q * (N * (Map<Vector3 const>(delta + 3)));
 
       if (extended) {
-        Map<vector3_t> v_result(result + 7);
-        Map<vector3_t const> v(x + 7);
-        Map<vector3_t const> dv(delta + (gauge_constraint ? 2 : 6));
+        Map<Vector3> v_result(result + 7);
+        Map<Vector3 const> v(x + 7);
+        Map<Vector3 const> dv(delta + (gauge_constraint ? 2 : 6));
         v_result = v + q * (N * dv);
       }
 

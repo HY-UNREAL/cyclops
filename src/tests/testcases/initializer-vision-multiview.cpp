@@ -22,56 +22,56 @@ namespace cyclops::initializer {
   using Eigen::Quaterniond;
   using Eigen::Vector3d;
 
-  static auto position_signal(timestamp_t t) {
+  static auto positionSignal(Timestamp t) {
     auto x = 3 * (1 - std::cos(t));
     return Vector3d(x, 0, 0);
   }
 
-  static auto orientation_signal(timestamp_t t) -> Quaterniond {
+  static auto orientationSignal(Timestamp t) -> Quaterniond {
     auto theta = atan2(1, cos(t));
-    auto q0 = make_default_camera_rotation();
+    auto q0 = makeDefaultCameraRotation();
     return Eigen::AngleAxisd(theta, Vector3d::UnitZ()) * q0;
   }
 
-  static auto make_multiview_data(
-    std::mt19937& rgen, pose_signal_t pose, se3_transform_t const& extrinsic) {
+  static auto makeMultiViewData(
+    std::mt19937& rgen, PoseSignal pose, SE3Transform const& extrinsic) {
     auto timestamps = linspace(0, M_PI_2, 8) | ranges::to_vector;
     auto motion_frame_ids = views::ints(0, 8) | ranges::to_vector;
-    auto motion_timestamps = make_dictionary<frame_id_t, timestamp_t>(
+    auto motion_timestamps = makeDictionary<FrameID, Timestamp>(
       views::zip(motion_frame_ids, timestamps));
 
-    auto landmarks = generate_landmarks(
+    auto landmarks = generateLandmarks(
       rgen, {200, Vector3d(3, 3, 0), Vector3d(1, 1, 1).asDiagonal()});
-    auto image_data = make_landmark_multiview_observation(
+    auto image_data = makeLandmarkMultiviewObservation(
       pose, extrinsic, landmarks, motion_timestamps);
 
     return std::make_tuple(motion_frame_ids, motion_timestamps, image_data);
   }
 
-  static auto resolve_vision_pose_gauge(
-    se3_transform_t const& se3_gauge, double scale_gauge,
-    se3_transform_t const& camera_pose) {
+  static auto resolveVisionPoseGauge(
+    SE3Transform const& se3_gauge, double scale_gauge,
+    SE3Transform const& camera_pose) {
     auto [p, q] = compose(inverse(se3_gauge), camera_pose);
-    return se3_transform_t {p * scale_gauge, q};
+    return SE3Transform {p * scale_gauge, q};
   }
 
   TEST_CASE("Multiview vision reconstruction") {
     auto rgen = std::make_shared<std::mt19937>(20240513006);
 
-    auto config = make_default_config();
-    config->extrinsics.imu_camera_transform = se3_transform_t::Identity();
+    auto config = makeDefaultConfig();
+    config->extrinsics.imu_camera_transform = SE3Transform::Identity();
     auto const& camera_extrinsic = config->extrinsics.imu_camera_transform;
 
     GIVEN("Random generated multi-view data") {
-      auto pose_signal = pose_signal_t {position_signal, orientation_signal};
+      auto pose_signal = PoseSignal {positionSignal, orientationSignal};
       auto [motion_frames, motion_timestamps, image_data] =
-        make_multiview_data(*rgen, pose_signal, camera_extrinsic);
-      auto rotation_prior = make_multiview_rotation_prior(
+        makeMultiViewData(*rgen, pose_signal, camera_extrinsic);
+      auto rotation_prior = makeMultiViewRotationPrior(
         pose_signal, camera_extrinsic, motion_timestamps);
 
       WHEN("Solved multi-view geometry") {
-        auto solver = MultiviewVisionGeometrySolver::create(
-          config, rgen, InitializerTelemetry::createDefault());
+        auto solver = MultiviewVisionGeometrySolver::Create(
+          config, rgen, InitializerTelemetry::CreateDefault());
         auto possible_solutions = solver->solve(image_data, rotation_prior);
         REQUIRE_FALSE(possible_solutions.empty());
 
@@ -99,7 +99,7 @@ namespace cyclops::initializer {
           camera_motions.at(init_frame_id).translation,
           camera_motions.at(last_frame_id).translation);
         auto truth_travel =
-          distance(position_signal(init_time), position_signal(last_time));
+          distance(positionSignal(init_time), positionSignal(last_time));
 
         REQUIRE(result_travel != 0);
         REQUIRE(truth_travel != 0);
@@ -108,10 +108,10 @@ namespace cyclops::initializer {
 
         THEN("The result camera motions are up-to-gauge correct to the truth") {
           for (auto const& [motion_frame_id, time] : motion_timestamps) {
-            auto result_motion = resolve_vision_pose_gauge(
+            auto result_motion = resolveVisionPoseGauge(
               camera_motions.at(last_frame_id), scale,
               camera_motions.at(motion_frame_id));
-            auto true_motion = resolve_vision_pose_gauge(
+            auto true_motion = resolveVisionPoseGauge(
               pose_signal.evaluate(last_time), 1, pose_signal.evaluate(time));
 
             auto const& q_truth = true_motion.rotation;

@@ -5,7 +5,7 @@
 
 int main(int argc, char* argv[]) {
   doctest::Context context(argc, argv);
-  cyclops::init_logger(1);
+  cyclops::initLogger(1);
 
   return context.run();
 }

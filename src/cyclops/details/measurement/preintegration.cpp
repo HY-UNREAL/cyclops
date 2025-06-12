@@ -26,13 +26,13 @@ namespace cyclops::measurement {
     return result;
   }
 
-  struct imu_single_step_propagation_t {
+  struct ImuSingleStepPropagation {
     Quaterniond rotation_increment;
     Vector3d position_increment;
     Vector3d velocity_increment;
   };
 
-  static imu_single_step_propagation_t propagate_single_step(
+  static ImuSingleStepPropagation propagateSingleStep(
     double dt, Vector3d const& a, Vector3d const& w) {
     auto theta = w.norm() * dt;
     auto S = skew3d((w * dt).eval());
@@ -71,7 +71,7 @@ namespace cyclops::measurement {
     };
   }
 
-  void IMUPreintegration::integrate(imu_data_t const& data) {
+  void ImuPreintegration::integrate(ImuData const& data) {
     auto dt = data.dt;
     time_delta += dt;
 
@@ -83,7 +83,7 @@ namespace cyclops::measurement {
     auto& y_v = velocity_delta;
 
     // local increments of the preintegration delta.
-    auto [dy_q, dy_p, dy_v] = propagate_single_step(dt, a_bar, w_bar);
+    auto [dy_q, dy_p, dy_v] = propagateSingleStep(dt, a_bar, w_bar);
     auto dy_R_T = dy_q.matrix().transpose().eval();
 
     y_q = y_q * dy_q;
@@ -103,7 +103,7 @@ namespace cyclops::measurement {
     updateCovariance(F, dt);
   }
 
-  void IMUPreintegration::updateJacobians(
+  void ImuPreintegration::updateJacobians(
     Eigen::Matrix<double, 9, 9> const& F, double dt) {
     auto& G = bias_jacobian;
 
@@ -112,7 +112,7 @@ namespace cyclops::measurement {
     G.block<3, 3>(6, 0) -= Matrix3d::Identity() * dt;
   }
 
-  void IMUPreintegration::updateCovariance(
+  void ImuPreintegration::updateCovariance(
     Eigen::Matrix<double, 9, 9> const& F, double dt) {
     auto const& n_a = _noise.acc_white_noise;
     auto const& n_w = _noise.gyr_white_noise;
@@ -134,7 +134,7 @@ namespace cyclops::measurement {
       F * covariance * F.transpose() + N * Q.asDiagonal() * N.transpose();
   }
 
-  void IMUPreintegration::reset() {
+  void ImuPreintegration::reset() {
     time_delta = 0;
     rotation_delta.setIdentity();
     position_delta.setZero();
@@ -143,29 +143,29 @@ namespace cyclops::measurement {
     bias_jacobian.setZero();
   }
 
-  void IMUPreintegration::propagate(
+  void ImuPreintegration::propagate(
     double dt, Vector3d const& a_hat, Vector3d const& w_hat) {
     _history.push_back({dt, a_hat, w_hat});
     integrate(_history.back());
   }
 
-  void IMUPreintegration::repropagate() {
+  void ImuPreintegration::repropagate() {
     reset();
     for (auto const& data : _history)
       integrate(data);
   }
 
-  void IMUPreintegration::updateBias(Vector3d const& b_a, Vector3d const& b_w) {
+  void ImuPreintegration::updateBias(Vector3d const& b_a, Vector3d const& b_w) {
     _b_a = b_a;
     _b_w = b_w;
     repropagate();
   }
 
-  Vector3d const& IMUPreintegration::accBias() const {
+  Vector3d const& ImuPreintegration::accBias() const {
     return _b_a;
   }
 
-  Vector3d const& IMUPreintegration::gyrBias() const {
+  Vector3d const& ImuPreintegration::gyrBias() const {
     return _b_w;
   }
 }  // namespace cyclops::measurement

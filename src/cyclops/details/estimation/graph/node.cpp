@@ -2,77 +2,77 @@
 #include "cyclops/details/utils/type.hpp"
 
 namespace cyclops::estimation {
-  bool operator<(node_t::frame_t const& a, node_t::frame_t const& b) {
+  bool operator<(Node::Frame const& a, Node::Frame const& b) {
     return a.id < b.id;
   }
 
-  bool operator<(node_t::bias_t const& a, node_t::bias_t const& b) {
+  bool operator<(Node::Bias const& a, Node::Bias const& b) {
     return a.id < b.id;
   }
 
-  bool operator<(node_t::landmark_t const& a, node_t::landmark_t const& b) {
+  bool operator<(Node::Landmark const& a, Node::Landmark const& b) {
     return a.id < b.id;
   }
 
-  bool node_t::operator<(node_t const& other) const {
+  bool Node::operator<(Node const& other) const {
     return this->variant < other.variant;
   }
 
-  bool operator==(node_t::frame_t const& a, node_t::frame_t const& b) {
+  bool operator==(Node::Frame const& a, Node::Frame const& b) {
     return a.id == b.id;
   }
 
-  bool operator==(node_t::bias_t const& a, node_t::bias_t const& b) {
+  bool operator==(Node::Bias const& a, Node::Bias const& b) {
     return a.id == b.id;
   }
 
-  bool operator==(node_t::landmark_t const& a, node_t::landmark_t const& b) {
+  bool operator==(Node::Landmark const& a, Node::Landmark const& b) {
     return a.id == b.id;
   }
 
-  bool node_t::operator==(node_t const& other) const {
+  bool Node::operator==(Node const& other) const {
     return this->variant == other.variant;
   }
 
-  int node_t::frame_t::dimension() const {
+  int Node::Frame::dimension() const {
     return 10;
   }
 
-  int node_t::frame_t::manifold_dimension() const {
+  int Node::Frame::localDimension() const {
     return 9;
   }
 
-  int node_t::bias_t::dimension() const {
+  int Node::Bias::dimension() const {
     return 6;
   }
 
-  int node_t::bias_t::manifold_dimension() const {
+  int Node::Bias::localDimension() const {
     return 6;
   }
 
-  int node_t::landmark_t::dimension() const {
+  int Node::Landmark::dimension() const {
     return 3;
   }
 
-  int node_t::landmark_t::manifold_dimension() const {
+  int Node::Landmark::localDimension() const {
     return 3;
   }
 
-  int node_t::dimension() const {
+  int Node::dimension() const {
     return std::visit([](auto const& _) { return _.dimension(); }, variant);
   }
 
-  int node_t::manifold_dimension() const {
+  int Node::localDimension() const {
     return std::visit(
-      [](auto const& _) { return _.manifold_dimension(); }, variant);
+      [](auto const& _) { return _.localDimension(); }, variant);
   }
 
-  std::ostream& operator<<(std::ostream& o, node_t const& node) {
+  std::ostream& operator<<(std::ostream& o, Node const& node) {
     std::visit(
       overloaded {
-        [&o](node_t::frame_t frame) { o << "frame(" << frame.id << ")"; },
-        [&o](node_t::bias_t frame) { o << "bias(" << frame.id << ")"; },
-        [&o](node_t::landmark_t node) { o << "landmark(" << node.id << ")"; },
+        [&o](Node::Frame frame) { o << "frame(" << frame.id << ")"; },
+        [&o](Node::Bias frame) { o << "bias(" << frame.id << ")"; },
+        [&o](Node::Landmark node) { o << "landmark(" << node.id << ")"; },
       },
       node.variant);
     return o;

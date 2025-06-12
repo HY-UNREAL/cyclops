@@ -4,7 +4,7 @@
 
 namespace cyclops {
   template <int n, int m>
-  static Eigen::Matrix<double, n, m> make_random_matrix(
+  static Eigen::Matrix<double, n, m> makeRandomMatrix(
     std::mt19937& rgen, double s) {
     std::normal_distribution<double> random(0, s);
 
@@ -17,7 +17,7 @@ namespace cyclops {
     return M;
   }
 
-  static Eigen::MatrixXd make_random_matrix(
+  static Eigen::MatrixXd makeRandomMatrix(
     std::mt19937& rgen, int n, int m, double s) {
     std::normal_distribution<double> random(0, s);
 

@@ -6,37 +6,37 @@
 #include <map>
 
 namespace cyclops {
-  using timestamp_t = double;
+  using Timestamp = double;
 
-  using frame_id_t = std::size_t;
-  using landmark_id_t = std::size_t;
+  using FrameID = std::size_t;
+  using LandmarkID = std::size_t;
 
-  struct imu_data_t {
-    timestamp_t timestamp;
+  using LandmarkPositions = std::map<LandmarkID, Eigen::Vector3d>;
+
+  struct ImuData {
+    Timestamp timestamp;
     Eigen::Vector3d accel;
     Eigen::Vector3d rotat;
   };
 
-  struct feature_point_t {
+  struct FeaturePoint {
     Eigen::Vector2d point;
     Eigen::Matrix2d weight;
   };
 
-  struct image_data_t {
-    timestamp_t timestamp;
-    std::map<landmark_id_t, feature_point_t> features;
+  struct ImageData {
+    Timestamp timestamp;
+    std::map<LandmarkID, FeaturePoint> features;
   };
 
-  using landmark_positions_t = std::map<landmark_id_t, Eigen::Vector3d>;
-
-  struct se3_transform_t {
+  struct SE3Transform {
     Eigen::Vector3d translation;
     Eigen::Quaterniond rotation;
 
-    static se3_transform_t Identity();
+    static SE3Transform Identity();
   };
 
-  struct imu_motion_state_t {
+  struct ImuMotionState {
     Eigen::Quaterniond orientation;
     Eigen::Vector3d position;
     Eigen::Vector3d velocity;

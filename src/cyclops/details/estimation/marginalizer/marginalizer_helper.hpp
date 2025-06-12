@@ -8,18 +8,18 @@
 #include <set>
 
 namespace cyclops::estimation {
-  struct gaussian_prior_t;
+  struct GaussianPrior;
 
   struct FactorGraphInstance;
   struct StateVariableReadAccessor;
 
-  struct marginalization_subgraph_t {
-    node_set_t drop_nodes;
-    node_set_t keep_nodes;
-    factor_set_t factors;
+  struct MarginalizationSubgraph {
+    NodeSet drop_nodes;
+    NodeSet keep_nodes;
+    FactorSet factors;
   };
 
-  gaussian_prior_t evaluate_gaussian_prior(
+  GaussianPrior evaluateGaussianPrior(
     FactorGraphInstance& graph, StateVariableReadAccessor const& state_accessor,
-    marginalization_subgraph_t const& drop_subgraph);
+    MarginalizationSubgraph const& drop_subgraph);
 }  // namespace cyclops::estimation

@@ -20,16 +20,16 @@ namespace cyclops::initializer {
     bool operator()(
       scalar_t const* const x, scalar_t const* const f,
       scalar_t* const r) const {
-      using quaternion_t = Eigen::Quaternion<scalar_t>;
-      using vector3_t = Eigen::Matrix<scalar_t, 3, 1>;
-      using vector2_t = Eigen::Matrix<scalar_t, 2, 1>;
-      using vector2_map_t = Eigen::Map<vector2_t>;
+      using Quaternion = Eigen::Quaternion<scalar_t>;
+      using Vector3 = Eigen::Matrix<scalar_t, 3, 1>;
+      using Vector2 = Eigen::Matrix<scalar_t, 2, 1>;
+      using Vector2Map = Eigen::Map<Vector2>;
 
-      auto v = Eigen::Map<vector3_t const>(x);
+      auto v = Eigen::Map<Vector3 const>(x);
       auto w = x[3];
-      auto p = Eigen::Map<vector3_t const>(x + 4);
+      auto p = Eigen::Map<Vector3 const>(x + 4);
 
-      auto d = (Eigen::Map<vector3_t const>(f) - p).eval();
+      auto d = (Eigen::Map<Vector3 const>(f) - p).eval();
       auto _2 = scalar_t(2);
 
       // clang-format off
@@ -43,7 +43,7 @@ namespace cyclops::initializer {
       // clang-format on
 
       auto u_hat = (z.template head<2>() / z.z()).eval();
-      auto r_map = vector2_map_t(r);
+      auto r_map = Vector2Map(r);
       r_map = _W.cast<scalar_t>() * (u_hat - _u.cast<scalar_t>());
 
       return true;
@@ -84,7 +84,7 @@ namespace cyclops::initializer {
       auto cost_autodiff = ceres::AutoDiffCostFunction<AutoDiffCost, 2, 7, 3>(
         new AutoDiffCost(u, W));
       auto cost_analytic = LandmarkProjectionCost(
-        feature_point_t {.point = u, .weight = W.transpose() * W});
+        FeaturePoint {.point = u, .weight = W.transpose() * W});
 
       WHEN("Evaluated analytic cost function at random-given parameter") {
         auto q =

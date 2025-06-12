@@ -15,25 +15,25 @@ namespace ceres {
 }  // namespace ceres
 
 namespace cyclops::estimation {
-  struct node_t;
-  using node_set_t = std::set<node_t>;
-  using node_set_cref_t = std::reference_wrapper<node_set_t const>;
+  struct Node;
+  using NodeSet = std::set<Node>;
+  using NodeSetCRef = std::reference_wrapper<NodeSet const>;
 
-  struct factor_t;
+  struct Factor;
 
-  using factor_id_t = uint64_t;
-  using factor_ptr_t = ceres::internal::ResidualBlock*;
-  using factor_entry_t = std::tuple<factor_ptr_t, factor_t>;
+  using FactorID = uint64_t;
+  using FactorPtr = ceres::internal::ResidualBlock*;
+  using FactorEntry = std::tuple<FactorPtr, Factor>;
 
-  using factor_set_t = std::map<factor_id_t, factor_entry_t>;
+  using FactorSet = std::map<FactorID, FactorEntry>;
 
-  using parameter_t = double*;
+  using Parameter = double*;
 
-  struct gaussian_prior_t {
+  struct GaussianPrior {
     Eigen::MatrixXd jacobian;
     Eigen::VectorXd residual;
 
-    node_set_t input_nodes;
+    NodeSet input_nodes;
     std::vector<double> nominal_parameters;
   };
 }  // namespace cyclops::estimation

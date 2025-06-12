@@ -3,33 +3,33 @@
 #include <memory>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct imu_match_translation_solution_t;
-  struct imu_match_translation_uncertainty_t;
+  struct ImuTranslationMatchSolution;
+  struct ImuTranslationMatchUncertainty;
 
-  class IMUTranslationMatchAcceptDiscriminator {
+  class ImuTranslationMatchAcceptDiscriminator {
   public:
-    virtual ~IMUTranslationMatchAcceptDiscriminator() = default;
+    virtual ~ImuTranslationMatchAcceptDiscriminator() = default;
     virtual void reset() = 0;
 
-    enum decision_t {
+    enum AcceptDecision {
       ACCEPT,
       REJECT_COST_PROBABILITY_INSIGNIFICANT,
       REJECT_UNDERINFORMATIVE_PARAMETER,
       REJECT_SCALE_LESS_THAN_ZERO,
     };
 
-    virtual decision_t determineCandidate(
-      imu_match_translation_solution_t const& solution,
-      imu_match_translation_uncertainty_t const& uncertainty) const = 0;
-    virtual decision_t determineAccept(
-      imu_match_translation_solution_t const& solution,
-      imu_match_translation_uncertainty_t const& uncertainty) const = 0;
+    virtual AcceptDecision determineCandidate(
+      ImuTranslationMatchSolution const& solution,
+      ImuTranslationMatchUncertainty const& uncertainty) const = 0;
+    virtual AcceptDecision determineAccept(
+      ImuTranslationMatchSolution const& solution,
+      ImuTranslationMatchUncertainty const& uncertainty) const = 0;
 
-    static std::unique_ptr<IMUTranslationMatchAcceptDiscriminator> create(
-      std::shared_ptr<cyclops_global_config_t const> config);
+    static std::unique_ptr<ImuTranslationMatchAcceptDiscriminator> Create(
+      std::shared_ptr<CyclopsConfig const> config);
   };
 }  // namespace cyclops::initializer

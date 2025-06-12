@@ -17,40 +17,40 @@ namespace cyclops::initializer {
   using Matrix6d = Eigen::Matrix<double, 6, 6>;
   using Vector6d = Eigen::Matrix<double, 6, 1>;
 
-  using measurement::imu_motion_ref_t;
+  using measurement::ImuMotionRef;
 
-  class IMUMatchTranslationAnalyzerImpl: public IMUMatchTranslationAnalyzer {
+  class ImuTranslationMatchAnalyzerImpl: public ImuTranslationMatchAnalyzer {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
 
   public:
-    explicit IMUMatchTranslationAnalyzerImpl(
-      std::shared_ptr<cyclops_global_config_t const> config)
+    explicit ImuTranslationMatchAnalyzerImpl(
+      std::shared_ptr<CyclopsConfig const> config)
         : _config(config) {
     }
     void reset() override;
 
-    imu_match_translation_analysis_t analyze(
-      std::vector<imu_motion_ref_t> const& imu_motions,
-      imu_match_rotation_solution_t const& rotations,
-      imu_match_camera_translation_prior_t const& camera_prior) override;
+    ImuTranslationMatchAnalysis analyze(
+      std::vector<ImuMotionRef> const& imu_motions,
+      ImuRotationMatch const& rotations,
+      ImuMatchCameraTranslationPrior const& camera_prior) override;
   };
 
-  void IMUMatchTranslationAnalyzerImpl::reset() {
+  void ImuTranslationMatchAnalyzerImpl::reset() {
     // does nothing.
   }
 
-  struct imu_motion_analysis_t {
+  struct ImuMotionAnalysis {
     MatrixXd A_I;
     MatrixXd B_I;
     Vector6d alpha;
     Vector6d beta;
   };
 
-  static imu_motion_analysis_t analyze_imu_motion(
-    imu_match_camera_translation_prior_t const& camera_translation_prior,
-    imu_match_rotation_solution_t const& rotation_matching, int n, int i,
-    se3_transform_t const& extrinsic, imu_motion_ref_t const& imu_motion) {
+  static ImuMotionAnalysis analyzeImuMotion(
+    ImuMatchCameraTranslationPrior const& camera_translation_prior,
+    ImuRotationMatch const& rotation_matching, int n, int i,
+    SE3Transform const& extrinsic, ImuMotionRef const& imu_motion) {
     auto A_I_bar = MatrixXd::Zero(6, 6 + 3 * n).eval();
     auto B_I_bar = MatrixXd::Zero(3, 3 * n).eval();
 
@@ -69,8 +69,8 @@ namespace cyclops::initializer {
     auto const& y_v = data->velocity_delta;
     auto const& y_p = data->position_delta;
 
-    auto delta_theta = so3_logmap(data->rotation_delta.conjugate() * q_ij_bar);
-    auto N_inv = so3_left_jacobian_inverse(delta_theta);
+    auto delta_theta = so3Logmap(data->rotation_delta.conjugate() * q_ij_bar);
+    auto N_inv = so3LeftJacobianInverse(delta_theta);
     auto N_inv__y_R_T = (N_inv * y_R_T).eval();
 
     auto R_bc = q_bc.matrix().eval();
@@ -112,10 +112,10 @@ namespace cyclops::initializer {
     };
   }
 
-  imu_match_translation_analysis_t IMUMatchTranslationAnalyzerImpl::analyze(
-    std::vector<imu_motion_ref_t> const& imu_motions,
-    imu_match_rotation_solution_t const& rotations,
-    imu_match_camera_translation_prior_t const& camera_prior) {
+  ImuTranslationMatchAnalysis ImuTranslationMatchAnalyzerImpl::analyze(
+    std::vector<ImuMotionRef> const& imu_motions,
+    ImuRotationMatch const& rotations,
+    ImuMatchCameraTranslationPrior const& camera_prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
     auto acc_bias_prior_weight = 1 / _config->noise.acc_bias_prior_stddev;
 
@@ -134,7 +134,7 @@ namespace cyclops::initializer {
 
     for (auto const& [i, motion] : ranges::views::enumerate(imu_motions)) {
       auto analysis =
-        analyze_imu_motion(camera_prior, rotations, n, i, extrinsic, motion);
+        analyzeImuMotion(camera_prior, rotations, n, i, extrinsic, motion);
       A_I.middleRows(6 * i + 3, 6) = analysis.A_I;
       B_I.middleRows(6 * i + 3, 6) = analysis.B_I;
       alpha.segment(6 * i + 3, 6) = analysis.alpha;
@@ -154,9 +154,9 @@ namespace cyclops::initializer {
     };
   }
 
-  std::unique_ptr<IMUMatchTranslationAnalyzer>
-  IMUMatchTranslationAnalyzer::create(
-    std::shared_ptr<cyclops_global_config_t const> config) {
-    return std::make_unique<IMUMatchTranslationAnalyzerImpl>(config);
+  std::unique_ptr<ImuTranslationMatchAnalyzer>
+  ImuTranslationMatchAnalyzer::Create(
+    std::shared_ptr<CyclopsConfig const> config) {
+    return std::make_unique<ImuTranslationMatchAnalyzerImpl>(config);
   }
 }  // namespace cyclops::initializer

@@ -23,10 +23,10 @@ namespace cyclops::initializer {
   using Eigen::Matrix2d;
   using Eigen::Matrix3d;
 
-  using two_view_data_t = std::map<landmark_id_t, two_view_feature_pair_t>;
+  using TwoViewData = std::map<LandmarkID, TwoViewFeaturePair>;
 
-  static vector<set<landmark_id_t>> make_ransac_batch(
-    int size, set<landmark_id_t> const& features, std::mt19937& rgen) {
+  static vector<set<LandmarkID>> makeRansacBatch(
+    int size, set<LandmarkID> const& features, std::mt19937& rgen) {
     if (features.size() < 8)
       return {};
 
@@ -37,7 +37,7 @@ namespace cyclops::initializer {
       ranges::to_vector;
   }
 
-  enum geometry_model_selection_t {
+  enum GeometryModelSelection {
     FAILURE,
     EPIPOLAR,
     HOMOGRAPHY,
@@ -47,38 +47,38 @@ namespace cyclops::initializer {
   private:
     std::unique_ptr<TwoViewMotionHypothesisSelector> _motion_selector;
 
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<std::mt19937> _rgen;
 
-    geometry_model_selection_t selectGeometryModel(
-      epipolar_analysis_t const& epipolar,
-      homography_analysis_t const& homography) const;
+    GeometryModelSelection selectGeometryModel(
+      EpipolarAnalysis const& epipolar,
+      HomographyAnalysis const& homography) const;
 
-    vector<two_view_geometry_t> solveHomography(
-      homography_analysis_t const& homography, two_view_data_t const& features,
-      two_view_imu_rotation_data_t const& rotation_prior);
-    vector<two_view_geometry_t> solveEpipolar(
-      epipolar_analysis_t const& epipolar, two_view_data_t const& features,
-      two_view_imu_rotation_data_t const& rotation_prior);
+    vector<TwoViewGeometry> solveHomography(
+      HomographyAnalysis const& homography, TwoViewData const& features,
+      TwoViewImuRotationData const& rotation_prior);
+    vector<TwoViewGeometry> solveEpipolar(
+      EpipolarAnalysis const& epipolar, TwoViewData const& features,
+      TwoViewImuRotationData const& rotation_prior);
 
-    vector<two_view_geometry_t> solveGeometry(
-      two_view_correspondence_data_t const& correspondence);
+    vector<TwoViewGeometry> solveGeometry(
+      TwoViewCorrespondenceData const& correspondence);
 
   public:
     TwoViewVisionGeometrySolverImpl(
       std::unique_ptr<TwoViewMotionHypothesisSelector> motion_selector,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<std::mt19937> rgen);
     ~TwoViewVisionGeometrySolverImpl();
     void reset() override;
 
-    vector<two_view_geometry_t> solve(
-      two_view_correspondence_data_t const& correspondence) override;
+    vector<TwoViewGeometry> solve(
+      TwoViewCorrespondenceData const& correspondence) override;
   };
 
   TwoViewVisionGeometrySolverImpl::TwoViewVisionGeometrySolverImpl(
     std::unique_ptr<TwoViewMotionHypothesisSelector> motion_selector,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<std::mt19937> rgen)
       : _motion_selector(std::move(motion_selector)),
         _config(config),
@@ -91,10 +91,9 @@ namespace cyclops::initializer {
     _motion_selector->reset();
   }
 
-  geometry_model_selection_t
-  TwoViewVisionGeometrySolverImpl::selectGeometryModel(
-    epipolar_analysis_t const& epipolar,
-    homography_analysis_t const& homography) const {
+  GeometryModelSelection TwoViewVisionGeometrySolverImpl::selectGeometryModel(
+    EpipolarAnalysis const& epipolar,
+    HomographyAnalysis const& homography) const {
     auto S_H = homography.expected_inliers;
     auto S_E = epipolar.expected_inliers;
 
@@ -122,14 +121,14 @@ namespace cyclops::initializer {
     }
   }
 
-  vector<two_view_geometry_t> TwoViewVisionGeometrySolverImpl::solveHomography(
-    homography_analysis_t const& homography, two_view_data_t const& data,
-    two_view_imu_rotation_data_t const& rotation_prior) {
+  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solveHomography(
+    HomographyAnalysis const& homography, TwoViewData const& data,
+    TwoViewImuRotationData const& rotation_prior) {
     auto const& [expected_inliers, H, inliers] = homography;
     if (expected_inliers <= 0)
       return {};
 
-    auto hypotheses = solve_homography_motion_hypothesis(H);
+    auto hypotheses = solveHomographyMotionHypothesis(H);
     if (hypotheses.size() != 8)
       return {};
 
@@ -137,14 +136,14 @@ namespace cyclops::initializer {
       hypotheses, data, inliers, rotation_prior);
   }
 
-  vector<two_view_geometry_t> TwoViewVisionGeometrySolverImpl::solveEpipolar(
-    epipolar_analysis_t const& epipolar, two_view_data_t const& data,
-    two_view_imu_rotation_data_t const& rotation_prior) {
+  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solveEpipolar(
+    EpipolarAnalysis const& epipolar, TwoViewData const& data,
+    TwoViewImuRotationData const& rotation_prior) {
     auto const& [expected_inliers, E, inliers] = epipolar;
     if (expected_inliers <= 0)
       return {};
 
-    auto hypotheses = solve_epipolar_motion_hypothesis(E);
+    auto hypotheses = solveEpipolarMotionHypothesis(E);
     if (hypotheses.size() != 4)
       return {};
 
@@ -152,8 +151,8 @@ namespace cyclops::initializer {
       hypotheses, data, inliers, rotation_prior);
   }
 
-  vector<two_view_geometry_t> TwoViewVisionGeometrySolverImpl::solveGeometry(
-    two_view_correspondence_data_t const& correspondence) {
+  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solveGeometry(
+    TwoViewCorrespondenceData const& correspondence) {
     auto tic = std::chrono::steady_clock::now();
     auto const& vision_config = _config->initialization.vision;
     auto const& features = correspondence.features;
@@ -162,17 +161,17 @@ namespace cyclops::initializer {
     __logger__->trace("Solving two-view structure for vision initialization.");
     __logger__->trace("Number of common features: {}", features.size());
 
-    auto rotation_vector = so3_logmap(rotation_prior.value);
+    auto rotation_vector = so3Logmap(rotation_prior.value);
     __logger__->debug(
       "Two-view rotation prior: {}", rotation_vector.transpose());
 
     auto landmark_ids = features | views::keys | ranges::to<set>;
-    auto ransac_batch = make_ransac_batch(
+    auto ransac_batch = makeRansacBatch(
       vision_config.two_view.model_selection.ransac_batch_size, landmark_ids,
       *_rgen);
-    auto homography = analyze_two_view_homography(
+    auto homography = analyzeTwoViewHomography(
       vision_config.feature_point_isotropic_noise, ransac_batch, features);
-    auto epipolar = analyze_two_view_epipolar(
+    auto epipolar = analyzeTwoViewEpipolar(
       vision_config.feature_point_isotropic_noise, ransac_batch, features);
 
     auto model_selection = selectGeometryModel(epipolar, homography);
@@ -208,16 +207,16 @@ namespace cyclops::initializer {
     }
   }
 
-  vector<two_view_geometry_t> TwoViewVisionGeometrySolverImpl::solve(
-    two_view_correspondence_data_t const& correspondence) {
+  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solve(
+    TwoViewCorrespondenceData const& correspondence) {
     return solveGeometry(correspondence);
   }
 
   std::unique_ptr<TwoViewVisionGeometrySolver>
-  TwoViewVisionGeometrySolver::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  TwoViewVisionGeometrySolver::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<std::mt19937> rgen) {
     return std::make_unique<TwoViewVisionGeometrySolverImpl>(
-      TwoViewMotionHypothesisSelector::create(config), config, rgen);
+      TwoViewMotionHypothesisSelector::Create(config), config, rgen);
   }
 }  // namespace cyclops::initializer

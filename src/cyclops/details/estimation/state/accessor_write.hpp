@@ -11,7 +11,7 @@ namespace cyclops::estimation {
   class StateVariableWriteAccessor {
   private:
     template <typename value_t>
-    using maybe_ref_t = std::optional<std::reference_wrapper<value_t>>;
+    using MaybeRef = std::optional<std::reference_wrapper<value_t>>;
 
   private:
     std::shared_ptr<StateVariableInternal> _state;
@@ -21,16 +21,16 @@ namespace cyclops::estimation {
       std::shared_ptr<StateVariableInternal> state);
     ~StateVariableWriteAccessor();
 
-    std::tuple<std::set<frame_id_t>, std::set<landmark_id_t>> prune(
-      std::set<frame_id_t> const& current_frames,
-      std::set<landmark_id_t> const& current_landmarks);
+    std::tuple<std::set<FrameID>, std::set<LandmarkID>> prune(
+      std::set<FrameID> const& current_frames,
+      std::set<LandmarkID> const& current_landmarks);
     void reset();
 
-    void updateMotionFrameGuess(motion_frame_parameter_blocks_t const& frames);
-    void updateLandmarkGuess(landmark_parameter_blocks_t const& landmarks);
-    void updateMappedLandmarks(landmark_positions_t const& positions);
+    void updateMotionFrameGuess(MotionFrameParameterBlocks const& frames);
+    void updateLandmarkGuess(LandmarkParameterBlocks const& landmarks);
+    void updateMappedLandmarks(LandmarkPositions const& positions);
 
-    maybe_ref_t<motion_frame_parameter_block_t> motionFrame(frame_id_t id);
-    maybe_ref_t<landmark_parameter_block_t> landmark(landmark_id_t id);
+    MaybeRef<MotionFrameParameterBlock> motionFrame(FrameID id);
+    MaybeRef<LandmarkParameterBlock> landmark(LandmarkID id);
   };
 }  // namespace cyclops::estimation

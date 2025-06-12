@@ -8,22 +8,22 @@
 #include <vector>
 
 namespace cyclops::estimation {
-  struct node_t;
+  struct Node;
 }  // namespace cyclops::estimation
 
 namespace cyclops::measurement {
-  struct IMUPreintegration;
+  struct ImuPreintegration;
 
-  struct imu_motion_t {
-    frame_id_t from;
-    frame_id_t to;
-    std::unique_ptr<IMUPreintegration> data;
+  struct ImuMotion {
+    FrameID from;
+    FrameID to;
+    std::unique_ptr<ImuPreintegration> data;
   };
+  using ImuMotions = std::vector<ImuMotion>;
 
-  using imu_motion_ref_t = std::reference_wrapper<imu_motion_t const>;
-  using imu_motions_t = std::vector<imu_motion_t>;
-  using imu_motion_refs_t = std::vector<imu_motion_ref_t>;
+  using ImuMotionRef = std::reference_wrapper<ImuMotion const>;
+  using ImuMotionRefs = std::vector<ImuMotionRef>;
 
-  using feature_track_t = std::map<frame_id_t, feature_point_t>;
-  using feature_tracks_t = std::map<landmark_id_t, feature_track_t>;
+  using FeatureTrack = std::map<FrameID, FeaturePoint>;
+  using FeatureTracks = std::map<LandmarkID, FeatureTrack>;
 }  // namespace cyclops::measurement

@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::telemetry {
@@ -16,27 +16,27 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct multiview_geometry_t;
-  struct two_view_imu_rotation_constraint_t;
+  struct MultiViewGeometry;
+  struct TwoViewImuRotationConstraint;
 
   class MultiviewVisionGeometrySolver {
   public:
-    using multiview_image_data_t =
-      std::map<frame_id_t, std::map<landmark_id_t, feature_point_t>>;
-    using camera_rotation_prior_lookup_t =
-      std::map<frame_id_t, two_view_imu_rotation_constraint_t>;
+    using MultiViewImageData =
+      std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+    using CameraRotationPriorLookup =
+      std::map<FrameID, TwoViewImuRotationConstraint>;
 
   public:
     virtual ~MultiviewVisionGeometrySolver() = default;
     virtual void reset() = 0;
 
     // returns a sequence of possible multiview geometries.
-    virtual std::vector<multiview_geometry_t> solve(
-      multiview_image_data_t const& multiview_data,
-      camera_rotation_prior_lookup_t const& camera_rotations) = 0;
+    virtual std::vector<MultiViewGeometry> solve(
+      MultiViewImageData const& multiview_data,
+      CameraRotationPriorLookup const& camera_rotations) = 0;
 
-    static std::unique_ptr<MultiviewVisionGeometrySolver> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<MultiviewVisionGeometrySolver> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<std::mt19937> rgen,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };

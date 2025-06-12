@@ -10,61 +10,61 @@
 #include <vector>
 
 namespace cyclops::measurement {
-  struct IMUPreintegration;
+  struct ImuPreintegration;
 }
 
 namespace cyclops {
-  struct imu_data_t;
-  struct sensor_statistics_t;
+  struct ImuData;
+  struct SensorStatistics;
 
-  struct imu_mockup_t {
+  struct ImuMockup {
     Eigen::Vector3d bias_acc;
     Eigen::Vector3d bias_gyr;
-    imu_data_t measurement;
+    ImuData measurement;
   };
 
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, std::vector<timestamp_t> const& timestamps);
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, std::vector<timestamp_t> const& timestamps,
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, std::vector<Timestamp> const& timestamps);
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, std::vector<Timestamp> const& timestamps,
     Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr);
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, std::vector<timestamp_t> const& timestamps,
-    std::mt19937& rgen, sensor_statistics_t const& noise);
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, std::vector<timestamp_t> const& timestamps,
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, std::vector<Timestamp> const& timestamps,
+    std::mt19937& rgen, SensorStatistics const& noise);
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, std::vector<Timestamp> const& timestamps,
     Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr,
-    std::mt19937& rgen, sensor_statistics_t const& noise);
+    std::mt19937& rgen, SensorStatistics const& noise);
 
-  std::unique_ptr<measurement::IMUPreintegration> make_imu_preintegration(
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e);
-  std::unique_ptr<measurement::IMUPreintegration> make_imu_preintegration(
-    sensor_statistics_t const& noise, pose_signal_t pose_signal,
-    timestamp_t t_s, timestamp_t t_e);
-  std::unique_ptr<measurement::IMUPreintegration> make_imu_preintegration(
+  std::unique_ptr<measurement::ImuPreintegration> makeImuPreintegration(
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e);
+  std::unique_ptr<measurement::ImuPreintegration> makeImuPreintegration(
+    SensorStatistics const& noise, PoseSignal pose_signal, Timestamp t_s,
+    Timestamp t_e);
+  std::unique_ptr<measurement::ImuPreintegration> makeImuPreintegration(
     Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e);
-  std::unique_ptr<measurement::IMUPreintegration> make_imu_preintegration(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e);
-  std::unique_ptr<measurement::IMUPreintegration> make_imu_preintegration(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e);
+  std::unique_ptr<measurement::ImuPreintegration> makeImuPreintegration(
+    std::mt19937& rgen, SensorStatistics const& noise,
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e);
+  std::unique_ptr<measurement::ImuPreintegration> makeImuPreintegration(
+    std::mt19937& rgen, SensorStatistics const& noise,
     Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e);
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e);
 
-  measurement::imu_motions_t make_imu_motions(
-    pose_signal_t pose_signal, std::map<frame_id_t, timestamp_t> const& frames);
-  measurement::imu_motions_t make_imu_motions(
-    sensor_statistics_t const& noise, pose_signal_t pose_signal,
-    std::map<frame_id_t, timestamp_t> const& frames);
-  measurement::imu_motions_t make_imu_motions(
+  measurement::ImuMotions makeImuMotions(
+    PoseSignal pose_signal, std::map<FrameID, Timestamp> const& frames);
+  measurement::ImuMotions makeImuMotions(
+    SensorStatistics const& noise, PoseSignal pose_signal,
+    std::map<FrameID, Timestamp> const& frames);
+  measurement::ImuMotions makeImuMotions(
     Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr,
-    pose_signal_t pose_signal, std::map<frame_id_t, timestamp_t> const& frames);
-  measurement::imu_motions_t make_imu_motions(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    pose_signal_t pose_signal, std::map<frame_id_t, timestamp_t> const& frames);
-  measurement::imu_motions_t make_imu_motions(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
+    PoseSignal pose_signal, std::map<FrameID, Timestamp> const& frames);
+  measurement::ImuMotions makeImuMotions(
+    std::mt19937& rgen, SensorStatistics const& noise,
+    PoseSignal pose_signal, std::map<FrameID, Timestamp> const& frames);
+  measurement::ImuMotions makeImuMotions(
+    std::mt19937& rgen, SensorStatistics const& noise,
     Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr,
-    pose_signal_t pose_signal, std::map<frame_id_t, timestamp_t> const& frames);
+    PoseSignal pose_signal, std::map<FrameID, Timestamp> const& frames);
 }  // namespace cyclops

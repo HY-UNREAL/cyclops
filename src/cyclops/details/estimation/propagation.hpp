@@ -7,25 +7,24 @@
 #include <tuple>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }  // namespace cyclops
 
 namespace cyclops::estimation {
-  class IMUPropagationUpdateHandler {
+  class ImuPropagationUpdateHandler {
   public:
-    virtual ~IMUPropagationUpdateHandler() = default;
+    virtual ~ImuPropagationUpdateHandler() = default;
     virtual void reset() = 0;
 
     virtual void updateOptimization(
-      timestamp_t last_timestamp,
-      motion_frame_parameter_block_t const& last_state) = 0;
-    virtual void updateIMUData(imu_data_t const& data) = 0;
+      Timestamp last_timestamp,
+      MotionFrameParameterBlock const& last_state) = 0;
+    virtual void updateImuData(ImuData const& data) = 0;
 
-    using timestamped_motion_state_t =
-      std::tuple<timestamp_t, imu_motion_state_t>;
-    virtual std::optional<timestamped_motion_state_t> get() const = 0;
+    virtual std::optional<std::tuple<Timestamp, ImuMotionState>> get()
+      const = 0;
 
-    static std::unique_ptr<IMUPropagationUpdateHandler> create(
-      std::shared_ptr<cyclops_global_config_t const> config);
+    static std::unique_ptr<ImuPropagationUpdateHandler> Create(
+      std::shared_ptr<CyclopsConfig const> config);
   };
 }  // namespace cyclops::estimation

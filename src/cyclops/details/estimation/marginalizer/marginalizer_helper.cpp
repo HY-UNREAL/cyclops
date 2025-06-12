@@ -29,12 +29,12 @@ namespace cyclops::estimation {
 
   namespace views = ranges::views;
 
-  struct schur_complement_t {
+  struct SchurComplement {
     MatrixXd jacobian;
     VectorXd residual;
   };
 
-  static schur_complement_t decompose(MatrixXd const& P, VectorXd const& s) {
+  static SchurComplement decompose(MatrixXd const& P, VectorXd const& s) {
     auto __tic__ = tic();
 
     Eigen::SelfAdjointEigenSolver<MatrixXd> eigen(P);
@@ -59,7 +59,7 @@ namespace cyclops::estimation {
     return {J, r};
   }
 
-  static vector<Matrix3d> compile_landmark_self_information(
+  static vector<Matrix3d> compileLandmarkSelfInformation(
     EigenCRSMatrix const& J_f, int n_landmarks) {
     vector<Matrix3d> H_ff;
     H_ff.reserve(n_landmarks);
@@ -71,7 +71,7 @@ namespace cyclops::estimation {
   }
 
   static std::tuple<MatrixXd, MatrixXd, MatrixXd, VectorXd, VectorXd>
-  marginalize_landmark_information(
+  marginalizeLandmarkInformation(
     EigenCRSMatrix const& J_n, EigenCRSMatrix const& J_f,
     EigenCRSMatrix const& J_k, VectorXd const& r) {
     __logger__->debug(
@@ -89,7 +89,7 @@ namespace cyclops::estimation {
     VectorXd s_k = J_k.transpose() * r;
 
     int n_landmarks = J_f.cols() / 3;
-    auto H_ff = compile_landmark_self_information(J_f, n_landmarks);
+    auto H_ff = compileLandmarkSelfInformation(J_f, n_landmarks);
     auto H_ff_eigens =
       vector<Eigen::SelfAdjointEigenSolver<Matrix3d>>(n_landmarks);
     for (int k = 0; k < n_landmarks; k++)
@@ -150,7 +150,7 @@ namespace cyclops::estimation {
     return std::make_tuple(H_nn_s, H_kk_s, H_nk, s_n, s_k);
   }
 
-  static schur_complement_t compute_schur_complement(
+  static SchurComplement evaluateSchurComplement(
     int drop_frame_dimension, int drop_landmark_dimension, int keep_dimension,
     EigenCRSMatrix const& J, VectorXd const& r) {
     auto __tic__ = tic();
@@ -165,14 +165,14 @@ namespace cyclops::estimation {
     EigenCRSMatrix const J_k = J.middleCols(m, k);
 
     size_t constexpr node_variants =
-      std::variant_size_v<decltype(node_t::variant)>;
+      std::variant_size_v<decltype(Node::variant)>;
     static_assert(
       std::is_same_v<
-        node_t::variant_t_at<node_variants - 1>, node_t::landmark_t>,
+        Node::VariantTypeOfIndex<node_variants - 1>, Node::Landmark>,
       "Landmark node should be ordered to the last of the variants");
 
     auto [H_nn, H_kk, H_nk, s_n, s_k] =
-      marginalize_landmark_information(J_n, J_f, J_k, r);
+      marginalizeLandmarkInformation(J_n, J_f, J_k, r);
     Eigen::SelfAdjointEigenSolver<MatrixXd> H_nn_eigen(H_nn);
     __logger__->debug(
       "Schur complement eigendecomposition time: {}[s]", toc(__tic__));
@@ -201,29 +201,29 @@ namespace cyclops::estimation {
   }
 
   template <typename maybe_block_reference_t>
-  static auto& get_or_die(maybe_block_reference_t const& maybe_ref) {
+  static auto& getOrDie(maybe_block_reference_t const& maybe_ref) {
     return maybe_ref.value().get();
   }
 
-  static vector<double> compile_node_nominals(
-    StateVariableReadAccessor const& states, set<node_t> const& nodes) {
+  static vector<double> compileNodeNominals(
+    StateVariableReadAccessor const& states, set<Node> const& nodes) {
     vector<double> result;
     for (auto const& node : nodes) {
       auto visitor = overloaded {
-        [&](node_t::frame_t const& _) {
-          auto& x = get_or_die(states.motionFrame(_.id));
+        [&](Node::Frame const& _) {
+          auto& x = getOrDie(states.motionFrame(_.id));
           auto s = x.begin();
           auto e = s + 10;
           result.insert(result.end(), s, e);
         },
-        [&](node_t::bias_t const& _) {
-          auto& x = get_or_die(states.motionFrame(_.id));
+        [&](Node::Bias const& _) {
+          auto& x = getOrDie(states.motionFrame(_.id));
           auto s = x.begin() + 10;
           auto e = x.end();
           result.insert(result.end(), s, e);
         },
-        [&](node_t::landmark_t const& _) {
-          auto& f = get_or_die(states.landmark(_.id));
+        [&](Node::Landmark const& _) {
+          auto& f = getOrDie(states.landmark(_.id));
           result.insert(result.end(), f.begin(), f.end());
         },
       };
@@ -232,55 +232,54 @@ namespace cyclops::estimation {
     return result;
   }
 
-  static gaussian_prior_t compute_prior(
+  static GaussianPrior computePrior(
     StateVariableReadAccessor const& state_accessor,
     EigenCRSMatrix const& jacobian, VectorXd const& residual, int n_drop_f,
-    int n_drop_l, int n_keep, set<node_t> const& keep_nodes) {
+    int n_drop_l, int n_keep, set<Node> const& keep_nodes) {
     auto [J_pi, r_pi] =
-      compute_schur_complement(n_drop_f, n_drop_l, n_keep, jacobian, residual);
+      evaluateSchurComplement(n_drop_f, n_drop_l, n_keep, jacobian, residual);
 
     return {
       .jacobian = std::move(J_pi),
       .residual = std::move(r_pi),
       .input_nodes = keep_nodes,
-      .nominal_parameters = compile_node_nominals(state_accessor, keep_nodes),
+      .nominal_parameters = compileNodeNominals(state_accessor, keep_nodes),
     };
   }
 
-  static auto compile_parameter_index(
-    marginalization_subgraph_t const& subgraph) {
+  static auto compileParameterIndex(MarginalizationSubgraph const& subgraph) {
     int n_drop_keyframes = 0;
     int n_drop_landmarks = 0;
     for (auto const& node : subgraph.drop_nodes) {
       auto visitor = overloaded {
-        [&](node_t::landmark_t const& _) {
-          n_drop_landmarks += _.manifold_dimension();
+        [&](Node::Landmark const& _) {
+          n_drop_landmarks += _.localDimension();
         },
-        [&](auto const& _) { n_drop_keyframes += _.manifold_dimension(); },
+        [&](auto const& _) { n_drop_keyframes += _.localDimension(); },
       };
       std::visit(visitor, node.variant);
     }
 
     int n_keep = 0;
     for (auto const& node : subgraph.keep_nodes)
-      n_keep += node.manifold_dimension();
+      n_keep += node.localDimension();
 
     return std::make_tuple(n_drop_keyframes, n_drop_landmarks, n_keep);
   }
 
-  gaussian_prior_t evaluate_gaussian_prior(
+  GaussianPrior evaluateGaussianPrior(
     FactorGraphInstance& graph, StateVariableReadAccessor const& state_accessor,
-    marginalization_subgraph_t const& drop_subgraph) {
+    MarginalizationSubgraph const& drop_subgraph) {
     auto factor_ptrs = drop_subgraph.factors | views::values |
       views::transform([](auto const& _) { return std::get<0>(_); }) |
       ranges::to_vector;
     auto nodes =
       views::concat(drop_subgraph.drop_nodes, drop_subgraph.keep_nodes) |
-      ranges::to<vector<node_t>>;
+      ranges::to<vector<Node>>;
     auto [jacobian, residual] = graph.evaluate(nodes, factor_ptrs);
 
-    auto [n_drop_f, n_drop_l, n_keep] = compile_parameter_index(drop_subgraph);
-    return compute_prior(
+    auto [n_drop_f, n_drop_l, n_keep] = compileParameterIndex(drop_subgraph);
+    return computePrior(
       state_accessor, jacobian, residual, n_drop_f, n_drop_l, n_keep,
       drop_subgraph.keep_nodes);
   }

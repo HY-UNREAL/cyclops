@@ -18,18 +18,18 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  class IMUMatchScaleSampleSolverContext {
+  class ImuMatchScaleSampleSolverContext {
   private:
-    IMUMatchTranslationLocalOptimizer& local_optimizer;
-    imu_match_translation_analysis_t const& analysis;
+    ImuTranslationMatchLocalOptimizer& local_optimizer;
+    ImuTranslationMatchAnalysis const& analysis;
 
-    IMUMatchScaleEvaluationContext evaluator;
+    ImuMatchScaleEvaluationContext evaluator;
 
-    cyclops_global_config_t const& config;
+    CyclopsConfig const& config;
     telemetry::InitializerTelemetry& telemetry;
 
     std::optional<double> evaluateCost(double s);
-    std::optional<imu_match_scale_sample_solution_t> evaluateSample(double s);
+    std::optional<ImuMatchScaleSampleSolution> evaluateSample(double s);
 
     std::optional<vector<tuple<double, double>>> refineSolutionCandidates(
       vector<tuple<double, double>> const& candidates);
@@ -38,22 +38,20 @@ namespace cyclops::initializer {
     int degreesOfFreedom() const;
 
   public:
-    IMUMatchScaleSampleSolverContext(
-      IMUMatchTranslationLocalOptimizer& local_optimizer,
-      imu_match_translation_analysis_t const& analysis,
-      IMUMatchTranslationAnalysisCache const& cache,
-      cyclops_global_config_t const& config,
-      telemetry::InitializerTelemetry& telemetry);
+    ImuMatchScaleSampleSolverContext(
+      ImuTranslationMatchLocalOptimizer& local_optimizer,
+      ImuTranslationMatchAnalysis const& analysis,
+      ImuTranslationMatchAnalysisCache const& cache,
+      CyclopsConfig const& config, telemetry::InitializerTelemetry& telemetry);
 
-    std::optional<vector<imu_match_scale_sample_solution_t>> solve(
-      std::set<frame_id_t> const& motion_frames);
+    std::optional<vector<ImuMatchScaleSampleSolution>> solve(
+      std::set<FrameID> const& motion_frames);
   };
 
-  IMUMatchScaleSampleSolverContext::IMUMatchScaleSampleSolverContext(
-    IMUMatchTranslationLocalOptimizer& local_optimizer,
-    imu_match_translation_analysis_t const& analysis,
-    IMUMatchTranslationAnalysisCache const& cache,
-    cyclops_global_config_t const& config,
+  ImuMatchScaleSampleSolverContext::ImuMatchScaleSampleSolverContext(
+    ImuTranslationMatchLocalOptimizer& local_optimizer,
+    ImuTranslationMatchAnalysis const& analysis,
+    ImuTranslationMatchAnalysisCache const& cache, CyclopsConfig const& config,
     telemetry::InitializerTelemetry& telemetry)
       : local_optimizer(local_optimizer),
         analysis(analysis),
@@ -62,26 +60,25 @@ namespace cyclops::initializer {
         telemetry(telemetry) {
   }
 
-  using Context = IMUMatchScaleSampleSolverContext;
-
-  int Context::degreesOfFreedom() const {
+  int ImuMatchScaleSampleSolverContext::degreesOfFreedom() const {
     return analysis.residual_dimension - analysis.parameter_dimension;
   }
 
-  std::optional<double> Context::evaluateCost(double s) {
+  std::optional<double> ImuMatchScaleSampleSolverContext::evaluateCost(
+    double s) {
     auto maybe_primal = evaluator.evaluate(s);
     if (!maybe_primal)
       return std::nullopt;
     return maybe_primal->cost;
   }
 
-  std::optional<imu_match_scale_sample_solution_t> Context::evaluateSample(
-    double s) {
+  std::optional<ImuMatchScaleSampleSolution>
+  ImuMatchScaleSampleSolverContext::evaluateSample(double s) {
     auto maybe_primal = evaluator.evaluate(s);
     if (!maybe_primal)
       return std::nullopt;
 
-    return imu_match_scale_sample_solution_t {
+    return ImuMatchScaleSampleSolution {
       .scale = s,
       .cost = maybe_primal->cost,
       .inertial_state = maybe_primal->inertial_solution,
@@ -91,7 +88,7 @@ namespace cyclops::initializer {
   }
 
   std::optional<vector<tuple<double, double>>>
-  Context::refineSolutionCandidates(
+  ImuMatchScaleSampleSolverContext::refineSolutionCandidates(
     vector<tuple<double, double>> const& candidates) {
     auto maybe_refined_candidates =
       candidates | views::transform([&](auto const& point) {
@@ -140,7 +137,7 @@ namespace cyclops::initializer {
     return views::iota(0, n) | views::transform(slice);
   }
 
-  static vector<tuple<double, double>> detect_local_minimums_in_samples(
+  static vector<tuple<double, double>> detectLocalMinimumsInSamples(
     vector<tuple<double, double>> const& samples) {
     int n_samples = samples.size();
     if (n_samples < 3)
@@ -163,7 +160,8 @@ namespace cyclops::initializer {
     return result;
   }
 
-  std::optional<vector<tuple<double, double>>> Context::sample() {
+  std::optional<vector<tuple<double, double>>>
+  ImuMatchScaleSampleSolverContext::sample() {
     auto const& sampling_config = config.initialization.imu.sampling;
     auto sigma_min = std::log(sampling_config.sampling_domain_lowerbound);
     auto sigma_max = std::log(sampling_config.sampling_domain_upperbound);
@@ -194,8 +192,9 @@ namespace cyclops::initializer {
     return costs;
   }
 
-  std::optional<vector<imu_match_scale_sample_solution_t>> Context::solve(
-    std::set<frame_id_t> const& motion_frames) {
+  std::optional<vector<ImuMatchScaleSampleSolution>>
+  ImuMatchScaleSampleSolverContext::solve(
+    std::set<FrameID> const& motion_frames) {
     auto maybe_costs = sample();
     if (!maybe_costs.has_value()) {
       __logger__->debug("IMU match cost sample evaluation failed.");
@@ -203,9 +202,9 @@ namespace cyclops::initializer {
     }
     auto const& costs = maybe_costs.value();
 
-    auto minima = detect_local_minimums_in_samples(costs);
+    auto minima = detectLocalMinimumsInSamples(costs);
     auto maybe_candidates = refineSolutionCandidates(minima);
-    telemetry.onIMUMatchAttempt({
+    telemetry.onImuMatchAttempt({
       .degrees_of_freedom = degreesOfFreedom(),
       .frames = motion_frames,
       .landscape = costs,
@@ -217,7 +216,7 @@ namespace cyclops::initializer {
     if (!maybe_candidates.has_value())
       return std::nullopt;
 
-    vector<imu_match_scale_sample_solution_t> samples;
+    vector<ImuMatchScaleSampleSolution> samples;
     for (auto const& [s, cost] : maybe_candidates.value()) {
       auto sample = evaluateSample(s);
       if (!sample)
@@ -227,54 +226,54 @@ namespace cyclops::initializer {
     return samples;
   }
 
-  class IMUMatchScaleSampleSolverImpl: public IMUMatchScaleSampleSolver {
+  class ImuMatchScaleSampleSolverImpl: public ImuMatchScaleSampleSolver {
   private:
-    std::unique_ptr<IMUMatchTranslationLocalOptimizer> _local_optimizer;
+    std::unique_ptr<ImuTranslationMatchLocalOptimizer> _local_optimizer;
 
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<telemetry::InitializerTelemetry> _telemetry;
 
   public:
-    IMUMatchScaleSampleSolverImpl(
-      std::unique_ptr<IMUMatchTranslationLocalOptimizer> local_optimizer,
-      std::shared_ptr<cyclops_global_config_t const> config,
+    ImuMatchScaleSampleSolverImpl(
+      std::unique_ptr<ImuTranslationMatchLocalOptimizer> local_optimizer,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
     void reset() override;
 
-    std::optional<vector<imu_match_scale_sample_solution_t>> solve(
-      std::set<frame_id_t> const& motion_frames,
-      imu_match_translation_analysis_t const& analysis,
-      IMUMatchTranslationAnalysisCache const& cache) const override;
+    std::optional<vector<ImuMatchScaleSampleSolution>> solve(
+      std::set<FrameID> const& motion_frames,
+      ImuTranslationMatchAnalysis const& analysis,
+      ImuTranslationMatchAnalysisCache const& cache) const override;
   };
 
-  IMUMatchScaleSampleSolverImpl::IMUMatchScaleSampleSolverImpl(
-    std::unique_ptr<IMUMatchTranslationLocalOptimizer> local_optimizer,
-    std::shared_ptr<cyclops_global_config_t const> config,
+  ImuMatchScaleSampleSolverImpl::ImuMatchScaleSampleSolverImpl(
+    std::unique_ptr<ImuTranslationMatchLocalOptimizer> local_optimizer,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry)
       : _local_optimizer(std::move(local_optimizer)),
         _config(config),
         _telemetry(telemetry) {
   }
 
-  void IMUMatchScaleSampleSolverImpl::reset() {
+  void ImuMatchScaleSampleSolverImpl::reset() {
     _local_optimizer->reset();
     _telemetry->reset();
   }
 
-  std::optional<vector<imu_match_scale_sample_solution_t>>
-  IMUMatchScaleSampleSolverImpl::solve(
-    std::set<frame_id_t> const& motion_frames,
-    imu_match_translation_analysis_t const& analysis,
-    IMUMatchTranslationAnalysisCache const& cache) const {
-    auto context = IMUMatchScaleSampleSolverContext(
+  std::optional<vector<ImuMatchScaleSampleSolution>>
+  ImuMatchScaleSampleSolverImpl::solve(
+    std::set<FrameID> const& motion_frames,
+    ImuTranslationMatchAnalysis const& analysis,
+    ImuTranslationMatchAnalysisCache const& cache) const {
+    auto context = ImuMatchScaleSampleSolverContext(
       *_local_optimizer, analysis, cache, *_config, *_telemetry);
     return context.solve(motion_frames);
   }
 
-  std::unique_ptr<IMUMatchScaleSampleSolver> IMUMatchScaleSampleSolver::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<ImuMatchScaleSampleSolver> ImuMatchScaleSampleSolver::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
-    return std::make_unique<IMUMatchScaleSampleSolverImpl>(
-      IMUMatchTranslationLocalOptimizer::create(config), config, telemetry);
+    return std::make_unique<ImuMatchScaleSampleSolverImpl>(
+      ImuTranslationMatchLocalOptimizer::Create(config), config, telemetry);
   }
 }  // namespace cyclops::initializer

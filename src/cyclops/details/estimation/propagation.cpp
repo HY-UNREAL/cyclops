@@ -10,54 +10,54 @@
 namespace cyclops::estimation {
   using Eigen::Vector3d;
 
-  using measurement::imu_noise_t;
-  using measurement::IMUPreintegration;
+  using measurement::ImuNoise;
+  using measurement::ImuPreintegration;
 
-  class IMUPropagationUpdateHandlerImpl: public IMUPropagationUpdateHandler {
+  using TimestampedMotionState = std::tuple<Timestamp, ImuMotionState>;
+
+  class ImuPropagationUpdateHandlerImpl: public ImuPropagationUpdateHandler {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
 
-    struct propagation_state_t {
-      timestamp_t timestamp;
+    struct PropagationState {
+      Timestamp timestamp;
 
-      imu_motion_state_t motion_state;
+      ImuMotionState motion_state;
       Vector3d bias_acc;
       Vector3d bias_gyr;
 
-      IMUPreintegration integrator;
+      ImuPreintegration integrator;
 
-      propagation_state_t(
-        timestamp_t timestamp, imu_motion_state_t const& motion_state,
-        Vector3d const& b_a, Vector3d const& b_w, imu_noise_t const& noise);
+      PropagationState(
+        Timestamp timestamp, ImuMotionState const& motion_state,
+        Vector3d const& b_a, Vector3d const& b_w, ImuNoise const& noise);
     };
 
-    std::unique_ptr<propagation_state_t> _propagation_state;
-    std::map<timestamp_t, imu_data_t> _imu_queue;
+    std::unique_ptr<PropagationState> _propagation_state;
+    std::map<Timestamp, ImuData> _imu_queue;
 
-    void propagateIMU(imu_data_t const& imu_prev, imu_data_t const& imu_next);
+    void propagateIMU(ImuData const& imu_prev, ImuData const& imu_next);
 
-    std::map<timestamp_t, imu_data_t>::const_iterator
-    findIMUQueuePointRightBefore(timestamp_t time) const;
+    std::map<Timestamp, ImuData>::const_iterator findIMUQueuePointRightBefore(
+      Timestamp time) const;
 
   public:
-    explicit IMUPropagationUpdateHandlerImpl(
-      std::shared_ptr<cyclops_global_config_t const> config);
-    ~IMUPropagationUpdateHandlerImpl();
+    explicit ImuPropagationUpdateHandlerImpl(
+      std::shared_ptr<CyclopsConfig const> config);
+    ~ImuPropagationUpdateHandlerImpl();
     void reset() override;
 
     void updateOptimization(
-      timestamp_t last_timestamp,
-      motion_frame_parameter_block_t const& last_state) override;
-    void updateIMUData(imu_data_t const& data) override;
+      Timestamp last_timestamp,
+      MotionFrameParameterBlock const& last_state) override;
+    void updateImuData(ImuData const& data) override;
 
-    using timestamped_motion_state_t =
-      std::tuple<timestamp_t, imu_motion_state_t>;
-    std::optional<timestamped_motion_state_t> get() const override;
+    std::optional<TimestampedMotionState> get() const override;
   };
 
-  IMUPropagationUpdateHandlerImpl::propagation_state_t::propagation_state_t(
-    timestamp_t timestamp, imu_motion_state_t const& motion_state,
-    Vector3d const& b_a, Vector3d const& b_w, imu_noise_t const& noise)
+  ImuPropagationUpdateHandlerImpl::PropagationState::PropagationState(
+    Timestamp timestamp, ImuMotionState const& motion_state,
+    Vector3d const& b_a, Vector3d const& b_w, ImuNoise const& noise)
       : timestamp(timestamp),
         motion_state(motion_state),
         bias_acc(b_a),
@@ -65,12 +65,9 @@ namespace cyclops::estimation {
         integrator(b_a, b_w, noise) {
   }
 
-  template <typename value_t>
-  using maybe_cref_t = std::optional<std::reference_wrapper<value_t const>>;
-
-  std::map<timestamp_t, imu_data_t>::const_iterator
-  IMUPropagationUpdateHandlerImpl::findIMUQueuePointRightBefore(
-    timestamp_t time) const {
+  std::map<Timestamp, ImuData>::const_iterator
+  ImuPropagationUpdateHandlerImpl::findIMUQueuePointRightBefore(
+    Timestamp time) const {
     auto i = _imu_queue.upper_bound(time);
     if (i == _imu_queue.begin())
       return _imu_queue.end();
@@ -78,8 +75,8 @@ namespace cyclops::estimation {
   }
 
   static Vector3d interpolate(
-    timestamp_t t_eval, timestamp_t t_init, Vector3d const& v_init,
-    timestamp_t t_term, Vector3d const& v_term) {
+    Timestamp t_eval, Timestamp t_init, Vector3d const& v_init,
+    Timestamp t_term, Vector3d const& v_term) {
     if (t_term - t_init < 1e-6) {
       if (std::abs(t_term - t_eval) < std::abs(t_init - t_eval))
         return v_term;
@@ -92,8 +89,8 @@ namespace cyclops::estimation {
     return v_init + std::min(1., std::max(0., n / d)) * delta;
   }
 
-  void IMUPropagationUpdateHandlerImpl::propagateIMU(
-    imu_data_t const& imu_prev, imu_data_t const& imu_next) {
+  void ImuPropagationUpdateHandlerImpl::propagateIMU(
+    ImuData const& imu_prev, ImuData const& imu_next) {
     auto const& t_curr = _propagation_state->timestamp;
     auto const& [t_prev, a_prev, w_prev] = imu_prev;
     auto const& [t_next, a_next, w_next] = imu_next;
@@ -112,23 +109,22 @@ namespace cyclops::estimation {
     _propagation_state->timestamp = t_next;
   }
 
-  IMUPropagationUpdateHandlerImpl::IMUPropagationUpdateHandlerImpl(
-    std::shared_ptr<cyclops_global_config_t const> config)
+  ImuPropagationUpdateHandlerImpl::ImuPropagationUpdateHandlerImpl(
+    std::shared_ptr<CyclopsConfig const> config)
       : _config(config) {
   }
 
-  IMUPropagationUpdateHandlerImpl::~IMUPropagationUpdateHandlerImpl() = default;
+  ImuPropagationUpdateHandlerImpl::~ImuPropagationUpdateHandlerImpl() = default;
 
-  void IMUPropagationUpdateHandlerImpl::updateOptimization(
-    timestamp_t timestamp, motion_frame_parameter_block_t const& state_block) {
-    auto motion_state =
-      estimation::motion_state_of_motion_frame_block(state_block);
-    auto bias_acc = estimation::acc_bias_of_motion_frame_block(state_block);
-    auto bias_gyr = estimation::gyr_bias_of_motion_frame_block(state_block);
+  void ImuPropagationUpdateHandlerImpl::updateOptimization(
+    Timestamp timestamp, MotionFrameParameterBlock const& state_block) {
+    auto motion_state = estimation::getMotionState(state_block);
+    auto bias_acc = estimation::getAccBias(state_block);
+    auto bias_gyr = estimation::getGyrBias(state_block);
 
-    _propagation_state = std::make_unique<propagation_state_t>(
+    _propagation_state = std::make_unique<PropagationState>(
       timestamp, motion_state, bias_acc, bias_gyr,
-      imu_noise_t {
+      ImuNoise {
         .acc_white_noise = _config->noise.acc_white_noise,
         .gyr_white_noise = _config->noise.gyr_white_noise,
       });
@@ -146,8 +142,7 @@ namespace cyclops::estimation {
     }
   }
 
-  void IMUPropagationUpdateHandlerImpl::updateIMUData(
-    imu_data_t const& imu_next) {
+  void ImuPropagationUpdateHandlerImpl::updateImuData(ImuData const& imu_next) {
     _imu_queue.emplace_hint(_imu_queue.end(), imu_next.timestamp, imu_next);
     if (_propagation_state == nullptr)
       return;
@@ -161,8 +156,8 @@ namespace cyclops::estimation {
     propagateIMU(imu_prev, imu_next);
   }
 
-  std::optional<IMUPropagationUpdateHandlerImpl::timestamped_motion_state_t>
-  IMUPropagationUpdateHandlerImpl::get() const {
+  std::optional<TimestampedMotionState> ImuPropagationUpdateHandlerImpl::get()
+    const {
     if (!_propagation_state)
       return std::nullopt;
 
@@ -173,7 +168,7 @@ namespace cyclops::estimation {
     auto const& dt = _propagation_state->integrator.time_delta;
 
     auto const& [q, p, v] = _propagation_state->motion_state;
-    auto propagated_state = imu_motion_state_t {
+    auto propagated_state = ImuMotionState {
       .orientation = q * y_q,
       .position = p + v * dt - 0.5 * g * dt * dt + q * y_p,
       .velocity = v - g * dt + q * y_v,
@@ -181,14 +176,14 @@ namespace cyclops::estimation {
     return std::make_tuple(_propagation_state->timestamp, propagated_state);
   }
 
-  void IMUPropagationUpdateHandlerImpl::reset() {
+  void ImuPropagationUpdateHandlerImpl::reset() {
     _propagation_state = nullptr;
     _imu_queue.clear();
   }
 
-  std::unique_ptr<IMUPropagationUpdateHandler>
-  IMUPropagationUpdateHandler::create(
-    std::shared_ptr<cyclops_global_config_t const> config) {
-    return std::make_unique<IMUPropagationUpdateHandlerImpl>(config);
+  std::unique_ptr<ImuPropagationUpdateHandler>
+  ImuPropagationUpdateHandler::Create(
+    std::shared_ptr<CyclopsConfig const> config) {
+    return std::make_unique<ImuPropagationUpdateHandlerImpl>(config);
   }
 }  // namespace cyclops::estimation

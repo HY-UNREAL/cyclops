@@ -17,18 +17,18 @@ namespace cyclops::initializer {
 
   using Matrix2x3d = Eigen::Matrix<double, 2, 3>;
 
-  static auto make_random_unit_vector(std::mt19937& rgen) {
+  static auto makeRandomUnitVector(std::mt19937& rgen) {
     auto d = std::uniform_real_distribution<double>(-1, 1);
     return Vector3d(d(rgen), d(rgen), d(rgen)).normalized().eval();
   }
 
-  static auto make_landmarks(std::mt19937& rgen) {
-    auto landmark_point_transform = [&](landmark_id_t id) {
+  static auto makeLandmarks(std::mt19937& rgen) {
+    auto landmark_point_transform = [&](LandmarkID id) {
       auto d = std::uniform_real_distribution<double>(-0.5, 0.5);
       return std::make_pair(id, Vector3d(d(rgen), d(rgen), 1.0 + d(rgen)));
     };
     return views::ints(0, 1000) | views::transform(landmark_point_transform) |
-      ranges::to<std::map<landmark_id_t, Vector3d>>;
+      ranges::to<std::map<LandmarkID, Vector3d>>;
   }
 
   static Vector2d project(Vector3d const& z) {
@@ -36,7 +36,7 @@ namespace cyclops::initializer {
   }
 
   template <typename keys_range_t, typename values_range_t>
-  static auto make_zipdict(
+  static auto makeZipdict(
     keys_range_t const& keys, values_range_t const& values) {
     auto pair_transform = [](auto _) {
       return std::make_pair(std::get<0>(_), std::get<1>(_));
@@ -44,8 +44,8 @@ namespace cyclops::initializer {
     return views::zip(keys, values) | views::transform(pair_transform);
   }
 
-  static auto make_two_view_feature_pairs(
-    std::map<landmark_id_t, Vector3d> const& landmarks,
+  static auto makeTwoViewFeaturePairs(
+    std::map<LandmarkID, Vector3d> const& landmarks,
     Quaterniond const& rotation, Vector3d const& translation,
     std::mt19937& rgen, double noise) {
     auto perturbation = [&](auto const& u) -> Vector2d {
@@ -62,22 +62,22 @@ namespace cyclops::initializer {
       views::transform(perturbation);
     auto two_view_features = views::zip(fst_view_features, snd_view_features);
 
-    return make_zipdict(landmarks | views::keys, two_view_features) |
-      ranges::to<std::map<landmark_id_t, two_view_feature_pair_t>>;
+    return makeZipdict(landmarks | views::keys, two_view_features) |
+      ranges::to<std::map<LandmarkID, TwoViewFeaturePair>>;
   }
 
   TEST_CASE("Test epipolar geometry refinement") {
     auto rgen = std::make_shared<std::mt19937>(20230804005);
-    auto landmarks = make_landmarks(*rgen);
+    auto landmarks = makeLandmarks(*rgen);
 
     auto sigma = 0.0075;
 
     auto rotation = Quaterniond(AngleAxisd(0.2, Vector3d::UnitX()));
-    auto translation = (0.2 * make_random_unit_vector(*rgen)).eval();
+    auto translation = (0.2 * makeRandomUnitVector(*rgen)).eval();
 
-    auto features = make_two_view_feature_pairs(
-      landmarks, rotation, translation, *rgen, sigma);
-    auto ids = features | views::keys | ranges::to<std::set<landmark_id_t>>;
+    auto features =
+      makeTwoViewFeaturePairs(landmarks, rotation, translation, *rgen, sigma);
+    auto ids = features | views::keys | ranges::to<std::set<LandmarkID>>;
 
     auto E_truth =
       (-rotation.conjugate().matrix() * skew3d(translation)).eval();
@@ -94,7 +94,7 @@ namespace cyclops::initializer {
       ranges::to_vector;
 
     auto context =
-      EpipolarGeometrySQPRefinementContext(E_truth, features_flatten);
+      EpipolarGeometrySQPRefinementContext(features_flatten, E_truth);
     auto const& E_refined = context.solve(8);
 
     CAPTURE(E_truth);

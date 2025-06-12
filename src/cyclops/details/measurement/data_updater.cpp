@@ -7,52 +7,53 @@
 #include <range/v3/all.hpp>
 
 namespace cyclops::measurement {
-  using estimation::IMUPropagationUpdateHandler;
+  using estimation::ImuPropagationUpdateHandler;
   using estimation::StateVariableReadAccessor;
 
   class MeasurementDataUpdaterImpl: public MeasurementDataUpdater {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<MeasurementDataQueue> _measurement_queue;
-    std::shared_ptr<IMUPropagationUpdateHandler> _propagator;
+    std::shared_ptr<ImuPropagationUpdateHandler> _propagator;
     std::shared_ptr<StateVariableReadAccessor const> _state_reader;
 
     double _landmark_dt_sum = 0;
-    std::deque<timestamp_t> _landmark_update_timestamps;
+    std::deque<Timestamp> _landmark_update_timestamps;
 
-    bool throttleLandmarkUpdateFps(timestamp_t timestamp);
+    bool throttleLandmarkUpdateFps(Timestamp timestamp);
 
   public:
     MeasurementDataUpdaterImpl(
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<MeasurementDataQueue> measurement_queue,
-      std::shared_ptr<IMUPropagationUpdateHandler> propagator,
+      std::shared_ptr<ImuPropagationUpdateHandler> propagator,
       std::shared_ptr<StateVariableReadAccessor const> state_reader);
     ~MeasurementDataUpdaterImpl();
     void reset() override;
 
-    void updateImu(imu_data_t const& data) override;
+    void updateImu(ImuData const& data) override;
 
-    std::optional<frame_id_t> updateLandmark(image_data_t const& data) override;
-    void repropagate(frame_id_t last_frame, timestamp_t timestamp) override;
+    std::optional<FrameID> updateLandmark(ImageData const& data) override;
+    void repropagate(FrameID last_frame, Timestamp timestamp) override;
 
-    std::map<frame_id_t, timestamp_t> frames() const override;
+    std::map<FrameID, Timestamp> frames() const override;
   };
 
   MeasurementDataUpdaterImpl::MeasurementDataUpdaterImpl(
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataQueue> measurement_queue,
-    std::shared_ptr<IMUPropagationUpdateHandler> propagator,
+    std::shared_ptr<ImuPropagationUpdateHandler> propagator,
     std::shared_ptr<StateVariableReadAccessor const> state_reader)
       : _config(config),
         _measurement_queue(measurement_queue),
         _propagator(propagator),
         _state_reader(state_reader) {
   }
+
   MeasurementDataUpdaterImpl::~MeasurementDataUpdaterImpl() = default;
 
   bool MeasurementDataUpdaterImpl::throttleLandmarkUpdateFps(
-    timestamp_t timestamp) {
+    Timestamp timestamp) {
     auto const& throttle_config = _config->update_throttling;
 
     if (_landmark_update_timestamps.empty()) {
@@ -92,33 +93,33 @@ namespace cyclops::measurement {
     return true;
   }
 
-  void MeasurementDataUpdaterImpl::updateImu(imu_data_t const& data) {
+  void MeasurementDataUpdaterImpl::updateImu(ImuData const& data) {
     _measurement_queue->updateImu(data);
-    _propagator->updateIMUData(data);
+    _propagator->updateImuData(data);
   }
 
-  std::optional<frame_id_t> MeasurementDataUpdaterImpl::updateLandmark(
-    image_data_t const& data) {
+  std::optional<FrameID> MeasurementDataUpdaterImpl::updateLandmark(
+    ImageData const& data) {
     if (!throttleLandmarkUpdateFps(data.timestamp))
       return std::nullopt;
     return _measurement_queue->updateLandmark(data);
   }
 
   void MeasurementDataUpdaterImpl::repropagate(
-    frame_id_t last_frame_id, timestamp_t timestamp) {
+    FrameID last_frame_id, Timestamp timestamp) {
     auto maybe_state_block = _state_reader->motionFrame(last_frame_id);
     if (!maybe_state_block)
       return;
     _propagator->updateOptimization(timestamp, *maybe_state_block);
   }
 
-  std::map<frame_id_t, timestamp_t> MeasurementDataUpdaterImpl::frames() const {
+  std::map<FrameID, Timestamp> MeasurementDataUpdaterImpl::frames() const {
     namespace views = ranges::views;
 
     auto const& keyframes = _measurement_queue->keyframes();
     auto const& pending_frames = _measurement_queue->pendingFrames();
     return views::concat(keyframes, views::all(pending_frames)) |
-      ranges::to<std::map<frame_id_t, timestamp_t>>;
+      ranges::to<std::map<FrameID, Timestamp>>;
   }
 
   void MeasurementDataUpdaterImpl::reset() {
@@ -126,10 +127,10 @@ namespace cyclops::measurement {
     _propagator->reset();
   }
 
-  std::unique_ptr<MeasurementDataUpdater> MeasurementDataUpdater::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<MeasurementDataUpdater> MeasurementDataUpdater::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataQueue> measurement_queue,
-    std::shared_ptr<IMUPropagationUpdateHandler> propagator,
+    std::shared_ptr<ImuPropagationUpdateHandler> propagator,
     std::shared_ptr<StateVariableReadAccessor const> state_reader) {
     return std::make_unique<MeasurementDataUpdaterImpl>(
       config, measurement_queue, propagator, state_reader);

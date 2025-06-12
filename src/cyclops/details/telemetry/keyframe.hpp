@@ -9,13 +9,12 @@ namespace cyclops::telemetry {
     virtual ~KeyframeTelemetry() = default;
     virtual void reset();
 
-    struct on_new_motion_frame_argument_t {
-      frame_id_t frame_id;
-      timestamp_t timestamp;
+    struct OnNewMotionFrame {
+      FrameID frame_id;
+      Timestamp timestamp;
     };
-    virtual void onNewMotionFrame(
-      on_new_motion_frame_argument_t const& argument);
+    virtual void onNewMotionFrame(OnNewMotionFrame const& argument);
 
-    static std::unique_ptr<KeyframeTelemetry> createDefault();
+    static std::unique_ptr<KeyframeTelemetry> CreateDefault();
   };
 }  // namespace cyclops::telemetry

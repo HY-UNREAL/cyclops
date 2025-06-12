@@ -18,52 +18,52 @@ namespace cyclops::initializer {
   namespace views = ranges::views;
 
   using telemetry::InitializerTelemetry;
-  using motion_statistics_lookup_t =
-    std::map<frame_id_t, image_frame_motion_statistics_t>;
+  using KeyframeMotionStatisticsLookup =
+    std::map<FrameID, KeyframeMotionStatistics>;
 
   template <typename key_t, typename value_t>
-  static std::set<key_t> project_keys(std::map<key_t, value_t> const& map) {
+  static std::set<key_t> projectKeys(std::map<key_t, value_t> const& map) {
     return map | views::keys | ranges::to<std::set<key_t>>;
   }
 
   class VisionBootstrapSolverImpl: public VisionBootstrapSolver {
   private:
     std::unique_ptr<MultiviewVisionGeometrySolver> _multiview_solver;
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<InitializerTelemetry> _telemetry;
 
-    motion_statistics_lookup_t compileMotionStatistics(
-      multiview_image_data_t const& image_data) const;
+    KeyframeMotionStatisticsLookup compileMotionStatistics(
+      MultiViewImageData const& image_data) const;
 
-    motion_statistics_lookup_t filterConnectedImageTrackSequence(
-      config::initializer::observability_pretest_threshold_t const& threshold,
-      motion_statistics_lookup_t const& lookup) const;
+    KeyframeMotionStatisticsLookup filterConnectedImageTrackSequence(
+      config::initializer::ObservabilityPretestThreshold const& threshold,
+      KeyframeMotionStatisticsLookup const& lookup) const;
     bool detectCameraMotion(
-      config::initializer::observability_pretest_threshold_t const& threshold,
-      motion_statistics_lookup_t const& lookup) const;
+      config::initializer::ObservabilityPretestThreshold const& threshold,
+      KeyframeMotionStatisticsLookup const& lookup) const;
 
     void reportBundleAdjustmentTelemetry(
-      std::set<frame_id_t> const& input_frames,
-      std::vector<vision_bootstrap_solution_t> const& solutions);
+      std::set<FrameID> const& input_frames,
+      std::vector<MSfMSolution> const& solutions);
 
   public:
     VisionBootstrapSolverImpl(
       std::unique_ptr<MultiviewVisionGeometrySolver> multiview_solver,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<InitializerTelemetry> telemetry);
     ~VisionBootstrapSolverImpl();
     void reset() override;
 
-    std::vector<vision_bootstrap_solution_t> solve(
-      multiview_image_data_t const& image_data,
-      camera_rotations_t const& camera_rotation_prior) override;
+    std::vector<MSfMSolution> solve(
+      MultiViewImageData const& image_data,
+      CameraRotations const& camera_rotation_prior) override;
   };
 
   VisionBootstrapSolverImpl::~VisionBootstrapSolverImpl() = default;
 
   VisionBootstrapSolverImpl::VisionBootstrapSolverImpl(
     std::unique_ptr<MultiviewVisionGeometrySolver> multiview_solver,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<InitializerTelemetry> telemetry)
       : _multiview_solver(std::move(multiview_solver)),
         _config(config),
@@ -74,8 +74,9 @@ namespace cyclops::initializer {
     _multiview_solver->reset();
   }
 
-  motion_statistics_lookup_t VisionBootstrapSolverImpl::compileMotionStatistics(
-    multiview_image_data_t const& image_data) const {
+  KeyframeMotionStatisticsLookup
+  VisionBootstrapSolverImpl::compileMotionStatistics(
+    MultiViewImageData const& image_data) const {
     return  //
       image_data | views::drop_last(1) |
       views::transform([&](auto const& id_frame) {
@@ -83,27 +84,27 @@ namespace cyclops::initializer {
         auto const& [_, last_frame] = *image_data.rbegin();
 
         return std::make_pair(
-          frame_id, compute_image_frame_motion_statistics(frame, last_frame));
+          frame_id, evaluateKeyframeMotionStatistics(frame, last_frame));
       }) |
-      ranges::to<motion_statistics_lookup_t>;
+      ranges::to<KeyframeMotionStatisticsLookup>;
   }
 
-  static auto make_image_observability_statistics_telemetry(
-    image_frame_motion_statistics_t const& motion_statistics) {
-    return InitializerTelemetry::image_observability_statistics_t {
+  static auto makeImageObservabilityStatisticsTelemetry(
+    KeyframeMotionStatistics const& motion_statistics) {
+    return InitializerTelemetry::ImageObservabilityStatistics {
       .common_features = motion_statistics.common_features,
       .motion_parallax = motion_statistics.average_parallax,
     };
   }
 
-  motion_statistics_lookup_t
+  KeyframeMotionStatisticsLookup
   VisionBootstrapSolverImpl::filterConnectedImageTrackSequence(
-    config::initializer::observability_pretest_threshold_t const& threshold,
-    motion_statistics_lookup_t const& lookup) const {
+    config::initializer::ObservabilityPretestThreshold const& threshold,
+    KeyframeMotionStatisticsLookup const& lookup) const {
     if (lookup.empty())
       return {};
 
-    motion_statistics_lookup_t result;
+    KeyframeMotionStatisticsLookup result;
     for (auto i = lookup.rbegin(); i != lookup.rend(); i++) {
       auto const& [frame_id, statistics] = *i;
       if (statistics.common_features < threshold.min_landmark_overlap)
@@ -116,21 +117,21 @@ namespace cyclops::initializer {
       lookup | views::transform([](auto const& pair) {
         auto const& [frame_id, statistics] = pair;
         return std::make_pair(
-          frame_id, make_image_observability_statistics_telemetry(statistics));
+          frame_id, makeImageObservabilityStatisticsTelemetry(statistics));
       }) |
-      ranges::to<std::map<
-        frame_id_t, InitializerTelemetry::image_observability_statistics_t>>;
+      ranges::to<
+        std::map<FrameID, InitializerTelemetry::ImageObservabilityStatistics>>;
 
     _telemetry->onImageObservabilityPretest({
       .frames = telemetry_frames,
-      .connected_frames = project_keys(result),
+      .connected_frames = projectKeys(result),
     });
     return result;
   }
 
   bool VisionBootstrapSolverImpl::detectCameraMotion(
-    config::initializer::observability_pretest_threshold_t const& threshold,
-    motion_statistics_lookup_t const& lookup) const {
+    config::initializer::ObservabilityPretestThreshold const& threshold,
+    KeyframeMotionStatisticsLookup const& lookup) const {
     auto average_parallax = ranges::max(  //
       lookup | views::values |
       views::transform([](auto const& _) { return _.average_parallax; }));
@@ -146,8 +147,8 @@ namespace cyclops::initializer {
   }
 
   void VisionBootstrapSolverImpl::reportBundleAdjustmentTelemetry(
-    std::set<frame_id_t> const& input_frames,
-    std::vector<vision_bootstrap_solution_t> const& solutions) {
+    std::set<FrameID> const& input_frames,
+    std::vector<MSfMSolution> const& solutions) {
     if (solutions.empty()) {
       _telemetry->onVisionFailure({
         .frames = input_frames,
@@ -165,7 +166,7 @@ namespace cyclops::initializer {
 
     auto sanity_telemetry =  //
       solutions | views::transform([](auto const& solution) {
-        return InitializerTelemetry::bundle_adjustment_sanity_t {
+        return InitializerTelemetry::BundleAdjustmentSanity {
           .acceptable = solution.acceptable,
           .inlier_ratio = solution.measurement_inlier_ratio,
           .final_cost_significant_probability =
@@ -180,9 +181,9 @@ namespace cyclops::initializer {
     });
   }
 
-  std::vector<vision_bootstrap_solution_t> VisionBootstrapSolverImpl::solve(
-    multiview_image_data_t const& image_data,
-    camera_rotations_t const& camera_rotation_prior) {
+  std::vector<MSfMSolution> VisionBootstrapSolverImpl::solve(
+    MultiViewImageData const& image_data,
+    CameraRotations const& camera_rotation_prior) {
     auto tic = ::cyclops::tic();
 
     auto const& threshold = _config->initialization.observability_pretest;
@@ -190,14 +191,14 @@ namespace cyclops::initializer {
       threshold, compileMotionStatistics(image_data));
     if ((connected_tracks.size() + 1) < threshold.min_keyframes) {
       _telemetry->onVisionFailure({
-        .frames = project_keys(image_data),
+        .frames = projectKeys(image_data),
         .reason = InitializerTelemetry::NOT_ENOUGH_CONNECTED_IMAGE_FRAMES,
       });
       return {};
     }
     if (!detectCameraMotion(threshold, connected_tracks)) {
       _telemetry->onVisionFailure({
-        .frames = project_keys(connected_tracks),
+        .frames = projectKeys(connected_tracks),
         .reason = InitializerTelemetry::NOT_ENOUGH_MOTION_PARALLAX,
       });
       return {};
@@ -210,7 +211,7 @@ namespace cyclops::initializer {
       views::transform([&](auto frame_id) {
         return std::make_pair(frame_id, image_data.at(frame_id));
       }) |
-      ranges::to<multiview_image_data_t>;
+      ranges::to<MultiViewImageData>;
 
     auto multiview_solutions =
       _multiview_solver->solve(image_data_filtered, camera_rotation_prior);
@@ -220,7 +221,7 @@ namespace cyclops::initializer {
     auto maybe_bundle_adjustments =
       multiview_solutions | views::transform([&](auto const& solution) {
         auto const& config = _config->initialization.vision;
-        return solve_bundle_adjustment(config, solution, image_data_filtered);
+        return solveBundleAdjustment(config, solution, image_data_filtered);
       }) |
       ranges::to_vector;
 
@@ -231,18 +232,18 @@ namespace cyclops::initializer {
       ranges::to_vector;
 
     reportBundleAdjustmentTelemetry(
-      project_keys(connected_tracks), successful_bundle_adjustments);
+      projectKeys(connected_tracks), successful_bundle_adjustments);
 
     __logger__->debug("Vision bootstrap time: {}[s]", toc(tic));
     return successful_bundle_adjustments;
   }
 
-  std::unique_ptr<VisionBootstrapSolver> VisionBootstrapSolver::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<VisionBootstrapSolver> VisionBootstrapSolver::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<std::mt19937> rgen,
     std::shared_ptr<InitializerTelemetry> telemetry) {
     return std::make_unique<VisionBootstrapSolverImpl>(
-      MultiviewVisionGeometrySolver::create(config, rgen, telemetry),  //
+      MultiviewVisionGeometrySolver::Create(config, rgen, telemetry),  //
       config, telemetry);
   }
 }  // namespace cyclops::initializer

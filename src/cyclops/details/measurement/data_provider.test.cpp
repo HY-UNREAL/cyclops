@@ -18,41 +18,41 @@ namespace cyclops::measurement {
     return container.find(key) != container.end();
   }
 
-  static auto make_empty_feature_point() {
-    return feature_point_t {
+  static auto makeEmptyFeaturePoint() {
+    return FeaturePoint {
       .point = Eigen::Vector2d::Zero(),
       .weight = Eigen::Matrix2d::Identity(),
     };
   }
 
   TEST_CASE("Measurement provider data update and marginalization") {
-    auto config = make_default_config();
+    auto config = makeDefaultConfig();
     auto state = std::make_shared<estimation::StateVariableInternal>();
     auto state_accessor =
       std::make_shared<estimation::StateVariableReadAccessor>(state, nullptr);
-    auto mprovider = MeasurementDataProvider::create(config, state_accessor);
+    auto mprovider = MeasurementDataProvider::Create(config, state_accessor);
 
     GIVEN("Landmark observation of ID 1~5 at t = 0 and frame_id = 0") {
-      auto l0 = image_data_t {0.0};
-      l0.features.emplace(1, make_empty_feature_point());
-      l0.features.emplace(2, make_empty_feature_point());
-      l0.features.emplace(3, make_empty_feature_point());
-      l0.features.emplace(4, make_empty_feature_point());
-      l0.features.emplace(5, make_empty_feature_point());
+      auto l0 = ImageData {0.0};
+      l0.features.emplace(1, makeEmptyFeaturePoint());
+      l0.features.emplace(2, makeEmptyFeaturePoint());
+      l0.features.emplace(3, makeEmptyFeaturePoint());
+      l0.features.emplace(4, makeEmptyFeaturePoint());
+      l0.features.emplace(5, makeEmptyFeaturePoint());
       mprovider->updateFrame(0, l0);
 
       GIVEN("Landmark observation of ID 1~3 at t = 0.1 and frame_id = 1") {
-        auto l1 = image_data_t {0.1};
-        l1.features.emplace(1, make_empty_feature_point());
-        l1.features.emplace(2, make_empty_feature_point());
-        l1.features.emplace(3, make_empty_feature_point());
+        auto l1 = ImageData {0.1};
+        l1.features.emplace(1, makeEmptyFeaturePoint());
+        l1.features.emplace(2, makeEmptyFeaturePoint());
+        l1.features.emplace(3, makeEmptyFeaturePoint());
         mprovider->updateFrame(0, 1, l1, nullptr);
 
         GIVEN("Landmark observation of ID 1~3 at t = 0.2 and frame_id = 2") {
-          auto l2 = image_data_t {0.2};
-          l2.features.emplace(1, make_empty_feature_point());
-          l2.features.emplace(2, make_empty_feature_point());
-          l2.features.emplace(3, make_empty_feature_point());
+          auto l2 = ImageData {0.2};
+          l2.features.emplace(1, makeEmptyFeaturePoint());
+          l2.features.emplace(2, makeEmptyFeaturePoint());
+          l2.features.emplace(3, makeEmptyFeaturePoint());
           mprovider->updateFrame(1, 2, l2, nullptr);
 
           THEN("Five landmark tracks exist") {

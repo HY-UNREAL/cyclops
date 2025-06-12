@@ -27,7 +27,7 @@ namespace cyclops::initializer {
 
       GIVEN(
         "Two-view feature pairs corresponding to the homography transform") {
-        std::map<landmark_id_t, two_view_feature_pair_t> feature_frame;
+        std::map<LandmarkID, TwoViewFeaturePair> feature_frame;
         for (auto feature_id : views::ints(0, 32)) {
           std::uniform_real_distribution<double> dist(-1, 1);
           auto const f_1 = Vector2d(dist(rgen), dist(rgen));
@@ -37,13 +37,13 @@ namespace cyclops::initializer {
         }
 
         WHEN("Solved homography by the random consensus") {
-          std::vector<std::set<landmark_id_t>> batch = {
+          std::vector<std::set<LandmarkID>> batch = {
             {0, 7, 25, 28}, {3, 8, 19, 26},  {5, 12, 24, 31},
             {4, 9, 17, 27}, {2, 15, 18, 23}, {11, 13, 21, 29},
           };
 
           auto const result =
-            analyze_two_view_homography(1e-6, batch, feature_frame);
+            analyzeTwoViewHomography(1e-6, batch, feature_frame);
 
           THEN("The result is same to the initially given homography matrix") {
             CAPTURE(result.homography);

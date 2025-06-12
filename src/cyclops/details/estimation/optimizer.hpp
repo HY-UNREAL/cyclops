@@ -8,7 +8,7 @@
 #include <optional>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::measurement {
@@ -16,7 +16,7 @@ namespace cyclops::measurement {
 }
 
 namespace cyclops::estimation {
-  struct gaussian_prior_t;
+  struct GaussianPrior;
 
   class FactorGraphInstance;
   class StateVariableWriteAccessor;
@@ -27,26 +27,26 @@ namespace cyclops::estimation {
     virtual ~LikelihoodOptimizer() = default;
     virtual void reset() = 0;
 
-    struct optimization_result_t {
+    struct OptimizationResult {
       std::unique_ptr<FactorGraphInstance> graph;
 
-      landmark_sanity_statistics_t landmark_sanity_statistics;
-      optimizer_sanity_statistics_t optimizer_sanity_statistics;
+      LandmarkSanityStatistics landmark_sanity_statistics;
+      OptimizerSanityStatistics optimizer_sanity_statistics;
 
       double solve_time;
       double optimizer_time;
       std::string optimizer_report;
 
-      std::set<frame_id_t> motion_frames;
-      std::set<landmark_id_t> active_landmarks;
-      std::set<landmark_id_t> mapped_landmarks;
+      std::set<FrameID> motion_frames;
+      std::set<LandmarkID> active_landmarks;
+      std::set<LandmarkID> mapped_landmarks;
     };
-    virtual std::optional<optimization_result_t> optimize(
-      gaussian_prior_t const& prior) = 0;
+    virtual std::optional<OptimizationResult> optimize(
+      GaussianPrior const& prior) = 0;
 
-    static std::unique_ptr<LikelihoodOptimizer> create(
+    static std::unique_ptr<LikelihoodOptimizer> Create(
       std::unique_ptr<OptimizerSolutionGuessPredictor> predictor,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<StateVariableWriteAccessor> state_accessor,
       std::shared_ptr<measurement::MeasurementDataProvider> measurement);
   };

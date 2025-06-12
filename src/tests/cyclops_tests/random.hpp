@@ -6,7 +6,7 @@
 #include <random>
 
 namespace cyclops {
-  struct imu_motion_state_t;
+  struct ImuMotionState;
 
   double perturbate(double const& x, double const& s, std::mt19937& rgen);
 
@@ -24,11 +24,11 @@ namespace cyclops {
   Eigen::Quaterniond perturbate(
     Eigen::Quaterniond const& q, Eigen::Matrix3d const& S, std::mt19937& rgen);
 
-  imu_motion_state_t perturbate(
-    imu_motion_state_t const& x, double S, std::mt19937& rgen);
+  ImuMotionState perturbate(
+    ImuMotionState const& x, double S, std::mt19937& rgen);
 
-  estimation::motion_frame_parameter_block_t make_perturbated_frame_state(
-    imu_motion_state_t const& x, double perturbation, std::mt19937& rgen);
-  estimation::landmark_parameter_block_t make_perturbated_landmark_state(
+  estimation::MotionFrameParameterBlock makePerturbatedFrameState(
+    ImuMotionState const& x, double perturbation, std::mt19937& rgen);
+  estimation::LandmarkParameterBlock makePerturbatedLandmarkState(
     Eigen::Vector3d const& landmark, double perturbation, std::mt19937& rgen);
 }  // namespace cyclops

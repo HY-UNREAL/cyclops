@@ -22,55 +22,54 @@ namespace cyclops::initializer {
   using Eigen::Vector3d;
   namespace views = ranges::views;
 
-  using AcceptDecision = IMUTranslationMatchAcceptDiscriminator::decision_t;
+  using AcceptDecision = ImuTranslationMatchAcceptDiscriminator::AcceptDecision;
   using RejectReason =
-    telemetry::InitializerTelemetry::imu_match_candidate_reject_reason_t;
+    telemetry::InitializerTelemetry::ImuMatchCandidateRejectReason;
 
-  class IMUBootstrapTranslationMatchSolutionParseContext {
+  class ImuTranslationMatchSolutionParseContext {
   private:
-    cyclops_global_config_t const& config;
-    IMUTranslationMatchAcceptDiscriminator const& acceptor;
+    CyclopsConfig const& config;
+    ImuTranslationMatchAcceptDiscriminator const& acceptor;
     telemetry::InitializerTelemetry& telemetry;
 
-    imu_match_rotation_solution_t const& rotation_match;
-    imu_match_camera_translation_prior_t const& camera_prior;
-    imu_match_translation_analysis_t const& analysis;
+    ImuRotationMatch const& rotation_match;
+    ImuMatchCameraTranslationPrior const& camera_prior;
+    ImuTranslationMatchAnalysis const& analysis;
 
-    vector<std::optional<imu_match_translation_uncertainty_t>>
+    vector<std::optional<ImuTranslationMatchUncertainty>>
     evaluateSolutionCandidateUncertainty(
-      vector<imu_match_scale_sample_solution_t> const& candidates);
+      vector<ImuMatchScaleSampleSolution> const& candidates);
 
-    imu_match_translation_solution_t parseMatchSolution(
-      imu_match_scale_sample_solution_t const& solution);
+    ImuTranslationMatchSolution parseMatchSolution(
+      ImuMatchScaleSampleSolution const& solution);
 
-    std::optional<telemetry::InitializerTelemetry::imu_match_reject_t>
+    std::optional<telemetry::InitializerTelemetry::ImuMatchReject>
     makeRejectTelemetry(
-      imu_match_translation_solution_t const& solution,
-      imu_match_translation_uncertainty_t const& uncertainty,
+      ImuTranslationMatchSolution const& solution,
+      ImuTranslationMatchUncertainty const& uncertainty,
       AcceptDecision decision);
 
-    std::optional<imu_translation_match_t> filterAndReportAccepts(
-      vector<imu_match_translation_solution_t> const& solutions,
-      vector<std::optional<imu_match_translation_uncertainty_t>> const&
+    std::optional<ImuTranslationMatch> filterAndReportAccepts(
+      vector<ImuTranslationMatchSolution> const& solutions,
+      vector<std::optional<ImuTranslationMatchUncertainty>> const&
         uncertainties);
 
-    telemetry::InitializerTelemetry::imu_match_solution_point_t
-    makeTelemetrySolutionPoint(
-      imu_match_translation_solution_t const& solution);
+    telemetry::InitializerTelemetry::ImuMatchSolutionPoint
+    makeTelemetrySolutionPoint(ImuTranslationMatchSolution const& solution);
 
-    telemetry::InitializerTelemetry::imu_match_uncertainty_t
+    telemetry::InitializerTelemetry::ImuMatchUncertainty
     makeTelemetrySolutionUncertainty(
-      imu_match_translation_solution_t const& solution,
-      imu_match_translation_uncertainty_t const& uncertainty);
+      ImuTranslationMatchSolution const& solution,
+      ImuTranslationMatchUncertainty const& uncertainty);
 
   public:
-    IMUBootstrapTranslationMatchSolutionParseContext(
-      cyclops_global_config_t const& config,
-      IMUTranslationMatchAcceptDiscriminator const& acceptor,
+    ImuTranslationMatchSolutionParseContext(
+      CyclopsConfig const& config,
+      ImuTranslationMatchAcceptDiscriminator const& acceptor,
       telemetry::InitializerTelemetry& telemetry,
-      imu_match_rotation_solution_t const& rotation_match,
-      imu_match_camera_translation_prior_t const& camera_prior,
-      imu_match_translation_analysis_t const& analysis)
+      ImuRotationMatch const& rotation_match,
+      ImuMatchCameraTranslationPrior const& camera_prior,
+      ImuTranslationMatchAnalysis const& analysis)
         : config(config),
           acceptor(acceptor),
           telemetry(telemetry),
@@ -79,24 +78,23 @@ namespace cyclops::initializer {
           analysis(analysis) {
     }
 
-    std::optional<imu_translation_match_t> parse(
-      vector<imu_match_scale_sample_solution_t> const& candidates);
+    std::optional<ImuTranslationMatch> parse(
+      vector<ImuMatchScaleSampleSolution> const& candidates);
   };
 
-  using Context = IMUBootstrapTranslationMatchSolutionParseContext;
-
-  vector<std::optional<imu_match_translation_uncertainty_t>>
-  Context::evaluateSolutionCandidateUncertainty(
-    vector<imu_match_scale_sample_solution_t> const& candidates) {
+  vector<std::optional<ImuTranslationMatchUncertainty>>
+  ImuTranslationMatchSolutionParseContext::evaluateSolutionCandidateUncertainty(
+    vector<ImuMatchScaleSampleSolution> const& candidates) {
     return  //
       candidates | views::transform([&](auto const& candidate) {
-        return imu_match_analyze_translation_uncertainty(analysis, candidate);
+        return analyzeImuTranslationMatchUncertainty(analysis, candidate);
       }) |
       ranges::to_vector;
   }
 
-  imu_match_translation_solution_t Context::parseMatchSolution(
-    imu_match_scale_sample_solution_t const& solution) {
+  ImuTranslationMatchSolution
+  ImuTranslationMatchSolutionParseContext::parseMatchSolution(
+    ImuMatchScaleSampleSolution const& solution) {
     auto const& extrinsic = config.extrinsics.imu_camera_transform;
     auto const& imu_orientations = rotation_match.body_orientations;
     auto const& camera_position_nominals = camera_prior.translations;
@@ -106,7 +104,7 @@ namespace cyclops::initializer {
     auto keyvalue_reverse_transform = views::transform(
       [](auto const& kv) { return std::make_pair(kv.second, kv.first); });
     auto keyframe_indexmap = views::enumerate(keyframes) |
-      keyvalue_reverse_transform | ranges::to<std::map<frame_id_t, int>>;
+      keyvalue_reverse_transform | ranges::to<std::map<FrameID, int>>;
 
     auto keyframe_index_transform = views::transform(
       [&](auto frame_id) { return keyframe_indexmap.at(frame_id); });
@@ -138,21 +136,21 @@ namespace cyclops::initializer {
         return p_c + q_c * delta_p;
       });
 
-    return imu_match_translation_solution_t {
+    return ImuTranslationMatchSolution {
       .scale = solution.scale,
       .cost = solution.cost,
       .gravity = x_I.head(3),
       .acc_bias = x_I.segment(3, 3),
       .imu_body_velocities = views::zip(keyframes, body_velocities) |
-        ranges::to<std::map<frame_id_t, Vector3d>>,
+        ranges::to<std::map<FrameID, Vector3d>>,
       .sfm_positions = views::zip(keyframes, camera_positions) |
-        ranges::to<std::map<frame_id_t, Vector3d>>,
+        ranges::to<std::map<FrameID, Vector3d>>,
     };
   }
 
-  telemetry::InitializerTelemetry::imu_match_solution_point_t
-  Context::makeTelemetrySolutionPoint(
-    imu_match_translation_solution_t const& solution) {
+  telemetry::InitializerTelemetry::ImuMatchSolutionPoint
+  ImuTranslationMatchSolutionParseContext::makeTelemetrySolutionPoint(
+    ImuTranslationMatchSolution const& solution) {
     return {
       .scale = solution.scale,
       .cost = solution.cost,
@@ -166,21 +164,21 @@ namespace cyclops::initializer {
     };
   }
 
-  static auto max_velocity(imu_match_translation_solution_t const& solution) {
+  static auto maxVelocity(ImuTranslationMatchSolution const& solution) {
     double result = 1e-6;
     for (auto const& [_, v] : solution.imu_body_velocities)
       result = std::max<double>(v.norm(), result);
     return result;
   }
 
-  telemetry::InitializerTelemetry::imu_match_uncertainty_t
-  Context::makeTelemetrySolutionUncertainty(
-    imu_match_translation_solution_t const& solution,
-    imu_match_translation_uncertainty_t const& uncertainty) {
+  telemetry::InitializerTelemetry::ImuMatchUncertainty
+  ImuTranslationMatchSolutionParseContext::makeTelemetrySolutionUncertainty(
+    ImuTranslationMatchSolution const& solution,
+    ImuTranslationMatchUncertainty const& uncertainty) {
     auto gravity_norm = config.gravity_norm;
     auto sigma_g = uncertainty.gravity_tangent_deviation(0) / gravity_norm;
     auto sigma_v =
-      uncertainty.body_velocity_deviation(1) / max_velocity(solution);
+      uncertainty.body_velocity_deviation(1) / maxVelocity(solution);
 
     return {
       .final_cost_significant_probability =
@@ -194,31 +192,31 @@ namespace cyclops::initializer {
     };
   }
 
-  std::optional<telemetry::InitializerTelemetry::imu_match_reject_t>
-  Context::makeRejectTelemetry(
-    imu_match_translation_solution_t const& solution,
-    imu_match_translation_uncertainty_t const& uncertainty,
+  std::optional<telemetry::InitializerTelemetry::ImuMatchReject>
+  ImuTranslationMatchSolutionParseContext::makeRejectTelemetry(
+    ImuTranslationMatchSolution const& solution,
+    ImuTranslationMatchUncertainty const& uncertainty,
     AcceptDecision decision) {
     switch (decision) {
     case AcceptDecision::ACCEPT:
       return std::nullopt;
 
     case AcceptDecision::REJECT_COST_PROBABILITY_INSIGNIFICANT:
-      return telemetry::InitializerTelemetry::imu_match_reject_t {
+      return telemetry::InitializerTelemetry::ImuMatchReject {
         .reason = RejectReason::COST_PROBABILITY_INSIGNIFICANT,
         .solution = makeTelemetrySolutionPoint(solution),
         .uncertainty = makeTelemetrySolutionUncertainty(solution, uncertainty),
       };
 
     case AcceptDecision::REJECT_UNDERINFORMATIVE_PARAMETER:
-      return telemetry::InitializerTelemetry::imu_match_reject_t {
+      return telemetry::InitializerTelemetry::ImuMatchReject {
         .reason = RejectReason::UNDERINFORMATIVE_PARAMETER,
         .solution = makeTelemetrySolutionPoint(solution),
         .uncertainty = makeTelemetrySolutionUncertainty(solution, uncertainty),
       };
 
     case AcceptDecision::REJECT_SCALE_LESS_THAN_ZERO:
-      return telemetry::InitializerTelemetry::imu_match_reject_t {
+      return telemetry::InitializerTelemetry::ImuMatchReject {
         .reason = RejectReason::SCALE_LESS_THAN_ZERO,
         .solution = makeTelemetrySolutionPoint(solution),
         .uncertainty = makeTelemetrySolutionUncertainty(solution, uncertainty),
@@ -227,16 +225,17 @@ namespace cyclops::initializer {
     return std::nullopt;
   }
 
-  std::optional<imu_translation_match_t> Context::filterAndReportAccepts(
-    vector<imu_match_translation_solution_t> const& solutions,
-    vector<std::optional<imu_match_translation_uncertainty_t>> const&
+  std::optional<ImuTranslationMatch>
+  ImuTranslationMatchSolutionParseContext::filterAndReportAccepts(
+    vector<ImuTranslationMatchSolution> const& solutions,
+    vector<std::optional<ImuTranslationMatchUncertainty>> const&
       uncertainties) {
     auto accepts =  //
       views::zip(solutions, uncertainties) |
       views::filter([&](auto const& pair) {
         auto const& [candidate, maybe_uncertainty] = pair;
         if (!maybe_uncertainty.has_value()) {
-          telemetry.onIMUMatchCandidateReject({
+          telemetry.onImuMatchCandidateReject({
             .reason = RejectReason::UNCERTAINTY_EVALUATION_FAILED,
             .solution = makeTelemetrySolutionPoint(candidate),
             .uncertainty = std::nullopt,
@@ -249,7 +248,7 @@ namespace cyclops::initializer {
         auto reject_telemetry =
           makeRejectTelemetry(candidate, uncertainty, decision);
         if (reject_telemetry.has_value()) {
-          telemetry.onIMUMatchCandidateReject(*reject_telemetry);
+          telemetry.onImuMatchCandidateReject(*reject_telemetry);
           return false;
         }
         return true;
@@ -270,7 +269,7 @@ namespace cyclops::initializer {
         }) |
         ranges::to_vector;
 
-      telemetry.onIMUMatchAmbiguity({solutions, uncertainties});
+      telemetry.onImuMatchAmbiguity({solutions, uncertainties});
       return std::nullopt;
     }
 
@@ -280,19 +279,20 @@ namespace cyclops::initializer {
     auto reject_telemetry =
       makeRejectTelemetry(solution, *uncertainty, decision);
     if (reject_telemetry.has_value()) {
-      telemetry.onIMUMatchReject(*reject_telemetry);
-      return imu_translation_match_t {false, solution};
+      telemetry.onImuMatchReject(*reject_telemetry);
+      return ImuTranslationMatch {false, solution};
     }
 
-    telemetry.onIMUMatchAccept({
+    telemetry.onImuMatchAccept({
       makeTelemetrySolutionPoint(solution),
       makeTelemetrySolutionUncertainty(solution, *uncertainty),
     });
-    return imu_translation_match_t {true, solution};
+    return ImuTranslationMatch {true, solution};
   }
 
-  std::optional<imu_translation_match_t> Context::parse(
-    vector<imu_match_scale_sample_solution_t> const& candidates) {
+  std::optional<ImuTranslationMatch>
+  ImuTranslationMatchSolutionParseContext::parse(
+    vector<ImuMatchScaleSampleSolution> const& candidates) {
     auto uncertainties = evaluateSolutionCandidateUncertainty(candidates);
     auto solutions =  //
       candidates | views::transform([&](auto const& solution) {
@@ -302,35 +302,35 @@ namespace cyclops::initializer {
     return filterAndReportAccepts(solutions, uncertainties);
   }
 
-  class IMUMatchTranslationSolverImpl: public IMUMatchTranslationSolver {
+  class ImuTranslationMatchSolverImpl: public ImuTranslationMatchSolver {
   private:
-    std::unique_ptr<IMUMatchTranslationAnalyzer> _analyzer;
-    std::unique_ptr<IMUTranslationMatchAcceptDiscriminator> _acceptor;
-    std::unique_ptr<IMUMatchScaleSampleSolver> _sample_solver;
+    std::unique_ptr<ImuTranslationMatchAnalyzer> _analyzer;
+    std::unique_ptr<ImuTranslationMatchAcceptDiscriminator> _acceptor;
+    std::unique_ptr<ImuMatchScaleSampleSolver> _sample_solver;
 
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<telemetry::InitializerTelemetry> _telemetry;
 
   public:
-    IMUMatchTranslationSolverImpl(
-      std::unique_ptr<IMUMatchTranslationAnalyzer> analyzer,
-      std::unique_ptr<IMUTranslationMatchAcceptDiscriminator> acceptor,
-      std::unique_ptr<IMUMatchScaleSampleSolver> sample_solver,
-      std::shared_ptr<cyclops_global_config_t const> config,
+    ImuTranslationMatchSolverImpl(
+      std::unique_ptr<ImuTranslationMatchAnalyzer> analyzer,
+      std::unique_ptr<ImuTranslationMatchAcceptDiscriminator> acceptor,
+      std::unique_ptr<ImuMatchScaleSampleSolver> sample_solver,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
     void reset() override;
 
-    std::optional<imu_translation_match_t> solve(
-      measurement::imu_motion_refs_t const& motions,
-      imu_match_rotation_solution_t const& rotations,
-      imu_match_camera_translation_prior_t const& camera_prior) override;
+    std::optional<ImuTranslationMatch> solve(
+      measurement::ImuMotionRefs const& motions,
+      ImuRotationMatch const& rotations,
+      ImuMatchCameraTranslationPrior const& camera_prior) override;
   };
 
-  IMUMatchTranslationSolverImpl::IMUMatchTranslationSolverImpl(
-    std::unique_ptr<IMUMatchTranslationAnalyzer> analyzer,
-    std::unique_ptr<IMUTranslationMatchAcceptDiscriminator> acceptor,
-    std::unique_ptr<IMUMatchScaleSampleSolver> sample_solver,
-    std::shared_ptr<cyclops_global_config_t const> config,
+  ImuTranslationMatchSolverImpl::ImuTranslationMatchSolverImpl(
+    std::unique_ptr<ImuTranslationMatchAnalyzer> analyzer,
+    std::unique_ptr<ImuTranslationMatchAcceptDiscriminator> acceptor,
+    std::unique_ptr<ImuMatchScaleSampleSolver> sample_solver,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry)
       : _analyzer(std::move(analyzer)),
         _acceptor(std::move(acceptor)),
@@ -339,22 +339,22 @@ namespace cyclops::initializer {
         _telemetry(telemetry) {
   }
 
-  void IMUMatchTranslationSolverImpl::reset() {
+  void ImuTranslationMatchSolverImpl::reset() {
     _analyzer->reset();
     _acceptor->reset();
     _sample_solver->reset();
     _telemetry->reset();
   }
 
-  std::optional<imu_translation_match_t> IMUMatchTranslationSolverImpl::solve(
-    measurement::imu_motion_refs_t const& motions,
-    imu_match_rotation_solution_t const& rotations,
-    imu_match_camera_translation_prior_t const& camera_prior) {
+  std::optional<ImuTranslationMatch> ImuTranslationMatchSolverImpl::solve(
+    measurement::ImuMotionRefs const& motions,
+    ImuRotationMatch const& rotations,
+    ImuMatchCameraTranslationPrior const& camera_prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
 
     auto analysis = _analyzer->analyze(motions, rotations, camera_prior);
 
-    auto cache = IMUMatchTranslationAnalysisCache(analysis);
+    auto cache = ImuTranslationMatchAnalysisCache(analysis);
     auto motion_keyframes =
       camera_prior.translations | views::keys | ranges::to<std::set>;
 
@@ -363,18 +363,17 @@ namespace cyclops::initializer {
     if (!maybe_candidates.has_value())
       return std::nullopt;
 
-    auto candidate_parse_context =
-      IMUBootstrapTranslationMatchSolutionParseContext(
-        *_config, *_acceptor, *_telemetry, rotations, camera_prior, analysis);
+    auto candidate_parse_context = ImuTranslationMatchSolutionParseContext(
+      *_config, *_acceptor, *_telemetry, rotations, camera_prior, analysis);
     return candidate_parse_context.parse(maybe_candidates.value());
   }
 
-  std::unique_ptr<IMUMatchTranslationSolver> IMUMatchTranslationSolver::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<ImuTranslationMatchSolver> ImuTranslationMatchSolver::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
-    return std::make_unique<IMUMatchTranslationSolverImpl>(
-      IMUMatchTranslationAnalyzer::create(config),
-      IMUTranslationMatchAcceptDiscriminator::create(config),
-      IMUMatchScaleSampleSolver::create(config, telemetry), config, telemetry);
+    return std::make_unique<ImuTranslationMatchSolverImpl>(
+      ImuTranslationMatchAnalyzer::Create(config),
+      ImuTranslationMatchAcceptDiscriminator::Create(config),
+      ImuMatchScaleSampleSolver::Create(config, telemetry), config, telemetry);
   }
 }  // namespace cyclops::initializer

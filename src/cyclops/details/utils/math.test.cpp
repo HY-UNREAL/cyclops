@@ -20,7 +20,7 @@ namespace cyclops {
     CHECK(y == doctest::Approx(-x * x / 2));
   }
 
-  static std::vector<double> make_rpoly_from_roots(
+  static std::vector<double> makeRpolyFromRoots(
     std::vector<double> const& roots, double leading_coefficient = 1) {
     auto step = [](auto const& p, double r) -> std::vector<double> {
       if (p.empty())
@@ -47,7 +47,7 @@ namespace cyclops {
   }
 
   TEST_CASE("Polynomial generation") {
-    auto p = make_rpoly_from_roots({1, 2, 3}, 2);
+    auto p = makeRpolyFromRoots({1, 2, 3}, 2);
     REQUIRE(p.size() == 4);
     CHECK(p.at(0) == doctest::Approx(-12));
     CHECK(p.at(1) == doctest::Approx(+22));
@@ -63,7 +63,7 @@ namespace cyclops {
     std::generate(s.begin(), s.end(), [&]() { return rand(rgen); });
 
     auto c = rand(rgen);
-    auto p = make_rpoly_from_roots(s, c * c);
+    auto p = makeRpolyFromRoots(s, c * c);
     REQUIRE(p.size() == 7);
 
     auto x = rand(rgen);
@@ -74,7 +74,7 @@ namespace cyclops {
         return c * std::pow(x, n);
       }),
       0.0);
-    auto p_x__got = evaluate_polynomial<7>(p.data(), x);
+    auto p_x__got = evaluatePolynomial<7>(p.data(), x);
 
     CHECK(p_x__expected == doctest::Approx(p_x__got));
   }
@@ -95,7 +95,7 @@ namespace cyclops {
           CAPTURE(a);
           CAPTURE(x);
           CHECK(
-            gamma_lower_incomplete_normal(a, x) ==
+            gammaLowerIncompleteNormal(a, x) ==
             doctest::Approx(boost::math::gamma_p(a, x)));
         }
       }
@@ -114,7 +114,7 @@ namespace cyclops {
           CAPTURE(a);
           CAPTURE(x);
           CHECK(
-            gamma_lower_incomplete_normal(a, x) ==
+            gammaLowerIncompleteNormal(a, x) ==
             doctest::Approx(boost::math::gamma_p(a, x)));
         }
       }
@@ -135,7 +135,7 @@ namespace cyclops {
 
         auto boost_chi_squared = boost::math::chi_squared(dof);
         auto boost_cdf = boost::math::cdf(boost_chi_squared, x);
-        auto my_cdf = ::cyclops::chi_squared_cdf(dof, x);
+        auto my_cdf = ::cyclops::chiSquaredCdf(dof, x);
 
         CAPTURE(r_max);
         CAPTURE(dof);
@@ -156,20 +156,20 @@ namespace cyclops {
       auto rotation =
         Quaterniond(Eigen::AngleAxisd(angle.norm(), angle.normalized()));
 
-      auto logangle = so3_logmap(rotation);
+      auto logangle = so3Logmap(rotation);
       CAPTURE(logangle.transpose());
       CAPTURE(angle.transpose());
       CHECK(logangle.isApprox(angle));
     }
 
-    CHECK(so3_logmap(Quaterniond::Identity()).norm() == 0);
+    CHECK(so3Logmap(Quaterniond::Identity()).norm() == 0);
 
     for (auto _ = 0; _ < 1000; _++) {
       auto angle = perturbate(Vector3d::Zero().eval(), 1e-6, rgen);
       auto rotation =
         Quaterniond(Eigen::AngleAxisd(angle.norm(), angle.normalized()));
 
-      auto logangle = so3_logmap(rotation);
+      auto logangle = so3Logmap(rotation);
       CAPTURE(logangle.transpose());
       CAPTURE(angle.transpose());
       CHECK(logangle.isApprox(angle));
@@ -180,7 +180,7 @@ namespace cyclops {
       auto rotation =
         Quaterniond(Eigen::AngleAxisd(angle.norm(), angle.normalized()));
 
-      auto logangle = so3_logmap(rotation);
+      auto logangle = so3Logmap(rotation);
       CAPTURE(logangle.transpose());
       CAPTURE(angle.transpose());
       CHECK(logangle.isApprox(angle));

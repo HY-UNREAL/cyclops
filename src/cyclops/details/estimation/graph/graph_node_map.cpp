@@ -23,7 +23,7 @@ namespace cyclops::estimation {
   FactorGraphStateNodeMap::~FactorGraphStateNodeMap() = default;
 
   bool FactorGraphStateNodeMap::createFrameNode(
-    ceres::Problem& problem, frame_id_t frame_id) {
+    ceres::Problem& problem, FrameID frame_id) {
     auto maybe_x = _state->motionFrame(frame_id);
     if (!maybe_x) {
       __logger__->error(
@@ -33,7 +33,7 @@ namespace cyclops::estimation {
 
     auto x = maybe_x->get().data();
     _node_contexts.emplace(
-      node::frame(frame_id), graph_node_context_t {x, {}, {}});
+      node::makeFrame(frame_id), GraphNodeContext {x, {}, {}});
 
     problem.AddParameterBlock(
       x, 10,
@@ -42,7 +42,7 @@ namespace cyclops::estimation {
 
     auto b = x + 10;
     _node_contexts.emplace(
-      node::bias(frame_id), graph_node_context_t {b, {}, {}});
+      node::makeBias(frame_id), GraphNodeContext {b, {}, {}});
 
     problem.AddParameterBlock(b, 6);
 
@@ -50,21 +50,21 @@ namespace cyclops::estimation {
   }
 
   bool FactorGraphStateNodeMap::createLandmarkNode(
-    ceres::Problem& problem, landmark_id_t landmark_id) {
+    ceres::Problem& problem, LandmarkID landmark_id) {
     auto maybe_f = _state->landmark(landmark_id);
     if (!maybe_f)
       return false;
 
     auto f = maybe_f->get().data();
     _node_contexts.emplace(
-      node::landmark(landmark_id), graph_node_context_t {f, {}, {}});
+      node::makeLandmark(landmark_id), GraphNodeContext {f, {}, {}});
     problem.AddParameterBlock(f, 3);
 
     return true;
   }
 
-  maybe_graph_node_context_ref_t FactorGraphStateNodeMap::findContext(
-    node_t const& node) {
+  GraphNodeContext::MaybeRef FactorGraphStateNodeMap::findContext(
+    Node const& node) {
     auto maybe_context = _node_contexts.find(node);
     if (maybe_context == _node_contexts.end())
       return std::nullopt;
@@ -73,8 +73,8 @@ namespace cyclops::estimation {
     return context;
   }
 
-  maybe_graph_node_context_cref_t FactorGraphStateNodeMap::findContext(
-    node_t const& node) const {
+  GraphNodeContext::MaybeCRef FactorGraphStateNodeMap::findContext(
+    Node const& node) const {
     auto maybe_context = _node_contexts.find(node);
     if (maybe_context == _node_contexts.end())
       return std::nullopt;
@@ -83,8 +83,8 @@ namespace cyclops::estimation {
     return context;
   }
 
-  factor_id_t FactorGraphStateNodeMap::createPriorFactor(
-    ceres::Problem& problem, factor_ptr_t ptr, node_set_t const& nodes) {
+  FactorID FactorGraphStateNodeMap::createPriorFactor(
+    ceres::Problem& problem, FactorPtr ptr, NodeSet const& nodes) {
     if (_prior) {
       __logger__->warn("Warning: setting prior twice");
       problem.RemoveResidualBlock(_prior->ptr);
@@ -94,9 +94,9 @@ namespace cyclops::estimation {
     return _last_factor_id;
   }
 
-  factor_id_t FactorGraphStateNodeMap::createFactor(
-    factor_entry_t factor_entry,
-    std::vector<std::pair<node_t, graph_node_context_ref_t>> const& nodes) {
+  FactorID FactorGraphStateNodeMap::createFactor(
+    FactorEntry factor_entry,
+    std::vector<std::pair<Node, GraphNodeContext::Ref>> const& nodes) {
     auto pairs =
       views::cartesian_product(
         views::iota(0, (int)nodes.size()), views::iota(0, (int)nodes.size())) |
@@ -118,17 +118,17 @@ namespace cyclops::estimation {
     return _last_factor_id;
   }
 
-  std::optional<node_set_cref_t> FactorGraphStateNodeMap::queryNeighbors(
-    node_t const& node) const {
+  std::optional<NodeSetCRef> FactorGraphStateNodeMap::queryNeighbors(
+    Node const& node) const {
     auto maybe_context = findContext(node);
     if (!maybe_context)
       return std::nullopt;
     return maybe_context->get().neighbors;
   }
 
-  neighbor_query_result_t FactorGraphStateNodeMap::queryNeighbors(
-    node_set_t const& nodes) const {
-    neighbor_query_result_t result;
+  NeighborQueryResult FactorGraphStateNodeMap::queryNeighbors(
+    NodeSet const& nodes) const {
+    NeighborQueryResult result;
     for (auto const& node : nodes) {
       auto maybe_context = findContext(node);
       if (!maybe_context) {
@@ -142,16 +142,16 @@ namespace cyclops::estimation {
     return result;
   }
 
-  std::optional<prior_node_t> const& FactorGraphStateNodeMap::getPrior() const {
+  std::optional<PriorNode> const& FactorGraphStateNodeMap::getPrior() const {
     return _prior;
   }
 
-  std::vector<node_t> FactorGraphStateNodeMap::allNodes() const {
+  std::vector<Node> FactorGraphStateNodeMap::allNodes() const {
     return _node_contexts | views::keys | ranges::to_vector;
   }
 
-  factor_set_t FactorGraphStateNodeMap::allFactors() const {
-    factor_set_t result;
+  FactorSet FactorGraphStateNodeMap::allFactors() const {
+    FactorSet result;
     for (auto const& ctxt : _node_contexts | views::values)
       result.insert(ctxt.factors.begin(), ctxt.factors.end());
     return result;

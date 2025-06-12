@@ -25,43 +25,43 @@ namespace cyclops::initializer {
   using Eigen::Quaterniond;
   using Eigen::Vector3d;
 
-  static auto position_signal(timestamp_t t) {
+  static auto positionSignal(Timestamp t) {
     auto x = 3 * (1 - std::cos(t));
     return Vector3d(x, 0, 0);
   }
 
-  static auto orientation_signal(timestamp_t t) -> Quaterniond {
+  static auto orientationSignal(Timestamp t) -> Quaterniond {
     auto theta = atan2(1, cos(t));
-    auto q0 = make_default_camera_rotation();
+    auto q0 = makeDefaultCameraRotation();
     return Eigen::AngleAxisd(theta, Vector3d::UnitZ()) * q0;
   }
 
   TEST_CASE("Vision bootstrap solver") {
     auto rgen = std::make_shared<std::mt19937>(2021052403);
 
-    auto pose_signal = pose_signal_t {
-      .position = position_signal,
-      .orientation = orientation_signal,
+    auto pose_signal = PoseSignal {
+      .position = positionSignal,
+      .orientation = orientationSignal,
     };
-    auto extrinsic = se3_transform_t::Identity();
+    auto extrinsic = SE3Transform::Identity();
     auto timestamps = linspace(0, M_PI_2, 16) | ranges::to_vector;
     auto timestamp_lookup =
-      make_dictionary<frame_id_t, timestamp_t>(views::enumerate(timestamps));
+      makeDictionary<FrameID, Timestamp>(views::enumerate(timestamps));
 
     auto motion_frames = timestamp_lookup | views::keys | ranges::to_vector;
 
-    auto landmarks = generate_landmarks(
+    auto landmarks = generateLandmarks(
       *rgen, {200, Vector3d(3, 3, 0), Vector3d(1, 1, 1).asDiagonal()});
 
-    auto multiview_image_data = make_landmark_multiview_observation(
+    auto multiview_image_data = makeLandmarkMultiviewObservation(
       pose_signal, extrinsic, landmarks, timestamp_lookup);
     auto multiview_rotation_prior =
-      make_multiview_rotation_prior(pose_signal, extrinsic, timestamp_lookup);
+      makeMultiViewRotationPrior(pose_signal, extrinsic, timestamp_lookup);
 
-    auto config = make_default_config();
+    auto config = makeDefaultConfig();
     config->initialization.vision.feature_point_isotropic_noise = 0.005;
-    auto solver = VisionBootstrapSolver::create(
-      config, rgen, InitializerTelemetry::createDefault());
+    auto solver = VisionBootstrapSolver::Create(
+      config, rgen, InitializerTelemetry::CreateDefault());
     auto solutions =
       solver->solve(multiview_image_data, multiview_rotation_prior);
     REQUIRE_FALSE(solutions.empty());
@@ -88,7 +88,7 @@ namespace cyclops::initializer {
     auto init_time = timestamp_lookup.at(init_frame);
     auto last_time = timestamp_lookup.at(last_frame);
     auto truth_travel =
-      distance(position_signal(last_time), position_signal(init_time));
+      distance(positionSignal(last_time), positionSignal(init_time));
 
     REQUIRE(result_travel != 0);
     REQUIRE(truth_travel != 0);

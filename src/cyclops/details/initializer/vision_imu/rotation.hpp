@@ -7,27 +7,27 @@
 #include <optional>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct imu_match_camera_rotation_prior_t;
+  struct ImuMatchCameraRotationPrior;
 
-  struct imu_match_rotation_solution_t {
+  struct ImuRotationMatch {
     Eigen::Vector3d gyro_bias;
-    std::map<frame_id_t, Eigen::Quaterniond> body_orientations;
+    std::map<FrameID, Eigen::Quaterniond> body_orientations;
   };
 
-  class IMUMatchRotationSolver {
+  class ImuRotationMatchSolver {
   public:
-    virtual ~IMUMatchRotationSolver() = default;
+    virtual ~ImuRotationMatchSolver() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<imu_match_rotation_solution_t> solve(
-      measurement::imu_motion_refs_t const& motions,
-      imu_match_camera_rotation_prior_t const& prior) = 0;
+    virtual std::optional<ImuRotationMatch> solve(
+      measurement::ImuMotionRefs const& motions,
+      ImuMatchCameraRotationPrior const& prior) = 0;
 
-    static std::unique_ptr<IMUMatchRotationSolver> create(
-      std::shared_ptr<cyclops_global_config_t const> config);
+    static std::unique_ptr<ImuRotationMatchSolver> Create(
+      std::shared_ptr<CyclopsConfig const> config);
   };
 }  // namespace cyclops::initializer

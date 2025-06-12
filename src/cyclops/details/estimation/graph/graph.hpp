@@ -13,14 +13,14 @@
 #include <tuple>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::estimation {
-  struct prior_node_t;
-  struct neighbor_query_result_t;
-  struct landmark_acceptance_t;
-  struct gaussian_prior_t;
+  struct PriorNode;
+  struct NeighborQueryResult;
+  struct LandmarkAcceptance;
+  struct GaussianPrior;
 
   struct FactorGraphCostUpdater;
   struct FactorGraphStateNodeMap;
@@ -33,32 +33,31 @@ namespace cyclops::estimation {
   public:
     FactorGraphInstance(
       std::unique_ptr<FactorGraphCostUpdater> cost_helper,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<FactorGraphStateNodeMap> node_map);
     ~FactorGraphInstance();
 
-    void fixGauge(frame_id_t frame_id);
-    bool addFrameStateBlock(frame_id_t frame_id);
-    bool addLandmarkStateBlock(landmark_id_t landmark_id);
+    void fixGauge(FrameID frame_id);
+    bool addFrameStateBlock(FrameID frame_id);
+    bool addLandmarkStateBlock(LandmarkID landmark_id);
 
-    void addImuCost(measurement::imu_motion_t const& imu_motion);
-    void addBiasPriorCost(frame_id_t frame_id);
+    void addImuCost(measurement::ImuMotion const& imu_motion);
+    void addBiasPriorCost(FrameID frame_id);
 
-    landmark_acceptance_t addLandmarkCost(
-      std::set<frame_id_t> const& solvable_motions, landmark_id_t feature_id,
-      measurement::feature_track_t const& track);
+    LandmarkAcceptance addLandmarkCost(
+      std::set<FrameID> const& solvable_motions, LandmarkID feature_id,
+      measurement::FeatureTrack const& track);
 
-    void setPriorCost(gaussian_prior_t const& priors);
+    void setPriorCost(GaussianPrior const& priors);
 
-    std::optional<node_set_cref_t> queryNeighbors(node_t const& node) const;
-    neighbor_query_result_t queryNeighbors(node_set_t const& nodes) const;
+    std::optional<NodeSetCRef> queryNeighbors(Node const& node) const;
+    NeighborQueryResult queryNeighbors(NodeSet const& nodes) const;
 
-    std::optional<prior_node_t> const& prior() const;
+    std::optional<PriorNode> const& prior() const;
 
     std::string report() const;
     ceres::Solver::Summary solve();
     std::tuple<EigenCRSMatrix, Eigen::VectorXd> evaluate(
-      std::vector<node_t> const& nodes,
-      std::vector<factor_ptr_t> const& factors);
+      std::vector<Node> const& nodes, std::vector<FactorPtr> const& factors);
   };
 }  // namespace cyclops::estimation

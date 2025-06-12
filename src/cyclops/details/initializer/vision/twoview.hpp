@@ -5,12 +5,12 @@
 #include <memory>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::initializer {
-  struct two_view_geometry_t;
-  struct two_view_correspondence_data_t;
+  struct TwoViewGeometry;
+  struct TwoViewCorrespondenceData;
 
   class TwoViewVisionGeometrySolver {
   public:
@@ -18,11 +18,11 @@ namespace cyclops::initializer {
     virtual void reset() = 0;
 
     // returns a sequence of possible solutions.
-    virtual std::vector<two_view_geometry_t> solve(
-      two_view_correspondence_data_t const& two_view_correspondence) = 0;
+    virtual std::vector<TwoViewGeometry> solve(
+      TwoViewCorrespondenceData const& two_view_correspondence) = 0;
 
-    static std::unique_ptr<TwoViewVisionGeometrySolver> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<TwoViewVisionGeometrySolver> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<std::mt19937> rgen);
   };
 }  // namespace cyclops::initializer

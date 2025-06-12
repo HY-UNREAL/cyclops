@@ -30,20 +30,20 @@ namespace cyclops::initializer {
   using Eigen::Quaterniond;
   using Eigen::Vector3d;
 
-  using gyro_bias_block_t = std::array<double, 3>;
-  using orientation_block_t = std::array<double, 4>;
-  using orientation_blocks_t = std::map<frame_id_t, orientation_block_t>;
+  using GyroBiasBlock = std::array<double, 3>;
+  using OrientationBlock = std::array<double, 4>;
+  using OrientationBlocks = std::map<FrameID, OrientationBlock>;
 
-  using measurement::imu_motion_refs_t;
+  using measurement::ImuMotionRefs;
 
   template <typename value_t>
-  using maybe_ref_t = std::optional<std::reference_wrapper<value_t>>;
+  using MaybeRef = std::optional<std::reference_wrapper<value_t>>;
 
   static double degrees(double radian) {
     return radian * 180 / M_PI;
   }
 
-  static Matrix3d compute_inverse_cholesky_matrix_U(Matrix3d const& mat) {
+  static Matrix3d computeInverseCholeskyMatrixU(Matrix3d const& mat) {
     return Eigen::LLT<Matrix3d>(mat.inverse()).matrixU();
   }
 
@@ -55,17 +55,17 @@ namespace cyclops::initializer {
 
     template <typename scalar_t>
     bool operator()(scalar_t const* const b_w, scalar_t* const r) const {
-      using vec3_t = Eigen::Matrix<scalar_t, 3, 1>;
-      (Eigen::Map<vec3_t>(r)) = static_cast<scalar_t>(_weight) * vec3_t(b_w);
+      using Vector3 = Eigen::Matrix<scalar_t, 3, 1>;
+      (Eigen::Map<Vector3>(r)) = static_cast<scalar_t>(_weight) * Vector3(b_w);
       return true;
     }
   };
 
-  struct IMUPreintegratedRotationMatchCost {
-    measurement::IMUPreintegration const& _data;
+  struct ImuRotationMatchGyroCost {
+    measurement::ImuPreintegration const& _data;
 
-    explicit IMUPreintegratedRotationMatchCost(
-      measurement::IMUPreintegration const& data)
+    explicit ImuRotationMatchGyroCost(
+      measurement::ImuPreintegration const& data)
         : _data(data) {
     }
 
@@ -73,32 +73,31 @@ namespace cyclops::initializer {
     bool operator()(
       scalar_t const* const q0_, scalar_t const* const q1_,
       scalar_t const* const b_w, scalar_t* const r) const {
-      using vec3_t = Eigen::Matrix<scalar_t, 3, 1>;
-      using quat_t = Eigen::Quaternion<scalar_t>;
+      using Vector3 = Eigen::Matrix<scalar_t, 3, 1>;
+      using Quaternion = Eigen::Quaternion<scalar_t>;
 
-      auto q0 = quat_t(q0_);
-      auto q1 = quat_t(q1_);
-      auto db_w = (vec3_t(b_w) - _data.gyrBias().cast<scalar_t>()).eval();
+      auto q0 = Quaternion(q0_);
+      auto q1 = Quaternion(q1_);
+      auto db_w = (Vector3(b_w) - _data.gyrBias().cast<scalar_t>()).eval();
       auto G_R = _data.bias_jacobian.block<3, 3>(0, 3).cast<scalar_t>().eval();
 
-      quat_t y_q = _data.rotation_delta.cast<scalar_t>();
-      vec3_t u = so3_logmap(y_q.conjugate() * q0.conjugate() * q1) - G_R * db_w;
+      Quaternion y_q = _data.rotation_delta.cast<scalar_t>();
+      Vector3 u = so3Logmap(y_q.conjugate() * q0.conjugate() * q1) - G_R * db_w;
 
-      auto weight = compute_inverse_cholesky_matrix_U(
-        _data.covariance.topLeftCorner<3, 3>());
-      (Eigen::Map<vec3_t>(r)) = weight.cast<scalar_t>() * u;
+      auto weight =
+        computeInverseCholeskyMatrixU(_data.covariance.topLeftCorner<3, 3>());
+      (Eigen::Map<Vector3>(r)) = weight.cast<scalar_t>() * u;
       return true;
     }
   };
 
-  struct VisualSfmRotationPriorCost {
-    se3_transform_t const& _extrinsic;
-    imu_match_camera_rotation_prior_t const& _prior;
+  struct CameraRotationPriorCost {
+    SE3Transform const& _extrinsic;
+    ImuMatchCameraRotationPrior const& _prior;
     MatrixXd const _weight;
 
-    VisualSfmRotationPriorCost(
-      se3_transform_t const& extrinsic,
-      imu_match_camera_rotation_prior_t const& prior)
+    CameraRotationPriorCost(
+      SE3Transform const& extrinsic, ImuMatchCameraRotationPrior const& prior)
         : _extrinsic(extrinsic),
           _prior(prior),
           _weight(prior.weight.llt().matrixU()) {
@@ -107,8 +106,8 @@ namespace cyclops::initializer {
     template <typename scalar_t>
     bool operator()(
       scalar_t const* const* body_rotations, scalar_t* const residual) const {
-      using vecx_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
-      using quat_t = Eigen::Quaternion<scalar_t>;
+      using VectorX = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
+      using Quaternion = Eigen::Quaternion<scalar_t>;
 
       int n = _prior.rotations.size();
       if (n < 1)
@@ -116,48 +115,46 @@ namespace cyclops::initializer {
 
       auto dimension = 3 * std::max(0, n - 1);
       auto q_bc = _extrinsic.rotation.cast<scalar_t>();
-      auto delta = vecx_t(dimension);
+      auto delta = VectorX(dimension);
 
       for (auto const& [i, q_c_hat] : views::enumerate(
              _prior.rotations | views::values | views::slice(1, n))) {
-        auto q_b = quat_t(body_rotations[i]);
+        auto q_b = Quaternion(body_rotations[i]);
         auto q_c = q_b * q_bc;
         delta.segment(3 * i, 3) =
-          so3_logmap(q_c_hat.template cast<scalar_t>().conjugate() * q_c);
+          so3Logmap(q_c_hat.template cast<scalar_t>().conjugate() * q_c);
       }
-      (Eigen::Map<vecx_t>(residual, dimension)) =
+      (Eigen::Map<VectorX>(residual, dimension)) =
         _weight.cast<scalar_t>() * delta;
       return true;
     }
   };
 
-  static gyro_bias_block_t make_gyro_bias_block() {
-    gyro_bias_block_t result;
+  static GyroBiasBlock makeGyroBiasBlock() {
+    GyroBiasBlock result;
     std::fill(result.begin(), result.end(), 0);
     return result;
   }
 
-  static orientation_block_t make_orientation_block(Quaterniond const& q) {
-    orientation_block_t result;
+  static OrientationBlock makeOrientationBlock(Quaterniond const& q) {
+    OrientationBlock result;
     (Eigen::Map<Quaterniond>(result.data())) = q;
     return result;
   }
 
-  static orientation_blocks_t make_orientation_blocks(
-    imu_match_camera_rotation_prior_t const& prior,
-    se3_transform_t const& extrinsic) {
+  static OrientationBlocks makeOrientationBlocks(
+    ImuMatchCameraRotationPrior const& prior, SE3Transform const& extrinsic) {
     return  //
       prior.rotations | views::transform([&extrinsic](auto const& id_rotation) {
         auto const& [id, rotation] = id_rotation;
         return std::make_pair(
-          id,
-          make_orientation_block(rotation * extrinsic.rotation.conjugate()));
+          id, makeOrientationBlock(rotation * extrinsic.rotation.conjugate()));
       }) |
-      ranges::to<orientation_blocks_t>;
+      ranges::to<OrientationBlocks>;
   }
 
-  static maybe_ref_t<orientation_block_t> try_find_frame(
-    orientation_blocks_t& blocks, frame_id_t frame_id) {
+  static MaybeRef<OrientationBlock> tryFindFrame(
+    OrientationBlocks& blocks, FrameID frame_id) {
     auto i = blocks.find(frame_id);
     if (i == blocks.end()) {
       __logger__->warn(
@@ -168,29 +165,29 @@ namespace cyclops::initializer {
     return std::ref(block);
   }
 
-  static ceres::ResidualBlockId construct_gyro_bias_zero_prior_cost(
-    ceres::Problem& problem, gyro_bias_block_t& block, double weight) {
+  static ceres::ResidualBlockId constructGyroBiasZeroPriorCost(
+    ceres::Problem& problem, GyroBiasBlock& block, double weight) {
     auto cost = new AutoDiffCostFunction<GyroBiasZeroPriorCost, 3, 3>(
       new GyroBiasZeroPriorCost(weight));
     return problem.AddResidualBlock(cost, nullptr, block.data());
   }
 
   static std::optional<std::vector<ceres::ResidualBlockId>>
-  construct_imu_motion_cost(
-    ceres::Problem& problem, gyro_bias_block_t& gyro_bias,
-    orientation_blocks_t& orientations, imu_motion_refs_t const& imu_motions) {
+  constructImuMotionCost(
+    ceres::Problem& problem, GyroBiasBlock& gyro_bias,
+    OrientationBlocks& orientations, ImuMotionRefs const& imu_motions) {
     std::vector<ceres::ResidualBlockId> result;
     for (auto const& imu_motion_ref : imu_motions) {
       auto const& [from, to, data] = imu_motion_ref.get();
 
-      auto maybe_q0 = try_find_frame(orientations, from);
-      auto maybe_q1 = try_find_frame(orientations, to);
+      auto maybe_q0 = tryFindFrame(orientations, from);
+      auto maybe_q1 = tryFindFrame(orientations, to);
       if (!maybe_q0 || !maybe_q1)
         return std::nullopt;
 
       auto cost =
-        new AutoDiffCostFunction<IMUPreintegratedRotationMatchCost, 3, 4, 4, 3>(
-          new IMUPreintegratedRotationMatchCost(*data));
+        new AutoDiffCostFunction<ImuRotationMatchGyroCost, 3, 4, 4, 3>(
+          new ImuRotationMatchGyroCost(*data));
       auto residual_id = problem.AddResidualBlock(
         cost, nullptr, maybe_q0->get().data(), maybe_q1->get().data(),
         gyro_bias.data());
@@ -199,12 +196,12 @@ namespace cyclops::initializer {
     return result;
   }
 
-  static ceres::ResidualBlockId construct_camera_rotation_prior_cost(
-    ceres::Problem& problem, orientation_blocks_t& orientation_blocks,
-    se3_transform_t const& extrinsic,
-    imu_match_camera_rotation_prior_t const& camera_rotation_prior) {
-    auto cost = new DynamicAutoDiffCostFunction<VisualSfmRotationPriorCost>(
-      new VisualSfmRotationPriorCost(extrinsic, camera_rotation_prior));
+  static ceres::ResidualBlockId constructCameraRotationPriorCost(
+    ceres::Problem& problem, OrientationBlocks& orientation_blocks,
+    SE3Transform const& extrinsic,
+    ImuMatchCameraRotationPrior const& camera_rotation_prior) {
+    auto cost = new DynamicAutoDiffCostFunction<CameraRotationPriorCost>(
+      new CameraRotationPriorCost(extrinsic, camera_rotation_prior));
 
     int n = orientation_blocks.size();
     cost->SetNumResiduals(3 * std::max(0, n - 1));
@@ -218,7 +215,7 @@ namespace cyclops::initializer {
     return problem.AddResidualBlock(cost, nullptr, parameters);
   }
 
-  static void solve_problem(ceres::Problem& problem) {
+  static void solveProblem(ceres::Problem& problem) {
     ceres::Solver::Options options;
     ceres::Solver::Summary summary;
     options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;
@@ -228,10 +225,10 @@ namespace cyclops::initializer {
       "Finished gyro bias iteration: {}", summary.BriefReport());
   }
 
-  static MatrixXd evaluate_rotation_match_cost_and_hessian(
+  static MatrixXd evaluateRotationMatchCostAndHessian(
     ceres::Problem& problem,
     std::vector<ceres::ResidualBlockId> const& residual_ids,
-    gyro_bias_block_t& gyro_bias, orientation_blocks_t& orientations) {
+    GyroBiasBlock& gyro_bias, OrientationBlocks& orientations) {
     ceres::Problem::EvaluateOptions opt;
 
     std::vector<double*> parameters = {gyro_bias.data()};
@@ -250,13 +247,13 @@ namespace cyclops::initializer {
     return eigen_jacobian.transpose() * eigen_jacobian;
   }
 
-  static std::optional<Eigen::VectorXd> evaluate_rotation_match_deviation(
+  static std::optional<Eigen::VectorXd> evaluateRotationMatchDeviation(
     ceres::Problem& problem,
     std::vector<ceres::ResidualBlockId> const& residuals,
-    gyro_bias_block_t& gyro_bias, orientation_blocks_t& orientations) {
+    GyroBiasBlock& gyro_bias, OrientationBlocks& orientations) {
     __logger__->trace("Evaluating vision-IMU rotation match uncertainty");
 
-    auto H = evaluate_rotation_match_cost_and_hessian(
+    auto H = evaluateRotationMatchCostAndHessian(
       problem, residuals, gyro_bias, orientations);
     if (H.rows() != H.cols()) {
       __logger__->error("Vision-IMU rotation match: Non-square Hessian matrix");
@@ -288,9 +285,9 @@ namespace cyclops::initializer {
     return H_bar_eigen.eigenvalues().cwiseSqrt().cwiseInverse();
   }
 
-  static bool check_rotation_match_solution_imu_consistency(
+  static bool checkRotationMatchSolutionImuConsistency(
     double threshold,  //
-    orientation_blocks_t const& solution, imu_motion_refs_t const& motions) {
+    OrientationBlocks const& solution, ImuMotionRefs const& motions) {
     for (auto const& motion_ref : motions) {
       auto const& motion = motion_ref.get();
       auto const& imu_rotation = motion.data->rotation_delta;
@@ -306,10 +303,10 @@ namespace cyclops::initializer {
     return true;
   }
 
-  static bool check_rotation_match_solution_vision_consistency(
+  static bool checkRotationMatchSolutionVisionConsistency(
     double threshold,  //
-    orientation_blocks_t const& solution, Quaterniond const& extrinsic,
-    std::map<frame_id_t, Quaterniond> const& vision_prior) {
+    OrientationBlocks const& solution, Quaterniond const& extrinsic,
+    std::map<FrameID, Quaterniond> const& vision_prior) {
     for (auto const& [frame_id, camera_orientation] : vision_prior) {
       auto imu_orientation = camera_orientation * extrinsic.conjugate();
       auto solution_orientation = Quaterniond(solution.at(frame_id).data());
@@ -321,9 +318,8 @@ namespace cyclops::initializer {
     return true;
   }
 
-  static imu_match_rotation_solution_t make_rotation_match(
-    gyro_bias_block_t const& gyro_bias,
-    orientation_blocks_t const& orientations) {
+  static ImuRotationMatch makeRotationMatch(
+    GyroBiasBlock const& gyro_bias, OrientationBlocks const& orientations) {
     return {
       .gyro_bias = Vector3d(gyro_bias.data()),
       .body_orientations =
@@ -331,40 +327,40 @@ namespace cyclops::initializer {
           auto const& [id, block] = id_block;
           return std::make_pair(id, Quaterniond(block.data()));
         }) |
-        ranges::to<std::map<frame_id_t, Quaterniond>>,
+        ranges::to<std::map<FrameID, Quaterniond>>,
     };
   }
 
-  class IMUMatchRotationSolverImpl: public IMUMatchRotationSolver {
+  class ImuRotationMatchSolverImpl: public ImuRotationMatchSolver {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
 
     bool checkInputDataSolutionConsistency(
-      orientation_blocks_t const& solution, imu_motion_refs_t const& imu_data,
-      std::map<frame_id_t, Quaterniond> const& vision_prior) const;
+      OrientationBlocks const& solution, ImuMotionRefs const& imu_data,
+      std::map<FrameID, Quaterniond> const& vision_prior) const;
 
   public:
-    explicit IMUMatchRotationSolverImpl(
-      std::shared_ptr<cyclops_global_config_t const> config);
+    explicit ImuRotationMatchSolverImpl(
+      std::shared_ptr<CyclopsConfig const> config);
     void reset() override;
 
-    std::optional<imu_match_rotation_solution_t> solve(
-      imu_motion_refs_t const& motions,
-      imu_match_camera_rotation_prior_t const& prior) override;
+    std::optional<ImuRotationMatch> solve(
+      ImuMotionRefs const& motions,
+      ImuMatchCameraRotationPrior const& prior) override;
   };
 
-  IMUMatchRotationSolverImpl::IMUMatchRotationSolverImpl(
-    std::shared_ptr<cyclops_global_config_t const> config)
+  ImuRotationMatchSolverImpl::ImuRotationMatchSolverImpl(
+    std::shared_ptr<CyclopsConfig const> config)
       : _config(config) {
   }
 
-  void IMUMatchRotationSolverImpl::reset() {
+  void ImuRotationMatchSolverImpl::reset() {
     // does nothing.
   }
 
-  bool IMUMatchRotationSolverImpl::checkInputDataSolutionConsistency(
-    orientation_blocks_t const& solution, imu_motion_refs_t const& imu_data,
-    std::map<frame_id_t, Quaterniond> const& vision_prior) const {
+  bool ImuRotationMatchSolverImpl::checkInputDataSolutionConsistency(
+    OrientationBlocks const& solution, ImuMotionRefs const& imu_data,
+    std::map<FrameID, Quaterniond> const& vision_prior) const {
     auto const& rotation_match_config =
       _config->initialization.imu.rotation_match;
     auto const& threshold =
@@ -372,14 +368,14 @@ namespace cyclops::initializer {
 
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
 
-    if (!check_rotation_match_solution_imu_consistency(
+    if (!checkRotationMatchSolutionImuConsistency(
           threshold, solution, imu_data)) {
       __logger__->debug(
         "Vision-imu rotation match failure: imu rotation inconsistency");
       return false;
     }
 
-    if (!check_rotation_match_solution_vision_consistency(
+    if (!checkRotationMatchSolutionVisionConsistency(
           threshold, solution, extrinsic.rotation, vision_prior)) {
       __logger__->debug(
         "Vision-imu rotation match failure: vision rotation inconsistency");
@@ -400,10 +396,8 @@ namespace cyclops::initializer {
     return true;
   }
 
-  std::optional<imu_match_rotation_solution_t>
-  IMUMatchRotationSolverImpl::solve(
-    imu_motion_refs_t const& motions,
-    imu_match_camera_rotation_prior_t const& prior) {
+  std::optional<ImuRotationMatch> ImuRotationMatchSolverImpl::solve(
+    ImuMotionRefs const& motions, ImuMatchCameraRotationPrior const& prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
     auto gyro_bias_prior = 1 / _config->noise.gyr_bias_prior_stddev;
 
@@ -411,8 +405,8 @@ namespace cyclops::initializer {
     auto accept_max_deviation = accept_config.max_rotation_deviation;
     auto accept_min_p_value = accept_config.rotation_match_min_p_value;
 
-    auto gyro_bias = make_gyro_bias_block();
-    auto orientations = make_orientation_blocks(prior, extrinsic);
+    auto gyro_bias = makeGyroBiasBlock();
+    auto orientations = makeOrientationBlocks(prior, extrinsic);
 
     ceres::Problem problem;
     problem.AddParameterBlock(gyro_bias.data(), 3);
@@ -426,17 +420,17 @@ namespace cyclops::initializer {
     problem.SetParameterBlockConstant(reference.data());
 
     auto maybe_residuals =
-      construct_imu_motion_cost(problem, gyro_bias, orientations, motions);
+      constructImuMotionCost(problem, gyro_bias, orientations, motions);
     if (!maybe_residuals)
       return std::nullopt;
     auto& residuals = *maybe_residuals;
 
     residuals.push_back(
-      construct_gyro_bias_zero_prior_cost(problem, gyro_bias, gyro_bias_prior));
-    residuals.push_back(construct_camera_rotation_prior_cost(
+      constructGyroBiasZeroPriorCost(problem, gyro_bias, gyro_bias_prior));
+    residuals.push_back(constructCameraRotationPriorCost(
       problem, orientations, extrinsic, prior));
 
-    solve_problem(problem);
+    solveProblem(problem);
 
     Eigen::Map<Vector3d> b_w(gyro_bias.data());
     if (std::isnan(b_w.norm()))
@@ -447,7 +441,7 @@ namespace cyclops::initializer {
       return std::nullopt;
     }
 
-    auto maybe_deviation = evaluate_rotation_match_deviation(
+    auto maybe_deviation = evaluateRotationMatchDeviation(
       problem, residuals, gyro_bias, orientations);
     if (!maybe_deviation) {
       __logger__->debug("Solving gyro bias");
@@ -464,11 +458,11 @@ namespace cyclops::initializer {
 
     __logger__->trace(
       "Successed to solve gyro bias; [{}, {}, {}]", b_w.x(), b_w.y(), b_w.z());
-    return make_rotation_match(gyro_bias, orientations);
+    return makeRotationMatch(gyro_bias, orientations);
   }
 
-  std::unique_ptr<IMUMatchRotationSolver> IMUMatchRotationSolver::create(
-    std::shared_ptr<cyclops_global_config_t const> config) {
-    return std::make_unique<IMUMatchRotationSolverImpl>(config);
+  std::unique_ptr<ImuRotationMatchSolver> ImuRotationMatchSolver::Create(
+    std::shared_ptr<CyclopsConfig const> config) {
+    return std::make_unique<ImuRotationMatchSolverImpl>(config);
   }
 }  // namespace cyclops::initializer

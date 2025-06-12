@@ -7,10 +7,10 @@
 #include <vector>
 
 namespace cyclops {
-  struct se3_transform_t;
+  struct SE3Transform;
 
   std::string serialize(std::vector<Eigen::Vector3d> const&);
-  std::string serialize(std::vector<se3_transform_t> const&);
+  std::string serialize(std::vector<SE3Transform> const&);
   std::string serialize(
-    std::map<landmark_id_t, std::map<frame_id_t, feature_point_t>> const&);
+    std::map<LandmarkID, std::map<FrameID, FeaturePoint>> const&);
 }  // namespace cyclops

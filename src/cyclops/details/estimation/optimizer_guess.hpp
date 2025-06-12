@@ -4,7 +4,7 @@
 #include <memory>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::measurement {
@@ -23,15 +23,15 @@ namespace cyclops::estimation {
     virtual ~OptimizerSolutionGuessPredictor() = default;
     virtual void reset() = 0;
 
-    struct solution_t {
-      motion_frame_parameter_blocks_t motions;
-      landmark_parameter_blocks_t landmarks;
+    struct Solution {
+      MotionFrameParameterBlocks motions;
+      LandmarkParameterBlocks landmarks;
     };
-    virtual std::optional<solution_t> solve() = 0;
+    virtual std::optional<Solution> solve() = 0;
 
-    static std::unique_ptr<OptimizerSolutionGuessPredictor> create(
+    static std::unique_ptr<OptimizerSolutionGuessPredictor> Create(
       std::unique_ptr<initializer::InitializerMain> initializer,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<StateVariableReadAccessor const> state,
       std::shared_ptr<measurement::MeasurementDataProvider> measurement);
   };

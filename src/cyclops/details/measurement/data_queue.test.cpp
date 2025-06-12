@@ -28,19 +28,18 @@ namespace cyclops::measurement {
   }
 
   template <typename int_range_t>
-  static auto make_landmark_measurement(
-    timestamp_t time, int_range_t const& id_range) {
-    auto result = image_data_t {time};
+  static auto makeLandmarkMeasurement(
+    Timestamp time, int_range_t const& id_range) {
+    auto result = ImageData {time};
     for (auto id : id_range) {
       result.features.emplace(
         id,
-        feature_point_t {Eigen::Vector2d::Zero(), Eigen::Matrix2d::Identity()});
+        FeaturePoint {Eigen::Vector2d::Zero(), Eigen::Matrix2d::Identity()});
     }
     return result;
   }
 
-  static auto CHECK_IMU_MOTION_FRAME_CONTINUOUS(
-    imu_motions_t const& imu_motions) {
+  static auto CHECK_IMU_MOTION_FRAME_CONTINUOUS(ImuMotions const& imu_motions) {
     for (auto const& motion : imu_motions)
       CHECK(motion.from < motion.to);
 
@@ -53,7 +52,7 @@ namespace cyclops::measurement {
   }
 
   static auto CHECK_IMU_MOTION_FRAME_NOT_CONTAINS(
-    imu_motions_t const& imu_motions, frame_id_t frame) {
+    ImuMotions const& imu_motions, FrameID frame) {
     CHECK_FALSE(contains(
       imu_motions | views::transform([](auto const& _) { return _.from; }) |
         ranges::to<std::set>,
@@ -65,7 +64,7 @@ namespace cyclops::measurement {
   }
 
   TEST_CASE("Measurement queue data update and marginalization") {
-    auto config = make_default_config();
+    auto config = makeDefaultConfig();
     config->keyframe_window.optimization_phase_max_keyframes = 5;
 
     GIVEN("Initialized estimator") {
@@ -75,11 +74,11 @@ namespace cyclops::measurement {
       state_internal->motionFrames() = {{0, {}}};
 
       std::shared_ptr mprovider =
-        MeasurementDataProvider::create(config, state_accessor);
+        MeasurementDataProvider::Create(config, state_accessor);
 
-      auto telemetry = telemetry::KeyframeTelemetry::createDefault();
-      auto mqueue = MeasurementDataQueue::create(
-        config, mprovider, KeyframeManager::create(std::move(telemetry)),
+      auto telemetry = telemetry::KeyframeTelemetry::CreateDefault();
+      auto mqueue = MeasurementDataQueue::Create(
+        config, mprovider, KeyframeManager::Create(std::move(telemetry)),
         state_accessor);
 
       WHEN(
@@ -94,7 +93,7 @@ namespace cyclops::measurement {
           }
 
           auto landmark =
-            make_landmark_measurement(t_curr, std::vector {1, 2, 3, 4, 5});
+            makeLandmarkMeasurement(t_curr, std::vector {1, 2, 3, 4, 5});
           mqueue->updateLandmark(landmark);
         }
 
@@ -115,13 +114,13 @@ namespace cyclops::measurement {
             REQUIRE(mqueue->keyframes().size() == 3);
             REQUIRE(
               (mqueue->keyframes() | views::keys | ranges::to_vector) ==
-              std::vector<frame_id_t> {0, 1, 2});
+              std::vector<FrameID> {0, 1, 2});
 
             AND_THEN("And the rest are still pending") {
               REQUIRE(mqueue->pendingFrames().size() == 4);
               REQUIRE(
                 (mqueue->pendingFrames() | views::keys | ranges::to_vector) ==
-                std::vector<frame_id_t> {3, 4, 5, 6});
+                std::vector<FrameID> {3, 4, 5, 6});
             }
           }
 
@@ -142,9 +141,9 @@ namespace cyclops::measurement {
           AND_WHEN(
             "Marginalized the keyframe #0, specifying the pending frame #3 as "
             "the replacement frame, and also dropping the landmark #1") {
-            frame_id_t drop_frame = 0;
-            frame_id_t replacement_frame = 3;
-            landmark_id_t drop_landmark = 1;
+            FrameID drop_frame = 0;
+            FrameID replacement_frame = 3;
+            LandmarkID drop_landmark = 1;
 
             mqueue->marginalizeKeyframe(
               drop_frame, {drop_landmark}, replacement_frame);
@@ -152,12 +151,12 @@ namespace cyclops::measurement {
             THEN("keyframes are now [#1, #2, #3]") {
               REQUIRE(
                 (mqueue->keyframes() | views::keys | ranges::to_vector) ==
-                std::vector<frame_id_t> {1, 2, replacement_frame});
+                std::vector<FrameID> {1, 2, replacement_frame});
 
               AND_THEN("pending frames are now [#4, #5, #6]") {
                 REQUIRE(
                   (mqueue->pendingFrames() | views::keys | ranges::to_vector) ==
-                  std::vector<frame_id_t> {4, 5, 6});
+                  std::vector<FrameID> {4, 5, 6});
               }
             }
 
@@ -186,18 +185,18 @@ namespace cyclops::measurement {
             }
 
             AND_WHEN("Marginalized the pending frame #4") {
-              frame_id_t drop_frame = 4;
+              FrameID drop_frame = 4;
               mqueue->marginalizePendingFrame(drop_frame, {});
 
               THEN("Keyframes are still [#1, #2, #3]") {
                 REQUIRE(
                   (mqueue->keyframes() | views::keys | ranges::to_vector) ==
-                  std::vector<frame_id_t> {1, 2, 3});
+                  std::vector<FrameID> {1, 2, 3});
 
                 AND_THEN("Pending frames are now [#5, #6]") {
                   REQUIRE(
                     (mqueue->pendingFrames() | views::keys |
-                     ranges::to_vector) == std::vector<frame_id_t> {5, 6});
+                     ranges::to_vector) == std::vector<FrameID> {5, 6});
                 }
               }
 

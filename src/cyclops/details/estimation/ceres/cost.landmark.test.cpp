@@ -19,7 +19,7 @@ namespace cyclops::estimation {
     std::mt19937 rgen(20240516);
 
     GIVEN("Constant pose signal") {
-      auto pose_signal = cyclops::pose_signal_t {
+      auto pose_signal = cyclops::PoseSignal {
         .position = [](auto _) { return Vector3d(3, 0, 0); },
         .orientation =
           [](auto _) {
@@ -27,14 +27,14 @@ namespace cyclops::estimation {
           },
       };
 
-      auto extrinsic = cyclops::make_default_imu_camera_extrinsic();
-      auto landmarks = generate_landmarks(
+      auto extrinsic = cyclops::makeDefaultImuCameraExtrinsic();
+      auto landmarks = generateLandmarks(
         rgen, {200, Vector3d(0, 0, 0), 0.5 * Matrix3d::Identity()});
 
       GIVEN("Perfect landmark observations at t = 0") {
-        auto timestamps = std::map<frame_id_t, timestamp_t> {{0, 0.0}};
+        auto timestamps = std::map<FrameID, Timestamp> {{0, 0.0}};
         auto tracks =
-          make_landmark_tracks(pose_signal, extrinsic, landmarks, timestamps);
+          makeLandmarkTracks(pose_signal, extrinsic, landmarks, timestamps);
 
         THEN("Feature track is not empty") {
           REQUIRE_FALSE(tracks.empty());
@@ -55,12 +55,12 @@ namespace cyclops::estimation {
                   auto cost =
                     LandmarkProjectionCostEvaluator(feature, extrinsic);
 
-                  motion_frame_parameter_block_t x;
+                  MotionFrameParameterBlock x;
                   Eigen::Map<Quaterniond>(x.data()) = q;
                   Eigen::Map<Vector3d>(x.data() + 4) = p;
                   Eigen::Map<Vector3d>(x.data() + 7) = Vector3d::Zero();
 
-                  landmark_parameter_block_t f;
+                  LandmarkParameterBlock f;
                   Eigen::Map<Vector3d>(f.data()) = landmarks.at(id);
 
                   std::array<double, 2> r = {1., 1.};

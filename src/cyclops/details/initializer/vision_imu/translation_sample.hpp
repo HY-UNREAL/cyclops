@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::telemetry {
@@ -16,10 +16,10 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct imu_match_translation_analysis_t;
-  struct IMUMatchTranslationAnalysisCache;
+  struct ImuTranslationMatchAnalysis;
+  struct ImuTranslationMatchAnalysisCache;
 
-  struct imu_match_scale_sample_solution_t {
+  struct ImuMatchScaleSampleSolution {
     double scale;
     double cost;
 
@@ -29,18 +29,18 @@ namespace cyclops::initializer {
     Eigen::MatrixXd hessian;
   };
 
-  class IMUMatchScaleSampleSolver {
+  class ImuMatchScaleSampleSolver {
   public:
-    virtual ~IMUMatchScaleSampleSolver() = default;
+    virtual ~ImuMatchScaleSampleSolver() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<std::vector<imu_match_scale_sample_solution_t>> solve(
-      std::set<frame_id_t> const& motion_frames,
-      imu_match_translation_analysis_t const& analysis,
-      IMUMatchTranslationAnalysisCache const& cache) const = 0;
+    virtual std::optional<std::vector<ImuMatchScaleSampleSolution>> solve(
+      std::set<FrameID> const& motion_frames,
+      ImuTranslationMatchAnalysis const& analysis,
+      ImuTranslationMatchAnalysisCache const& cache) const = 0;
 
-    static std::unique_ptr<IMUMatchScaleSampleSolver> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<ImuMatchScaleSampleSolver> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };
 }  // namespace cyclops::initializer

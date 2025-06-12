@@ -25,51 +25,49 @@ namespace cyclops::estimation {
   using Eigen::Quaterniond;
   using Eigen::Vector3d;
 
-  struct imu_state_propagation_t {
-    imu_motion_state_t motion_state;
+  struct ImuStatePropagation {
+    ImuMotionState motion_state;
     Vector3d b_a;
     Vector3d b_w;
   };
 
-  using motion_state_propagation_lookup_t =
-    map<frame_id_t, imu_state_propagation_t>;
-  using camera_pose_lookup_t =
-    map<frame_id_t, rotation_translation_matrix_pair_t>;
+  using MotionStatePropagationLookup = map<FrameID, ImuStatePropagation>;
+  using CameraPoseLookup = map<FrameID, RotationPositionPair>;
 
   class OptimizerSolutionGuessPredictorImpl:
       public OptimizerSolutionGuessPredictor {
   private:
     std::unique_ptr<initializer::InitializerMain> _initializer;
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<StateVariableReadAccessor const> _state;
     std::shared_ptr<measurement::MeasurementDataProvider> _data_provider;
 
-    std::optional<solution_t> bootstrap();
+    std::optional<Solution> bootstrap();
 
-    std::optional<imu_state_propagation_t> propagateMotionState(
-      measurement::imu_motion_t const& imu_motion) const;
-    motion_state_propagation_lookup_t propagateUnknownMotions() const;
-    camera_pose_lookup_t makeCameraPoseLookup(
-      motion_state_propagation_lookup_t const& motion_states) const;
+    std::optional<ImuStatePropagation> propagateMotionState(
+      measurement::ImuMotion const& imu_motion) const;
+    MotionStatePropagationLookup propagateUnknownMotions() const;
+    CameraPoseLookup makeCameraPoseLookup(
+      MotionStatePropagationLookup const& motion_states) const;
 
-    measurement::feature_tracks_t collectUnknownSolvableLandmarks(
-      camera_pose_lookup_t const& pose_lookup) const;
+    measurement::FeatureTracks collectUnknownSolvableLandmarks(
+      CameraPoseLookup const& pose_lookup) const;
 
   public:
     OptimizerSolutionGuessPredictorImpl(
       std::unique_ptr<initializer::InitializerMain> initializer,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<StateVariableReadAccessor const> state,
       std::shared_ptr<measurement::MeasurementDataProvider> data_provider);
     ~OptimizerSolutionGuessPredictorImpl();
     void reset() override;
 
-    std::optional<solution_t> solve() override;
+    std::optional<Solution> solve() override;
   };
 
   OptimizerSolutionGuessPredictorImpl::OptimizerSolutionGuessPredictorImpl(
     std::unique_ptr<initializer::InitializerMain> initializer,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<StateVariableReadAccessor const> state,
     std::shared_ptr<measurement::MeasurementDataProvider> data_provider)
       : _initializer(std::move(initializer)),
@@ -86,10 +84,10 @@ namespace cyclops::estimation {
     _data_provider->reset();
   }
 
-  static auto make_frame_state_block(
-    frame_id_t frame_id, Quaterniond const& q, Vector3d const& p,
+  static auto makeFrameStateBlock(
+    FrameID frame_id, Quaterniond const& q, Vector3d const& p,
     Vector3d const& v, Vector3d const& b_a, Vector3d const& b_w) {
-    motion_frame_parameter_block_t result;
+    MotionFrameParameterBlock result;
     Eigen::Map<Quaterniond>(result.data()) = q;
     Eigen::Map<Vector3d>(result.data() + 4) = p;
     Eigen::Map<Vector3d>(result.data() + 7) = v;
@@ -98,23 +96,23 @@ namespace cyclops::estimation {
     return std::make_pair(frame_id, result);
   }
 
-  static auto make_frame_state_block(
-    Vector3d const& b_a, Vector3d const& b_w, frame_id_t frame_id,
-    imu_motion_state_t const& motion) {
-    return make_frame_state_block(
+  static auto makeFrameStateBlock(
+    Vector3d const& b_a, Vector3d const& b_w, FrameID frame_id,
+    ImuMotionState const& motion) {
+    return makeFrameStateBlock(
       frame_id, motion.orientation, motion.position, motion.velocity, b_a, b_w);
   }
 
-  static auto make_landmark_state_block(
-    landmark_positions_t::value_type const& id_position) {
+  static auto makeLandmarkStateBlock(
+    LandmarkPositions::value_type const& id_position) {
     auto [id, position] = id_position;
-    landmark_parameter_block_t result;
+    LandmarkParameterBlock result;
     Eigen::Map<Vector3d>(result.data()) = position;
 
     return std::make_pair(id, result);
   }
 
-  std::optional<OptimizerSolutionGuessPredictor::solution_t>
+  std::optional<OptimizerSolutionGuessPredictor::Solution>
   OptimizerSolutionGuessPredictorImpl::bootstrap() {
     auto tic = ::cyclops::tic();
     auto maybe_bootstrap = _initializer->solve();
@@ -131,26 +129,26 @@ namespace cyclops::estimation {
     auto motion_blocks =  //
       maybe_bootstrap->motions | views::transform([&](auto const& _) {
         auto [frame_id, motion] = _;
-        return make_frame_state_block(b_a, b_w, frame_id, motion);
+        return makeFrameStateBlock(b_a, b_w, frame_id, motion);
       }) |
-      ranges::to<motion_frame_parameter_blocks_t>;
+      ranges::to<MotionFrameParameterBlocks>;
 
     auto landmark_blocks = maybe_bootstrap->landmarks |
-      views::transform(make_landmark_state_block) |
-      ranges::to<landmark_parameter_blocks_t>;
+      views::transform(makeLandmarkStateBlock) |
+      ranges::to<LandmarkParameterBlocks>;
 
-    return solution_t {motion_blocks, landmark_blocks};
+    return Solution {motion_blocks, landmark_blocks};
   }
 
-  std::optional<imu_state_propagation_t>
+  std::optional<ImuStatePropagation>
   OptimizerSolutionGuessPredictorImpl::propagateMotionState(
-    measurement::imu_motion_t const& imu_motion) const {
+    measurement::ImuMotion const& imu_motion) const {
     auto const maybe_frame = _state->motionFrame(imu_motion.from);
     if (!maybe_frame)
       return std::nullopt;
 
     auto const& frame = maybe_frame->get();
-    auto [q, p, v] = estimation::motion_state_of_motion_frame_block(frame);
+    auto [q, p, v] = estimation::getMotionState(frame);
 
     auto const& dt = imu_motion.data->time_delta;
     auto const& alpha = imu_motion.data->position_delta;
@@ -159,21 +157,21 @@ namespace cyclops::estimation {
 
     auto g = Vector3d(0, 0, _config->gravity_norm);
 
-    auto motion_state = imu_motion_state_t {
+    auto motion_state = ImuMotionState {
       .orientation = q * gamma,
       .position = p + v * dt - 0.5 * g * dt * dt + q * alpha,
       .velocity = v - g * dt + q * beta,
     };
-    return imu_state_propagation_t {
+    return ImuStatePropagation {
       .motion_state = motion_state,
-      .b_a = estimation::acc_bias_of_motion_frame_block(frame),
-      .b_w = estimation::gyr_bias_of_motion_frame_block(frame),
+      .b_a = estimation::getAccBias(frame),
+      .b_w = estimation::getGyrBias(frame),
     };
   }
 
-  motion_state_propagation_lookup_t
+  MotionStatePropagationLookup
   OptimizerSolutionGuessPredictorImpl::propagateUnknownMotions() const {
-    map<frame_id_t, imu_state_propagation_t> result;
+    map<FrameID, ImuStatePropagation> result;
     for (auto const& motion : _data_provider->imu()) {
       if (_state->motionFrame(motion.to))  // if already initialized, skip.
         continue;
@@ -186,24 +184,22 @@ namespace cyclops::estimation {
     return result;
   }
 
-  camera_pose_lookup_t
-  OptimizerSolutionGuessPredictorImpl::makeCameraPoseLookup(
-    motion_state_propagation_lookup_t const& propagations) const {
+  CameraPoseLookup OptimizerSolutionGuessPredictorImpl::makeCameraPoseLookup(
+    MotionStatePropagationLookup const& propagations) const {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
 
-    std::set<frame_id_t> frames;
+    std::set<FrameID> frames;
     for (auto const& track : _data_provider->tracks() | views::values)
       actions::insert(frames, track | views::keys);
 
-    map<frame_id_t, rotation_translation_matrix_pair_t> result;
+    map<FrameID, RotationPositionPair> result;
     for (auto frame_id : frames) {
       auto i = propagations.find(frame_id);
       if (i != propagations.end()) {
         auto const& [_, state] = *i;
         auto const& x = state.motion_state;
         auto [p, q] = compose({x.position, x.orientation}, extrinsic);
-        result.emplace(
-          frame_id, rotation_translation_matrix_pair_t {q.matrix(), p});
+        result.emplace(frame_id, RotationPositionPair {q.matrix(), p});
         continue;
       }
 
@@ -212,17 +208,15 @@ namespace cyclops::estimation {
         continue;
 
       auto const& frame = maybe_frame->get();
-      auto [p, q] =
-        compose(estimation::se3_of_motion_frame_block(frame), extrinsic);
-      result.emplace(
-        frame_id, rotation_translation_matrix_pair_t {q.matrix(), p});
+      auto [p, q] = compose(estimation::getSE3Transform(frame), extrinsic);
+      result.emplace(frame_id, RotationPositionPair {q.matrix(), p});
     }
     return result;
   }
 
-  measurement::feature_tracks_t
+  measurement::FeatureTracks
   OptimizerSolutionGuessPredictorImpl::collectUnknownSolvableLandmarks(
-    camera_pose_lookup_t const& pose_lookup) const {
+    CameraPoseLookup const& pose_lookup) const {
     return  //
       _data_provider->tracks() | views::transform([&](auto const& id_track) {
         auto const& [landmark_id, track] = id_track;
@@ -231,7 +225,7 @@ namespace cyclops::estimation {
             auto const& [frame_id, _] = id_observation;
             return pose_lookup.find(frame_id) != pose_lookup.end();
           }) |
-          ranges::to<measurement::feature_track_t>;
+          ranges::to<measurement::FeatureTrack>;
 
         return std::make_pair(landmark_id, track_filtered);
       }) |
@@ -240,12 +234,12 @@ namespace cyclops::estimation {
         auto maybe_landmark = _state->landmark(landmark_id);
         return !maybe_landmark && track.size() >= 2;
       }) |
-      ranges::to<measurement::feature_tracks_t>;
+      ranges::to<measurement::FeatureTracks>;
   }
 
-  static bool determine_landmark_outlier(
-    measurement::feature_track_t const& track,
-    camera_pose_lookup_t const& camera_pose_lookup, Vector3d const& f,
+  static bool determineLandmarkOutlier(
+    measurement::FeatureTrack const& track,
+    CameraPoseLookup const& camera_pose_lookup, Vector3d const& f,
     double feature_min_depth) {
     for (auto const& frame_id : track | views::keys) {
       auto const& [R, p] = camera_pose_lookup.at(frame_id);
@@ -257,15 +251,15 @@ namespace cyclops::estimation {
     return false;
   }
 
-  static landmark_positions_t triangulate_landmarks(
-    camera_pose_lookup_t const& camera_pose_lookup,
-    measurement::feature_tracks_t const& tracks, double feature_min_depth) {
-    landmark_positions_t result;
+  static LandmarkPositions triangulateLandmarks(
+    CameraPoseLookup const& camera_pose_lookup,
+    measurement::FeatureTracks const& tracks, double feature_min_depth) {
+    LandmarkPositions result;
     for (auto const& [landmark_id, track] : tracks) {
-      auto maybe_point = triangulate_point(track, camera_pose_lookup);
+      auto maybe_point = triangulatePoint(track, camera_pose_lookup);
       if (!maybe_point)
         continue;
-      if (determine_landmark_outlier(
+      if (determineLandmarkOutlier(
             track, camera_pose_lookup, *maybe_point, feature_min_depth))
         continue;
       result.emplace(landmark_id, *maybe_point);
@@ -273,7 +267,7 @@ namespace cyclops::estimation {
     return result;
   }
 
-  std::optional<OptimizerSolutionGuessPredictor::solution_t>
+  std::optional<OptimizerSolutionGuessPredictor::Solution>
   OptimizerSolutionGuessPredictorImpl::solve() {
     if (_state->motionFrames().empty())
       return bootstrap();
@@ -281,7 +275,7 @@ namespace cyclops::estimation {
     auto camera_pose_lookup = makeCameraPoseLookup(propagated_motions);
 
     auto unknown_features = collectUnknownSolvableLandmarks(camera_pose_lookup);
-    auto landmark_positions = triangulate_landmarks(
+    auto landmark_positions = triangulateLandmarks(
       camera_pose_lookup, unknown_features,
       _config->estimation.landmark_acceptance.inlier_min_depth);
 
@@ -290,20 +284,20 @@ namespace cyclops::estimation {
         auto const& [frame_id, propagated_state] = id_propagation;
         auto const& [motion_state, b_a, b_w] = propagated_state;
         auto const& [q, p, v] = motion_state;
-        return make_frame_state_block(frame_id, q, p, v, b_a, b_w);
+        return makeFrameStateBlock(frame_id, q, p, v, b_a, b_w);
       }) |
-      ranges::to<motion_frame_parameter_blocks_t>;
+      ranges::to<MotionFrameParameterBlocks>;
     auto landmark_blocks = landmark_positions |
-      views::transform(make_landmark_state_block) |
-      ranges::to<landmark_parameter_blocks_t>;
+      views::transform(makeLandmarkStateBlock) |
+      ranges::to<LandmarkParameterBlocks>;
 
-    return solution_t {motion_blocks, landmark_blocks};
+    return Solution {motion_blocks, landmark_blocks};
   }
 
   std::unique_ptr<OptimizerSolutionGuessPredictor>
-  OptimizerSolutionGuessPredictor::create(
+  OptimizerSolutionGuessPredictor::Create(
     std::unique_ptr<initializer::InitializerMain> initializer,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<StateVariableReadAccessor const> state,
     std::shared_ptr<measurement::MeasurementDataProvider> data_provider) {
     return std::make_unique<OptimizerSolutionGuessPredictorImpl>(

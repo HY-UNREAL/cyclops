@@ -26,8 +26,8 @@ namespace cyclops::estimation {
 
   using ceres::AutoDiffLocalParameterization;
 
-  using measurement::feature_track_t;
-  using measurement::imu_motion_t;
+  using measurement::FeatureTrack;
+  using measurement::ImuMotion;
 
   using Eigen::VectorXd;
 
@@ -37,52 +37,52 @@ namespace cyclops::estimation {
   private:
     std::unique_ptr<FactorGraphCostUpdater> _cost_helper;
 
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<FactorGraphStateNodeMap> _node_map;
 
     ceres::Problem _problem;
-    optional<frame_id_t> _gauge_constraint_frame;
+    optional<FrameID> _gauge_constraint_frame;
 
-    void setGaugeConstraint(frame_id_t frame_id, bool set_or_not);
+    void setGaugeConstraint(FrameID frame_id, bool set_or_not);
     void evaluate(
-      vector<node_t> const& nodes, vector<factor_ptr_t> const& factors,
+      vector<Node> const& nodes, vector<FactorPtr> const& factors,
       vector<double>* residual, ceres::CRSMatrix* jacobian);
 
   public:
     Impl(
       std::unique_ptr<FactorGraphCostUpdater> cost_helper,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<FactorGraphStateNodeMap> node_map)
         : _cost_helper(std::move(cost_helper)),
           _config(config),
           _node_map(node_map) {
     }
 
-    void fixGauge(frame_id_t frame_id);
-    bool addFrameStateBlock(frame_id_t frame_id);
-    bool addLandmarkStateBlock(landmark_id_t landmark_id);
+    void fixGauge(FrameID frame_id);
+    bool addFrameStateBlock(FrameID frame_id);
+    bool addLandmarkStateBlock(LandmarkID landmark_id);
 
-    void addImuCost(imu_motion_t const& imu_motion);
-    void addBiasPriorCost(frame_id_t frame_id);
+    void addImuCost(ImuMotion const& imu_motion);
+    void addBiasPriorCost(FrameID frame_id);
 
-    landmark_acceptance_t addLandmarkCost(
-      set<frame_id_t> const& solvable_motions, landmark_id_t feature_id,
-      feature_track_t const& track);
+    LandmarkAcceptance addLandmarkCost(
+      set<FrameID> const& solvable_motions, LandmarkID feature_id,
+      FeatureTrack const& track);
 
-    void setPriorCost(gaussian_prior_t const& priors);
+    void setPriorCost(GaussianPrior const& priors);
 
-    optional<node_set_cref_t> queryNeighbors(node_t const& node) const;
-    neighbor_query_result_t queryNeighbors(node_set_t const& nodes) const;
+    optional<NodeSetCRef> queryNeighbors(Node const& node) const;
+    NeighborQueryResult queryNeighbors(NodeSet const& nodes) const;
 
-    optional<prior_node_t> const& prior() const;
+    optional<PriorNode> const& prior() const;
 
     string report();
     ceres::Solver::Summary solve();
     std::tuple<EigenCRSMatrix, VectorXd> evaluate(
-      vector<node_t> const& nodes, vector<factor_ptr_t> const& factors);
+      vector<Node> const& nodes, vector<FactorPtr> const& factors);
   };
 
-  static ceres::LocalParameterization* make_frame_manifold(bool gauge_fix) {
+  static ceres::LocalParameterization* makeFrameManifold(bool gauge_fix) {
     if (gauge_fix) {
       return new AutoDiffLocalParameterization<ExponentialSE3Plus<true>, 10, 9>;
     } else {
@@ -92,8 +92,8 @@ namespace cyclops::estimation {
   }
 
   void FactorGraphInstance::Impl::setGaugeConstraint(
-    frame_id_t frame_id, bool set_or_not) {
-    auto maybe_context = _node_map->findContext(node::frame(frame_id));
+    FrameID frame_id, bool set_or_not) {
+    auto maybe_context = _node_map->findContext(node::makeFrame(frame_id));
     if (!maybe_context) {
       __logger__->error(
         "Tried to {} gauge constraint for frame {}, but the parameter is not "
@@ -103,10 +103,10 @@ namespace cyclops::estimation {
     }
     auto const& context = maybe_context->get();
     _problem.SetParameterization(
-      context.parameter, make_frame_manifold(set_or_not));
+      context.parameter, makeFrameManifold(set_or_not));
   }
 
-  void FactorGraphInstance::Impl::fixGauge(frame_id_t frame_id) {
+  void FactorGraphInstance::Impl::fixGauge(FrameID frame_id) {
     if (_gauge_constraint_frame)
       setGaugeConstraint(*_gauge_constraint_frame, false);
 
@@ -114,32 +114,32 @@ namespace cyclops::estimation {
     _gauge_constraint_frame = frame_id;
   }
 
-  bool FactorGraphInstance::Impl::addFrameStateBlock(frame_id_t frame_id) {
+  bool FactorGraphInstance::Impl::addFrameStateBlock(FrameID frame_id) {
     return _node_map->createFrameNode(_problem, frame_id);
   }
 
   bool FactorGraphInstance::Impl::addLandmarkStateBlock(
-    landmark_id_t landmark_id) {
+    LandmarkID landmark_id) {
     return _node_map->createLandmarkNode(_problem, landmark_id);
   }
 
-  void FactorGraphInstance::Impl::addImuCost(imu_motion_t const& imu_motion) {
+  void FactorGraphInstance::Impl::addImuCost(ImuMotion const& imu_motion) {
     _cost_helper->addImuCost(_problem, imu_motion);
   }
 
-  landmark_acceptance_t FactorGraphInstance::Impl::addLandmarkCost(
-    set<frame_id_t> const& solvable_motions, landmark_id_t landmark_id,
-    feature_track_t const& track) {
+  LandmarkAcceptance FactorGraphInstance::Impl::addLandmarkCost(
+    set<FrameID> const& solvable_motions, LandmarkID landmark_id,
+    FeatureTrack const& track) {
     return _cost_helper->addLandmarkCostBatch(
       _problem, solvable_motions, landmark_id, track);
   }
 
-  void FactorGraphInstance::Impl::addBiasPriorCost(frame_id_t frame_id) {
+  void FactorGraphInstance::Impl::addBiasPriorCost(FrameID frame_id) {
     _cost_helper->addBiasPriorCost(_problem, frame_id);
   }
 
-  void FactorGraphInstance::Impl::setPriorCost(gaussian_prior_t const& prior) {
-    vector<std::reference_wrapper<graph_node_context_t>> node_contexts;
+  void FactorGraphInstance::Impl::setPriorCost(GaussianPrior const& prior) {
+    vector<std::reference_wrapper<GraphNodeContext>> node_contexts;
     for (auto const& node : prior.input_nodes) {
       auto maybe_ctxt = _node_map->findContext(node);
       if (!maybe_ctxt) {
@@ -156,7 +156,7 @@ namespace cyclops::estimation {
     auto factor = new GaussianPriorCost(prior);
     _node_map->createPriorFactor(
       _problem, _problem.AddResidualBlock(factor, nullptr, parameters),
-      node_set_t(prior.input_nodes.begin(), prior.input_nodes.end()));
+      NodeSet(prior.input_nodes.begin(), prior.input_nodes.end()));
   }
 
   static double norm(vector<double> const& v) {
@@ -164,17 +164,17 @@ namespace cyclops::estimation {
   }
 
   template <int residual_dimension>
-  static void print_factor_stats(
+  static void printFactorStats(
     std::ostringstream& ss, vector<double> const& residual,
     std::vector<int> const& start_indices) {
-    using vector_t = Eigen::Matrix<double, residual_dimension, 1>;
+    using Vector = Eigen::Matrix<double, residual_dimension, 1>;
 
     double max_cost = 0;
     double mean_cost = 0;
-    vector_t average_residual_squared = vector_t::Zero();
+    Vector average_residual_squared = Vector::Zero();
 
     for (auto i : start_indices) {
-      auto r = Eigen::Map<vector_t const>(residual.data() + i);
+      auto r = Eigen::Map<Vector const>(residual.data() + i);
 
       auto cost = r.dot(r);
       if (cost > max_cost)
@@ -224,34 +224,34 @@ namespace cyclops::estimation {
     for (auto const& [ptr, skeleton] : factors | views::values) {
       std::visit(
         overloaded {
-          [&](factor_t::imu_t const& _) {
+          [&](Factor::Imu const& _) {
             imu_indices.emplace_back(i);
             i += 9;
           },
-          [&](factor_t::bias_walk_t const& _) {
+          [&](Factor::BiasWalk const& _) {
             bias_walk_indices.emplace_back(i);
             i += 6;
           },
-          [&](factor_t::bias_prior_t const& _) { i += 6; },
-          [&](factor_t::feature_t const& _) {
+          [&](Factor::BiasPrior const& _) { i += 6; },
+          [&](Factor::Feature const& _) {
             landmark_indices.emplace_back(i);
             i += 2;
           },
-          [](factor_t::prior_t const& _) { throw _; },
+          [](Factor::Prior const& _) { throw _; },
         },
         skeleton.variant);
     }
 
     ss << "IMU: ";
-    print_factor_stats<9>(ss, residual, imu_indices);
+    printFactorStats<9>(ss, residual, imu_indices);
     ss << "Bias walk: ";
-    print_factor_stats<6>(ss, residual, bias_walk_indices);
+    printFactorStats<6>(ss, residual, bias_walk_indices);
     ss << "Features: ";
-    print_factor_stats<2>(ss, residual, landmark_indices);
+    printFactorStats<2>(ss, residual, landmark_indices);
     return ss.str();
   }
 
-  optional<prior_node_t> const& FactorGraphInstance::Impl::prior() const {
+  optional<PriorNode> const& FactorGraphInstance::Impl::prior() const {
     return _node_map->getPrior();
   }
 
@@ -270,7 +270,7 @@ namespace cyclops::estimation {
   }
 
   void FactorGraphInstance::Impl::evaluate(
-    vector<node_t> const& nodes, vector<factor_ptr_t> const& factors,
+    vector<Node> const& nodes, vector<FactorPtr> const& factors,
     vector<double>* residual, ceres::CRSMatrix* jacobian) {
     ceres::Problem::EvaluateOptions opt;
 
@@ -300,7 +300,7 @@ namespace cyclops::estimation {
   }
 
   std::tuple<EigenCRSMatrix, VectorXd> FactorGraphInstance::Impl::evaluate(
-    vector<node_t> const& nodes, vector<factor_ptr_t> const& factors) {
+    vector<Node> const& nodes, vector<FactorPtr> const& factors) {
     vector<double> residual_;
     ceres::CRSMatrix jacobian_;
     evaluate(nodes, factors, &residual_, &jacobian_);
@@ -314,66 +314,66 @@ namespace cyclops::estimation {
     return std::make_tuple(jacobian, residual);
   }
 
-  optional<node_set_cref_t> FactorGraphInstance::Impl::queryNeighbors(
-    node_t const& node) const {
+  optional<NodeSetCRef> FactorGraphInstance::Impl::queryNeighbors(
+    Node const& node) const {
     return _node_map->queryNeighbors(node);
   }
 
-  neighbor_query_result_t FactorGraphInstance::Impl::queryNeighbors(
-    node_set_t const& nodes) const {
+  NeighborQueryResult FactorGraphInstance::Impl::queryNeighbors(
+    NodeSet const& nodes) const {
     return _node_map->queryNeighbors(nodes);
   }
 
   FactorGraphInstance::FactorGraphInstance(
     std::unique_ptr<FactorGraphCostUpdater> cost_helper,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<FactorGraphStateNodeMap> node_map) {
     _impl = std::make_unique<Impl>(std::move(cost_helper), config, node_map);
   }
 
   FactorGraphInstance::~FactorGraphInstance() = default;
 
-  void FactorGraphInstance::fixGauge(frame_id_t _) {
+  void FactorGraphInstance::fixGauge(FrameID _) {
     return _impl->fixGauge(_);
   }
 
-  bool FactorGraphInstance::addFrameStateBlock(frame_id_t _) {
+  bool FactorGraphInstance::addFrameStateBlock(FrameID _) {
     return _impl->addFrameStateBlock(_);
   }
 
-  bool FactorGraphInstance::addLandmarkStateBlock(landmark_id_t _) {
+  bool FactorGraphInstance::addLandmarkStateBlock(LandmarkID _) {
     return _impl->addLandmarkStateBlock(_);
   }
 
-  void FactorGraphInstance::addImuCost(imu_motion_t const& _) {
+  void FactorGraphInstance::addImuCost(ImuMotion const& _) {
     return _impl->addImuCost(_);
   }
 
-  landmark_acceptance_t FactorGraphInstance::addLandmarkCost(
-    set<frame_id_t> const& solvable_motions, landmark_id_t feature_id,
-    feature_track_t const& track) {
+  LandmarkAcceptance FactorGraphInstance::addLandmarkCost(
+    set<FrameID> const& solvable_motions, LandmarkID feature_id,
+    FeatureTrack const& track) {
     return _impl->addLandmarkCost(solvable_motions, feature_id, track);
   }
 
-  void FactorGraphInstance::addBiasPriorCost(frame_id_t frame_id) {
+  void FactorGraphInstance::addBiasPriorCost(FrameID frame_id) {
     return _impl->addBiasPriorCost(frame_id);
   }
 
-  void FactorGraphInstance::setPriorCost(gaussian_prior_t const& _) {
+  void FactorGraphInstance::setPriorCost(GaussianPrior const& _) {
     return _impl->setPriorCost(_);
   }
 
-  optional<node_set_cref_t> FactorGraphInstance::queryNeighbors(
-    node_t const& _) const {
+  optional<NodeSetCRef> FactorGraphInstance::queryNeighbors(
+    Node const& _) const {
     return _impl->queryNeighbors(_);
   }
 
-  neighbor_query_result_t FactorGraphInstance::queryNeighbors(
-    node_set_t const& _) const {
+  NeighborQueryResult FactorGraphInstance::queryNeighbors(
+    NodeSet const& _) const {
     return _impl->queryNeighbors(_);
   }
 
-  optional<prior_node_t> const& FactorGraphInstance::prior() const {
+  optional<PriorNode> const& FactorGraphInstance::prior() const {
     return _impl->prior();
   }
 
@@ -386,7 +386,7 @@ namespace cyclops::estimation {
   }
 
   std::tuple<EigenCRSMatrix, VectorXd> FactorGraphInstance::evaluate(
-    vector<node_t> const& nodes, vector<factor_ptr_t> const& factors) {
+    vector<Node> const& nodes, vector<FactorPtr> const& factors) {
     return _impl->evaluate(nodes, factors);
   }
 }  // namespace cyclops::estimation

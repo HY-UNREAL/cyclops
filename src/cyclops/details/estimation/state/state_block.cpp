@@ -4,59 +4,59 @@ namespace cyclops::estimation {
   using Eigen::Quaterniond;
   using Eigen::Vector3d;
 
-  Quaterniond orientation_of_motion_frame_ptr(double const* frame_ptr) {
-    return decltype(orientation_of_motion_frame_ptr(frame_ptr))(frame_ptr);
+  static Quaterniond getOrientation(double const* frame_ptr) {
+    return decltype(getOrientation(frame_ptr))(frame_ptr);
   }
 
-  Vector3d position_of_motion_frame_ptr(double const* frame_ptr) {
-    return decltype(position_of_motion_frame_ptr(frame_ptr))(frame_ptr + 4);
+  static Vector3d getPosition(double const* frame_ptr) {
+    return decltype(getPosition(frame_ptr))(frame_ptr + 4);
   }
 
-  Vector3d velocity_of_motion_frame_ptr(double const* frame_ptr) {
-    return decltype(velocity_of_motion_frame_ptr(frame_ptr))(frame_ptr + 7);
+  static Vector3d getVelocity(double const* frame_ptr) {
+    return decltype(getVelocity(frame_ptr))(frame_ptr + 7);
   }
 
-  Vector3d acc_bias_of_motion_frame_ptr(double const* frame_ptr) {
-    return decltype(acc_bias_of_motion_frame_ptr(frame_ptr))(frame_ptr + 10);
+  static Vector3d getAccBias(double const* frame_ptr) {
+    return decltype(getAccBias(frame_ptr))(frame_ptr + 10);
   }
 
-  Vector3d gyr_bias_of_motion_frame_ptr(double const* frame_ptr) {
-    return decltype(gyr_bias_of_motion_frame_ptr(frame_ptr))(frame_ptr + 13);
+  static Vector3d getGyrBias(double const* frame_ptr) {
+    return decltype(getGyrBias(frame_ptr))(frame_ptr + 13);
   }
+}  // namespace cyclops::estimation
 
-  se3_transform_t se3_of_motion_frame_ptr(double const* frame_ptr) {
+namespace cyclops::estimation::buffer::motion_frame {
+  SE3Transform getSE3Transform(double const* frame_ptr) {
     return {
-      .translation = position_of_motion_frame_ptr(frame_ptr),
-      .rotation = orientation_of_motion_frame_ptr(frame_ptr),
+      .translation = getPosition(frame_ptr),
+      .rotation = getOrientation(frame_ptr),
     };
   }
+}  // namespace cyclops::estimation::buffer::motion_frame
 
-  se3_transform_t se3_of_motion_frame_block(
-    motion_frame_parameter_block_t const& block) {
-    return se3_of_motion_frame_ptr(block.data());
+namespace cyclops::estimation {
+  SE3Transform getSE3Transform(MotionFrameParameterBlock const& block) {
+    return buffer::motion_frame::getSE3Transform(block.data());
   }
 
-  Vector3d position_of_landmark_block(landmark_parameter_block_t const& block) {
+  Vector3d getPosition(LandmarkParameterBlock const& block) {
     return Vector3d(block.data());
   }
 
-  imu_motion_state_t motion_state_of_motion_frame_block(
-    motion_frame_parameter_block_t const& frame) {
+  ImuMotionState getMotionState(MotionFrameParameterBlock const& frame) {
     auto frame_ptr = frame.data();
-    return imu_motion_state_t {
-      .orientation = orientation_of_motion_frame_ptr(frame_ptr),
-      .position = position_of_motion_frame_ptr(frame_ptr),
-      .velocity = velocity_of_motion_frame_ptr(frame_ptr),
+    return ImuMotionState {
+      .orientation = getOrientation(frame_ptr),
+      .position = getPosition(frame_ptr),
+      .velocity = getVelocity(frame_ptr),
     };
   }
 
-  Vector3d acc_bias_of_motion_frame_block(
-    motion_frame_parameter_block_t const& block) {
-    return acc_bias_of_motion_frame_ptr(block.data());
+  Vector3d getAccBias(MotionFrameParameterBlock const& block) {
+    return getAccBias(block.data());
   }
 
-  Vector3d gyr_bias_of_motion_frame_block(
-    motion_frame_parameter_block_t const& block) {
-    return gyr_bias_of_motion_frame_ptr(block.data());
+  Vector3d getGyrBias(MotionFrameParameterBlock const& block) {
+    return getGyrBias(block.data());
   }
 }  // namespace cyclops::estimation

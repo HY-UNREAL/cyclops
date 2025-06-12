@@ -4,5 +4,5 @@
 #include <vector>
 
 namespace cyclops {
-  vector3_signal_t bezier(double T, std::vector<Eigen::Vector3d> const& points);
+  Vector3Signal bezier(double T, std::vector<Eigen::Vector3d> const& points);
 }  // namespace cyclops

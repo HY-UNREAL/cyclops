@@ -5,10 +5,10 @@
 namespace cyclops {
   using nlohmann::json;
 
-  using frame_estimations_t = std::map<frame_id_t, se3_transform_t>;
+  using FrameEstimations = std::map<FrameID, SE3Transform>;
 
-  using feature_track_t = std::map<frame_id_t, feature_point_t>;
-  using feature_tracks_t = std::map<landmark_id_t, feature_track_t>;
+  using FeatureTrack = std::map<FrameID, FeaturePoint>;
+  using FeatureTracks = std::map<LandmarkID, FeatureTrack>;
 
   using Eigen::Quaterniond;
   using Eigen::Vector2d;
@@ -38,14 +38,14 @@ namespace cyclops {
     });
   }
 
-  static inline json parse(se3_transform_t const& tf) {
+  static inline json parse(SE3Transform const& tf) {
     return json::object({
       {"position", parse(tf.translation)},
       {"orientation", parse(tf.rotation)},
     });
   }
 
-  static inline json parse(frame_estimations_t::value_type const& id_frame) {
+  static inline json parse(FrameEstimations::value_type const& id_frame) {
     auto const& [frame_id, frame] = id_frame;
     return json::object({
       {"id", frame_id},
@@ -53,8 +53,7 @@ namespace cyclops {
     });
   }
 
-  static inline json parse(
-    landmark_positions_t::value_type const& id_landmark) {
+  static inline json parse(LandmarkPositions::value_type const& id_landmark) {
     auto const& [landmark_id, landmark] = id_landmark;
     return json::object({
       {"id", landmark_id},
@@ -62,7 +61,7 @@ namespace cyclops {
     });
   }
 
-  static json parse(feature_track_t::value_type const& id_feature) {
+  static json parse(FeatureTrack::value_type const& id_feature) {
     auto const& [id, feature] = id_feature;
     return json::object({
       {"frame_id", id},
@@ -70,14 +69,14 @@ namespace cyclops {
     });
   }
 
-  static json parse(feature_track_t const& track) {
+  static json parse(FeatureTrack const& track) {
     json result = json::array();
     for (auto const& id_feature : track)
       result.emplace_back(parse(id_feature));
     return result;
   }
 
-  static json parse(feature_tracks_t::value_type const& id_track) {
+  static json parse(FeatureTracks::value_type const& id_track) {
     auto const& [id, track] = id_track;
     return json::object({
       {"id", id},
@@ -85,14 +84,14 @@ namespace cyclops {
     });
   }
 
-  static inline json parse(frame_estimations_t const& frames) {
+  static inline json parse(FrameEstimations const& frames) {
     json result = json::array();
     for (auto const& frame : frames)
       result.emplace_back(parse(frame));
     return result;
   }
 
-  static inline json parse(landmark_positions_t const& landmarks) {
+  static inline json parse(LandmarkPositions const& landmarks) {
     json result = json::array();
     for (auto const& landmark : landmarks)
       result.emplace_back(parse(landmark));
@@ -106,14 +105,14 @@ namespace cyclops {
     return result;
   }
 
-  static inline json parse(std::vector<se3_transform_t> const& frames) {
+  static inline json parse(std::vector<SE3Transform> const& frames) {
     json result = json::array();
     for (auto const& frame : frames)
       result.emplace_back(parse(frame));
     return result;
   }
 
-  static json parse(feature_tracks_t const& tracks) {
+  static json parse(FeatureTracks const& tracks) {
     json result = json::array();
     for (auto const& track : tracks)
       result.emplace_back(parse(track));
@@ -124,11 +123,11 @@ namespace cyclops {
     return parse(vectors).dump();
   }
 
-  std::string serialize(std::vector<se3_transform_t> const& frames) {
+  std::string serialize(std::vector<SE3Transform> const& frames) {
     return parse(frames).dump();
   }
 
-  std::string serialize(feature_tracks_t const& tracks) {
+  std::string serialize(FeatureTracks const& tracks) {
     return parse(tracks).dump();
   }
 }  // namespace cyclops

@@ -15,15 +15,15 @@ namespace cyclops::measurement {
     virtual ~KeyframeManager() = default;
     virtual void reset() = 0;
 
-    virtual frame_id_t createNewFrame(timestamp_t timestamp) = 0;
-    virtual void setKeyframe(frame_id_t id) = 0;
-    virtual void removeFrame(frame_id_t frame) = 0;
+    virtual FrameID createNewFrame(Timestamp timestamp) = 0;
+    virtual void setKeyframe(FrameID id) = 0;
+    virtual void removeFrame(FrameID frame) = 0;
 
-    using frame_sequence_t = std::map<frame_id_t, timestamp_t>;
-    virtual frame_sequence_t const& keyframes() const = 0;
-    virtual frame_sequence_t const& pendingFrames() const = 0;
+    using FrameSequence = std::map<FrameID, Timestamp>;
+    virtual FrameSequence const& keyframes() const = 0;
+    virtual FrameSequence const& pendingFrames() const = 0;
 
-    static std::unique_ptr<KeyframeManager> create(
+    static std::unique_ptr<KeyframeManager> Create(
       std::shared_ptr<telemetry::KeyframeTelemetry> telemetry);
   };
 }  // namespace cyclops::measurement

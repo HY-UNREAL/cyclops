@@ -32,29 +32,29 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  using multiview_image_frame_t = std::map<landmark_id_t, feature_point_t>;
-  using multiview_image_data_t = std::map<frame_id_t, multiview_image_frame_t>;
+  using MultiviewImageFrame = std::map<LandmarkID, FeaturePoint>;
+  using MultiViewImageData = std::map<FrameID, MultiviewImageFrame>;
 
   class BundleAdjustmentConstructor {
   private:
-    config::initializer::vision_solver_config_t const& _config;
+    config::initializer::VisionSolverConfig const& _config;
     std::shared_ptr<BundleAdjustmentOptimizationState> _state;
 
     ceres::Problem _problem;
 
-    std::map<landmark_id_t, double*> _landmark_parameters;
-    std::map<frame_id_t, double*> _frame_parameters;
+    std::map<LandmarkID, double*> _landmark_parameters;
+    std::map<FrameID, double*> _frame_parameters;
     std::vector<ceres::ResidualBlockId> _residuals;
 
     bool constructCameraMotionStates();
-    bool constructLandmarkFactors(multiview_image_data_t const& data);
+    bool constructLandmarkFactors(MultiViewImageData const& data);
     bool constructVirtualScaleGaugeFactor();
 
-    struct solution_evaluation_t {
+    struct SolutionEvaluation {
       std::vector<double> residuals;
       EigenCRSMatrix jacobian;
     };
-    solution_evaluation_t evaluateFinalSolution();
+    SolutionEvaluation evaluateFinalSolution();
     MatrixXd getCameraMotionFisherInformation(EigenCRSMatrix const& jacobian);
 
     int countOutliers(
@@ -62,12 +62,12 @@ namespace cyclops::initializer {
 
   public:
     BundleAdjustmentConstructor(
-      config::initializer::vision_solver_config_t const& config,
+      config::initializer::VisionSolverConfig const& config,
       std::shared_ptr<BundleAdjustmentOptimizationState> state);
 
-    bool construct(multiview_image_data_t const& data);
+    bool construct(MultiViewImageData const& data);
 
-    vision_bootstrap_solution_t solve();
+    MSfMSolution solve();
   };
 
   bool BundleAdjustmentConstructor::constructCameraMotionStates() {
@@ -81,7 +81,7 @@ namespace cyclops::initializer {
   }
 
   bool BundleAdjustmentConstructor::constructLandmarkFactors(
-    multiview_image_data_t const& data) {
+    MultiViewImageData const& data) {
     for (auto const& [frame_id, image_frame] : data) {
       auto maybe_x = _frame_parameters.find(frame_id);
       if (maybe_x == _frame_parameters.end()) {
@@ -130,7 +130,7 @@ namespace cyclops::initializer {
     return true;
   }
 
-  BundleAdjustmentConstructor::solution_evaluation_t
+  BundleAdjustmentConstructor::SolutionEvaluation
   BundleAdjustmentConstructor::evaluateFinalSolution() {
     ceres::Problem::EvaluateOptions opt;
 
@@ -143,7 +143,7 @@ namespace cyclops::initializer {
     ceres::CRSMatrix jacobian;
     _problem.Evaluate(opt, nullptr, &residuals, nullptr, &jacobian);
 
-    return solution_evaluation_t {
+    return SolutionEvaluation {
       .residuals = std::move(residuals),
       .jacobian = Eigen::Map<EigenCRSMatrix>(
         jacobian.num_rows, jacobian.num_cols, jacobian.values.size(),
@@ -169,8 +169,7 @@ namespace cyclops::initializer {
     return H_kk - H_km__H_mm__inv__H_mk;
   }
 
-  bool BundleAdjustmentConstructor::construct(
-    multiview_image_data_t const& data) {
+  bool BundleAdjustmentConstructor::construct(MultiViewImageData const& data) {
     if (!constructCameraMotionStates()) {
       __logger__->error("BA camera motion state construction failed.");
       return false;
@@ -203,7 +202,7 @@ namespace cyclops::initializer {
     return n_outliers;
   }
 
-  vision_bootstrap_solution_t BundleAdjustmentConstructor::solve() {
+  MSfMSolution BundleAdjustmentConstructor::solve() {
     ceres::Solver::Options options;
     ceres::Solver::Summary summary;
     options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -220,7 +219,7 @@ namespace cyclops::initializer {
     auto n_parameters = static_cast<int>(summary.num_effective_parameters);
     auto degrees_of_freedom = n_residuals - n_parameters;
     auto failure_probability =
-      chi_squared_cdf(degrees_of_freedom, summary.final_cost);
+      chiSquaredCdf(degrees_of_freedom, summary.final_cost);
     auto success_probability = 1.0 - failure_probability;
 
     auto n_measurements = (n_residuals - 1) / 2;
@@ -240,21 +239,21 @@ namespace cyclops::initializer {
       .solution_significant_probability = success_probability,
       .measurement_inlier_ratio = inlier_ratio,
 
-      .geometry = _state->as_multi_view_geometry(),
+      .geometry = _state->asMultiViewGeometry(),
       .motion_information_weight =
         getCameraMotionFisherInformation(evaluation.jacobian),
     };
   }
 
   BundleAdjustmentConstructor::BundleAdjustmentConstructor(
-    config::initializer::vision_solver_config_t const& config,
+    config::initializer::VisionSolverConfig const& config,
     std::shared_ptr<BundleAdjustmentOptimizationState> state)
       : _config(config), _state(state) {
   }
 
-  std::optional<vision_bootstrap_solution_t> solve_bundle_adjustment(
-    config::initializer::vision_solver_config_t const& config,
-    multiview_geometry_t const& guess, multiview_image_data_t const& data) {
+  std::optional<MSfMSolution> solveBundleAdjustment(
+    config::initializer::VisionSolverConfig const& config,
+    MultiViewGeometry const& guess, MultiViewImageData const& data) {
     auto state = std::make_shared<BundleAdjustmentOptimizationState>(guess);
     auto context = BundleAdjustmentConstructor(config, state);
 

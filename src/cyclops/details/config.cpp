@@ -1,7 +1,7 @@
 #include "cyclops/details/config.hpp"
 
 namespace cyclops::config::initializer {
-  vision_solver_config_t vision_solver_config_t::createDefault() {
+  VisionSolverConfig VisionSolverConfig::CreateDefault() {
     return {
       .feature_point_isotropic_noise = 0.0075,
       .bundle_adjustment_robust_kernel_radius = 1.0,
@@ -37,7 +37,7 @@ namespace cyclops::config::initializer {
     };
   }
 
-  imu_solver_config_t imu_solver_config_t::createDefault() {
+  ImuSolverConfig ImuSolverConfig::CreateDefault() {
     return {
       .rotation_match =
         {
@@ -74,7 +74,7 @@ namespace cyclops::config::initializer {
     };
   }
 
-  initialization_config_t initialization_config_t::createDefault() {
+  InitializationConfig InitializationConfig::CreateDefault() {
     return {
       .observability_pretest =
         {
@@ -82,14 +82,14 @@ namespace cyclops::config::initializer {
           .min_keyframes = 4,
           .min_average_parallax = 0.005,
         },
-      .vision = vision_solver_config_t::createDefault(),
-      .imu = imu_solver_config_t::createDefault(),
+      .vision = VisionSolverConfig::CreateDefault(),
+      .imu = ImuSolverConfig::CreateDefault(),
     };
   }
 }  // namespace cyclops::config::initializer
 
 namespace cyclops::config::estimation {
-  estimator_config_t estimator_config_t::createDefault() {
+  EstimatorConfig EstimatorConfig::CreateDefault() {
     return {
       .optimizer =
         {
@@ -115,10 +115,10 @@ namespace cyclops::config::estimation {
 }  // namespace cyclops::config::estimation
 
 namespace cyclops {
-  std::unique_ptr<cyclops_global_config_t> make_default_cyclops_global_config(
-    sensor_statistics_t const& sensor_noise,
-    sensor_extrinsics_t const& sensor_extrinsics) {
-    return std::make_unique<cyclops_global_config_t>(cyclops_global_config_t {
+  std::unique_ptr<CyclopsConfig> CyclopsConfig::CreateDefault(
+    SensorStatistics const& sensor_noise,
+    SensorExtrinsics const& sensor_extrinsics) {
+    return std::make_unique<CyclopsConfig>(CyclopsConfig {
       .gravity_norm = 9.81,
       .noise = sensor_noise,
       .extrinsics = sensor_extrinsics,
@@ -138,8 +138,8 @@ namespace cyclops {
           .update_rate_smoothing_window_size = 1.0,
         },
       .initialization =
-        config::initializer::initialization_config_t::createDefault(),
-      .estimation = config::estimation::estimator_config_t::createDefault(),
+        config::initializer::InitializationConfig::CreateDefault(),
+      .estimation = config::estimation::EstimatorConfig::CreateDefault(),
     });
   }
 }  // namespace cyclops

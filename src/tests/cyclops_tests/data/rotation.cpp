@@ -7,10 +7,10 @@
 namespace cyclops {
   namespace views = ranges::views;
 
-  std::map<frame_id_t, initializer::two_view_imu_rotation_constraint_t>
-  make_multiview_rotation_prior(
-    pose_signal_t const& pose_signal, se3_transform_t const& camera_extrinsic,
-    std::map<frame_id_t, timestamp_t> const& frame_timestamps) {
+  std::map<FrameID, initializer::TwoViewImuRotationConstraint>
+  makeMultiViewRotationPrior(
+    PoseSignal const& pose_signal, SE3Transform const& camera_extrinsic,
+    std::map<FrameID, Timestamp> const& frame_timestamps) {
     auto multiview_frame_pair = views::zip(
       views::drop_last(frame_timestamps, 1), views::drop(frame_timestamps, 1));
 
@@ -21,7 +21,7 @@ namespace cyclops {
         auto q1 = pose_signal.orientation(time1) * camera_extrinsic.rotation;
         auto q2 = pose_signal.orientation(time2) * camera_extrinsic.rotation;
 
-        auto prior = initializer::two_view_imu_rotation_constraint_t {
+        auto prior = initializer::TwoViewImuRotationConstraint {
           .init_frame_id = frame1,
           .term_frame_id = frame2,
           .rotation =
@@ -38,7 +38,6 @@ namespace cyclops {
 
     return multiview_frame_pair |
       views::transform(camera_relative_rotation_prior_transform) |
-      ranges::to<std::map<
-        frame_id_t, initializer::two_view_imu_rotation_constraint_t>>;
+      ranges::to<std::map<FrameID, initializer::TwoViewImuRotationConstraint>>;
   }
 }  // namespace cyclops

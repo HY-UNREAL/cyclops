@@ -7,7 +7,7 @@ namespace cyclops::initializer {
   namespace views = ranges::views;
 
   BundleAdjustmentCameraMotionStateBlock::
-    BundleAdjustmentCameraMotionStateBlock(se3_transform_t const& guess) {
+    BundleAdjustmentCameraMotionStateBlock(SE3Transform const& guess) {
     orientation() = guess.rotation;
     position() = guess.translation;
   }
@@ -60,9 +60,8 @@ namespace cyclops::initializer {
     return _data_block.data();
   }
 
-  se3_transform_t BundleAdjustmentCameraMotionStateBlock::asSE3Transform()
-    const {
-    return se3_transform_t {
+  SE3Transform BundleAdjustmentCameraMotionStateBlock::asSE3Transform() const {
+    return SE3Transform {
       .translation = position(),
       .rotation = orientation(),
     };
@@ -107,7 +106,7 @@ namespace cyclops::initializer {
   }
 
   template <typename transform_t>
-  static auto value_transform(transform_t tf) {
+  static auto valueTransform(transform_t tf) {
     return views::transform([=](auto const& key_value) {
       auto const& [key, value] = key_value;
       return std::make_pair(key, tf(value));
@@ -115,23 +114,22 @@ namespace cyclops::initializer {
   }
 
   BundleAdjustmentOptimizationState::BundleAdjustmentOptimizationState(
-    multiview_geometry_t const& guess)
+    MultiViewGeometry const& guess)
       : camera_motions(
           guess.camera_motions |
-          value_transform([](auto const& _) { return MotionBlock(_); }) |
-          ranges::to<std::map<frame_id_t, MotionBlock>>),
+          valueTransform([](auto const& _) { return MotionBlock(_); }) |
+          ranges::to<std::map<FrameID, MotionBlock>>),
         landmark_positions(
           guess.landmarks |
-          value_transform([](auto const& _) { return LandmarkBlock(_); }) |
-          ranges::to<std::map<landmark_id_t, LandmarkBlock>>) {
+          valueTransform([](auto const& _) { return LandmarkBlock(_); }) |
+          ranges::to<std::map<LandmarkID, LandmarkBlock>>) {
   }
 
   using MotionBlockRef = BundleAdjustmentOptimizationState::MotionBlockRef;
   using MotionBlock = BundleAdjustmentOptimizationState::MotionBlock;
 
   static std::optional<std::tuple<MotionBlockRef, MotionBlockRef, double>>
-  find_farthest_from_initial_frame(
-    std::map<frame_id_t, MotionBlock>& camera_motions) {
+  findFarthestFromInitialFrame(std::map<FrameID, MotionBlock>& camera_motions) {
     if (camera_motions.size() < 2)
       return std::nullopt;
 
@@ -158,7 +156,7 @@ namespace cyclops::initializer {
 
   std::optional<BundleAdjustmentOptimizationState::MotionBlockRefPair>
   BundleAdjustmentOptimizationState::normalize() {
-    auto maybe_pair = find_farthest_from_initial_frame(camera_motions);
+    auto maybe_pair = findFarthestFromInitialFrame(camera_motions);
     if (!maybe_pair)
       return std::nullopt;
 
@@ -180,15 +178,15 @@ namespace cyclops::initializer {
     return std::make_tuple(x_0, x_n);
   }
 
-  multiview_geometry_t
-  BundleAdjustmentOptimizationState::as_multi_view_geometry() const {
+  MultiViewGeometry BundleAdjustmentOptimizationState::asMultiViewGeometry()
+    const {
     return {
       .camera_motions = camera_motions |
-        value_transform([](auto const& _) { return _.asSE3Transform(); }) |
-        ranges::to<std::map<frame_id_t, se3_transform_t>>,
+        valueTransform([](auto const& _) { return _.asSE3Transform(); }) |
+        ranges::to<std::map<FrameID, SE3Transform>>,
       .landmarks = landmark_positions |
-        value_transform([](auto const& _) { return _.asVector3(); }) |
-        ranges::to<landmark_positions_t>,
+        valueTransform([](auto const& _) { return _.asVector3(); }) |
+        ranges::to<LandmarkPositions>,
     };
   }
 }  // namespace cyclops::initializer

@@ -7,7 +7,7 @@ namespace cyclops {
   using Eigen::Matrix3d;
   using Eigen::Vector3d;
 
-  qcqp1_solution_t solve_norm_constrained_qcqp1(
+  Qcqp1Solution solveNormConstrainedQcqp1(
     Matrix3d const& H, Vector3d const& b, double norm_sqr,
     double multiplier_min, size_t max_iterations,
     double constraint_violation_tolerance, double multiplier_safeguard_margin) {

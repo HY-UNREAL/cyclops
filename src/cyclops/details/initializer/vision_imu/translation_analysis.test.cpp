@@ -16,14 +16,14 @@ namespace cyclops::initializer {
   using Eigen::Vector3d;
   using Eigen::VectorXd;
 
-  using measurement::imu_motion_ref_t;
-  using measurement::imu_motion_t;
-  using measurement::imu_motions_t;
+  using measurement::ImuMotionRef;
+  using measurement::ImuMotions;
+  using measurement::ImuMotion;
 
   template <
     typename orientation_signal_t, typename velocity_signal_t,
     typename position_signal_t>
-  static auto make_imu_motions(
+  static auto makeImuMotions(
     orientation_signal_t q, velocity_signal_t v, position_signal_t p,
     Vector3d const& gravity, std::vector<double> times) {
     auto n = static_cast<int>(times.size());
@@ -31,18 +31,18 @@ namespace cyclops::initializer {
       views::zip(times | views::slice(0, n - 1), times | views::slice(1, n));
     auto index_pairs = views::zip(views::ints(0, n - 1), views::ints(1, n));
 
-    imu_motions_t result;
+    ImuMotions result;
     for (auto const& [time_pair, index_pair] :
          views::zip(time_pairs, index_pairs)) {
       auto const& [t_s, t_e] = time_pair;
       auto const& [n_s, n_e] = index_pair;
       auto dt = (t_e - t_s);
 
-      result.emplace_back(imu_motion_t {
-        static_cast<frame_id_t>(n_s), static_cast<frame_id_t>(n_e),
-        std::make_unique<measurement::IMUPreintegration>(
+      result.emplace_back(ImuMotion {
+        static_cast<FrameID>(n_s), static_cast<FrameID>(n_e),
+        std::make_unique<measurement::ImuPreintegration>(
           Vector3d::Zero(), Vector3d::Zero(),
-          measurement::imu_noise_t {0.0, 0.0})});
+          measurement::ImuNoise {0.0, 0.0})});
       auto const& imu = result.back().data;
       imu->time_delta = dt;
       imu->rotation_delta = q(t_s).conjugate() * q(t_e);
@@ -57,24 +57,24 @@ namespace cyclops::initializer {
   }
 
   template <int dim>
-  using vector_t = Eigen::Matrix<double, dim, 1>;
+  using Vector = Eigen::Matrix<double, dim, 1>;
 
   template <int dim>
-  static VectorXd concatenate(vector_t<dim> const& v) {
+  static VectorXd concatenate(Vector<dim> const& v) {
     return v;
   }
 
   template <int vector1_dim, int vector2_dim, int... rest_dims>
   static auto concatenate(
-    vector_t<vector1_dim> const& v1, vector_t<vector2_dim> const& v2,
-    vector_t<rest_dims> const&... rest) {
+    Vector<vector1_dim> const& v1, Vector<vector2_dim> const& v2,
+    Vector<rest_dims> const&... rest) {
     VectorXd v3(v1.size() + v2.size());
     v3 << v1, v2;
     return concatenate(v3, rest...);
   }
 
   template <int dim>
-  static VectorXd concatenate(std::vector<vector_t<dim>> const& vs) {
+  static VectorXd concatenate(std::vector<Vector<dim>> const& vs) {
     VectorXd result(ranges::accumulate(
       vs | views::transform([](auto const& v) { return v.size(); }), 0));
 
@@ -96,7 +96,7 @@ namespace cyclops::initializer {
       Vector3d(rand(), rand(), rand()).normalized().eval();
     auto const translation_axis =
       Vector3d(rand(), rand(), rand()).normalized().eval();
-    auto const extrinsic = se3_transform_t {
+    auto const extrinsic = SE3Transform {
       Vector3d(rand(), rand(), rand()),
       Quaterniond(rand(), rand(), rand(), rand()).normalized()};
     auto const scale = 0.4;
@@ -145,7 +145,7 @@ namespace cyclops::initializer {
       auto const& dp = position_perturbations.at(i - 1);
       return (p_c / scale - q_c * dp);
     };
-    auto position_prior = imu_match_camera_translation_prior_t {
+    auto position_prior = ImuMatchCameraTranslationPrior {
       .translations =
         {
           {0, make_camera_position_prior(0)},
@@ -154,7 +154,7 @@ namespace cyclops::initializer {
         },
       .weight = 1e4 * MatrixXd::Identity(6, 6),
     };
-    auto orientations = imu_match_rotation_solution_t {
+    auto orientations = ImuRotationMatch {
       .gyro_bias = Vector3d::Zero(),
       .body_orientations =
         {
@@ -165,19 +165,19 @@ namespace cyclops::initializer {
     };
     auto times = std::vector {0.0, 0.1, 0.2};
 
-    auto imu_motions = make_imu_motions(
+    auto imu_motions = makeImuMotions(
       orientation_signal, velocity_signal, position_signal, gravity,
       std::vector {0.0, 0.1, 0.2});
 
-    auto config = std::make_shared<cyclops_global_config_t>();
+    auto config = std::make_shared<CyclopsConfig>();
     config->gravity_norm = 9.81;
     config->extrinsics.imu_camera_transform = extrinsic;
     config->noise.acc_bias_prior_stddev = 1.;
 
-    auto analyzer = IMUMatchTranslationAnalyzer::create(config);
+    auto analyzer = ImuTranslationMatchAnalyzer::Create(config);
     auto [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analyzer->analyze(
       imu_motions |
-        views::transform([](auto const& _) -> imu_motion_ref_t { return _; }) |
+        views::transform([](auto const& _) -> ImuMotionRef { return _; }) |
         ranges::to_vector,
       orientations, position_prior);
 

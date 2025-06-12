@@ -36,9 +36,9 @@ namespace cyclops::initializer {
    * [1] R. Hartley and A. Zisserman, "Multiple View Geometry in Computer
    * Vision", 2nd ed. Cambridge: Cambridge University Press, 2004.
    */
-  static std::optional<Matrix3d> compute_homography_matrix(
-    map<landmark_id_t, two_view_feature_pair_t> const& features,
-    set<landmark_id_t> const& inliers) {
+  static std::optional<Matrix3d> computeHomographyMatrix(
+    map<LandmarkID, TwoViewFeaturePair> const& features,
+    set<LandmarkID> const& inliers) {
     auto n = inliers.size();
     if (n < 4) {
       __logger__->warn("Degenerate homography (n_features = {})", n);
@@ -86,13 +86,13 @@ namespace cyclops::initializer {
     return H21;
   }
 
-  static auto analyze_inliers(
+  static auto analyzeInliers(
     double sigma, Matrix3d const& H21,
-    map<landmark_id_t, two_view_feature_pair_t> const& features) {
+    map<LandmarkID, TwoViewFeaturePair> const& features) {
     Matrix3d H12 = H21.inverse();
 
     auto expected_inliers_number = 0.;
-    auto inliers = set<landmark_id_t>();
+    auto inliers = set<LandmarkID>();
     for (auto const& [feature_id, feature_pair] : features) {
       auto const& [f1, f2] = feature_pair;
       auto f2_hat = project(H21 * f1.homogeneous());
@@ -102,8 +102,8 @@ namespace cyclops::initializer {
       auto r2 = ((f2 - f2_hat) / sigma).eval();
 
       // inlier probability of f1 and f2
-      auto p1 = std::max(0., 1 - chi_squared_cdf(2, r1.dot(r1)));
-      auto p2 = std::max(0., 1 - chi_squared_cdf(2, r2.dot(r2)));
+      auto p1 = std::max(0., 1 - chiSquaredCdf(2, r1.dot(r1)));
+      auto p2 = std::max(0., 1 - chiSquaredCdf(2, r2.dot(r2)));
 
       if (p1 >= 0.05 && p2 >= 0.05) {
         expected_inliers_number += std::sqrt(p1 * p2);
@@ -113,37 +113,37 @@ namespace cyclops::initializer {
     return std::make_tuple(expected_inliers_number, inliers);
   }
 
-  static homography_analysis_t analyze_two_view_homography(
-    double sigma, set<landmark_id_t> const& ransac_selection,
-    map<landmark_id_t, two_view_feature_pair_t> const& features) {
-    auto maybe_H21 = compute_homography_matrix(features, ransac_selection);
+  static HomographyAnalysis analyzeTwoViewHomography(
+    double sigma, set<LandmarkID> const& ransac_selection,
+    map<LandmarkID, TwoViewFeaturePair> const& features) {
+    auto maybe_H21 = computeHomographyMatrix(features, ransac_selection);
     if (!maybe_H21)
       return {-1, Matrix3d::Identity(), {}};
     auto const& H21 = *maybe_H21;
 
-    auto [n_inliers, inliers] = analyze_inliers(sigma, H21, features);
+    auto [n_inliers, inliers] = analyzeInliers(sigma, H21, features);
     return {n_inliers, H21, inliers};
   }
 
-  homography_analysis_t analyze_two_view_homography(
-    double sigma, vector<set<landmark_id_t>> const& ransac_batch,
-    map<landmark_id_t, two_view_feature_pair_t> const& features) {
+  HomographyAnalysis analyzeTwoViewHomography(
+    double sigma, vector<set<LandmarkID>> const& ransac_batch,
+    map<LandmarkID, TwoViewFeaturePair> const& features) {
     if (sigma <= 0)
       return {-1, Matrix3d::Identity(), {}};
 
-    homography_analysis_t best_homography = {0., Matrix3d::Zero(), {}};
+    HomographyAnalysis best_homography = {0., Matrix3d::Zero(), {}};
     for (auto const& selection : ransac_batch) {
-      auto homography = analyze_two_view_homography(sigma, selection, features);
+      auto homography = analyzeTwoViewHomography(sigma, selection, features);
       if (homography.expected_inliers > best_homography.expected_inliers)
         best_homography = std::move(homography);
     }
     if (best_homography.inliers.size() < 4)
       return {-1, Matrix3d::Identity(), {}};
 
-    auto H_refinement = refine_homography_geometry(
+    auto H_refinement = refineHomographyGeometry(
       sigma, best_homography.homography, best_homography.inliers, features);
 
-    auto [n_inliers, inliers] = analyze_inliers(sigma, H_refinement, features);
+    auto [n_inliers, inliers] = analyzeInliers(sigma, H_refinement, features);
     return {n_inliers, H_refinement, inliers};
   }
 
@@ -155,7 +155,7 @@ namespace cyclops::initializer {
     return std::abs((a - b) / a) < h;
   }
 
-  static std::tuple<double, double> analyze_plane_normal_components(
+  static std::tuple<double, double> analyzePlaneNormalComponents(
     double s1, double s2, double s3) {
     auto s1s1_minus_s3s3 = s1 * s1 - s3 * s3;
     auto s1s1_minus_s2s2 = s1 * s1 - s2 * s2;
@@ -168,7 +168,7 @@ namespace cyclops::initializer {
   }
 
   template <typename app_t>
-  static auto foreach_sign_permutations(app_t const& app) {
+  static auto foreachSignPermutations(app_t const& app) {
     auto signs = std::array {-1., 1.};
     auto pair_app = [&](auto const& pair) {
       auto const& [e1, e3] = pair;
@@ -191,7 +191,7 @@ namespace cyclops::initializer {
     }
 
     auto handlePositiveDPrime(double x1, double x3) {
-      return foreach_sign_permutations([&](auto e1, auto e3) {
+      return foreachSignPermutations([&](auto e1, auto e3) {
         auto const sin = e1 * e3 * (s.x() - s.z()) * x1 * x3 / s.y();
         auto const cos = (s.x() * x3 * x3 + s.z() * x1 * x1) / s.y();
 
@@ -205,7 +205,7 @@ namespace cyclops::initializer {
         // clang-format on
         Vector3d const t = (s.x() - s.z()) * Vector3d(e1 * x1, 0, -e3 * x3);
 
-        return rotation_translation_matrix_pair_t {
+        return RotationPositionPair {
           .rotation = V * R.transpose() * U.transpose(),
           .translation = -V * R.transpose() * t,
         };
@@ -213,7 +213,7 @@ namespace cyclops::initializer {
     }
 
     auto handleNegativeDPrime(double x1, double x3) {
-      return foreach_sign_permutations([&](auto e1, auto e3) {
+      return foreachSignPermutations([&](auto e1, auto e3) {
         auto const sin = e1 * e3 * (s.x() + s.z()) * x1 * x3 / s.y();
         auto const cos = (s.z() * x1 * x1 - s.x() * x3 * x3) / s.y();
 
@@ -227,7 +227,7 @@ namespace cyclops::initializer {
         // clang-format on
         Vector3d const t = (s.x() + s.z()) * Vector3d(e1 * x1, 0, e3 * x3);
 
-        return rotation_translation_matrix_pair_t {
+        return RotationPositionPair {
           .rotation = V * R.transpose() * U.transpose(),
           .translation = -V * R.transpose() * t,
         };
@@ -242,7 +242,7 @@ namespace cyclops::initializer {
    * piecewise planar environment", in International Journal of Pattern
    * Recognition and Artificial Intelligence, vol. 2, no. 3, pp. 485-508, 1988
    */
-  vector<rotation_translation_matrix_pair_t> solve_homography_motion_hypothesis(
+  vector<RotationPositionPair> solveHomographyMotionHypothesis(
     Matrix3d const& homography) {
     Eigen::JacobiSVD<Matrix3d> svd(
       homography, Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -263,7 +263,7 @@ namespace cyclops::initializer {
     }
 
     HomographyMotionDecompositionContext context(U, V, s);
-    auto [x1, x3] = analyze_plane_normal_components(s.x(), s.y(), s.z());
+    auto [x1, x3] = analyzePlaneNormalComponents(s.x(), s.y(), s.z());
 
     auto h1 = context.handlePositiveDPrime(x1, x3);
     auto h2 = context.handleNegativeDPrime(x1, x3);

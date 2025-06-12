@@ -3,7 +3,7 @@
 #include <memory>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::measurement {
@@ -14,7 +14,7 @@ namespace cyclops::estimation {
   class FactorGraphInstance;
   class StateVariableReadAccessor;
 
-  struct gaussian_prior_t;
+  struct GaussianPrior;
 
   class MarginalizationManager {
   public:
@@ -23,10 +23,10 @@ namespace cyclops::estimation {
 
     virtual void marginalize(FactorGraphInstance& graph_instance) = 0;
     virtual void marginalize() = 0;
-    virtual gaussian_prior_t const& prior() const = 0;
+    virtual GaussianPrior const& prior() const = 0;
 
-    static std::unique_ptr<MarginalizationManager> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<MarginalizationManager> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<StateVariableReadAccessor const> state,
       std::shared_ptr<measurement::MeasurementDataQueue> data_queue);
   };

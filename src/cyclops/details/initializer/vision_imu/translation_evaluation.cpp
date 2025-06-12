@@ -11,9 +11,9 @@ namespace cyclops::initializer {
 
   using Matrix32d = Eigen::Matrix<double, 3, 2>;
 
-  IMUMatchScaleEvaluationContext::IMUMatchScaleEvaluationContext(
-    double gravity_norm, imu_match_translation_analysis_t const& analysis,
-    IMUMatchTranslationAnalysisCache const& cache)
+  ImuMatchScaleEvaluationContext::ImuMatchScaleEvaluationContext(
+    double gravity_norm, ImuTranslationMatchAnalysis const& analysis,
+    ImuTranslationMatchAnalysisCache const& cache)
       : gravity_norm(gravity_norm), analysis(analysis), cache(cache) {
   }
 
@@ -28,14 +28,14 @@ namespace cyclops::initializer {
    *       [H_g + mu * I3,   F_g] * [  g  ] + [ b_g ]  = [ 0 ]
    *       [F_g.T,           H_q]   [ x_q ]   [ b_q ]    [ 0 ].
    */
-  struct gravity_term_reduction_t {
+  struct GravityTermReduction {
     Matrix3d H_g_bar;
     Vector3d b_g_bar;
     MatrixXd F_q;
     VectorXd z_q;
   };
 
-  static gravity_term_reduction_t reduce_to_gravity_term(
+  static GravityTermReduction reduceToGravityTerm(
     MatrixXd const& H_I_bar, VectorXd const& b_I_bar) {
     auto dim = H_I_bar.cols();
     auto H_g = H_I_bar.block(0, 0, 3, 3).eval();
@@ -61,14 +61,13 @@ namespace cyclops::initializer {
     return c;
   }
 
-  std::optional<imu_match_scale_evaluation_t>
-  IMUMatchScaleEvaluationContext::evaluate(double s) const {
+  std::optional<ImuMatchScaleEvaluation>
+  ImuMatchScaleEvaluationContext::evaluate(double s) const {
     auto [H_I_bar, b_I_bar, F_V, z_V] = cache.inflatePrimal(s);
-    auto [H_g_bar, b_g_bar, F_q, z_q] =
-      reduce_to_gravity_term(H_I_bar, b_I_bar);
+    auto [H_g_bar, b_g_bar, F_q, z_q] = reduceToGravityTerm(H_I_bar, b_I_bar);
     auto rho_min = -H_g_bar.selfadjointView<Eigen::Upper>().eigenvalues()[0];
 
-    auto [success, rho_solved, g_solved] = solve_norm_constrained_qcqp1(
+    auto [success, rho_solved, g_solved] = solveNormConstrainedQcqp1(
       H_g_bar, 2 * b_g_bar, gravity_norm * gravity_norm, rho_min);
 
     if (!success)
@@ -85,7 +84,7 @@ namespace cyclops::initializer {
 
     auto cost = residual.dot(residual);
 
-    return imu_match_scale_evaluation_t {
+    return ImuMatchScaleEvaluation {
       .multiplier = rho_solved,
       .cost = cost,
       .inertial_solution = x_I_solved,
@@ -93,8 +92,8 @@ namespace cyclops::initializer {
     };
   }
 
-  double IMUMatchScaleEvaluationContext::evaluateDerivative(
-    imu_match_scale_evaluation_t const& evaluation, double s) const {
+  double ImuMatchScaleEvaluationContext::evaluateDerivative(
+    ImuMatchScaleEvaluation const& evaluation, double s) const {
     auto const& [mu, p, x_I, x_V] = evaluation;
     auto [r_s__dot, b_I_s__dot, b_V_s__dot, F_I, D_I] =
       cache.inflateDerivative(s);
@@ -104,7 +103,7 @@ namespace cyclops::initializer {
     return 2 * b_s_dot_T__x + x_T__H_s_dot__x + r_s__dot;
   }
 
-  static std::tuple<Vector3d, int> farthest_element_vector(Vector3d const& a) {
+  static std::tuple<Vector3d, int> farthestElementVector(Vector3d const& a) {
     auto max = std::numeric_limits<double>::lowest();
     auto max_i = 0;
 
@@ -120,11 +119,11 @@ namespace cyclops::initializer {
     return std::make_tuple(result, max_i);
   }
 
-  static Matrix32d find_gravity_tangent(Vector3d const& g) {
+  static Matrix32d findGravityTangent(Vector3d const& g) {
     // method in https://math.stackexchange.com/questions/1909536#1909570.
     // credit: professor M. van Leeuwen.
     auto a = g.normalized().eval();
-    auto [e, k] = farthest_element_vector(a);
+    auto [e, k] = farthestElementVector(a);
 
     Vector3d v = a - e;
     Vector3d u = v.normalized();
@@ -143,15 +142,15 @@ namespace cyclops::initializer {
     return T_g;
   }
 
-  Eigen::MatrixXd IMUMatchScaleEvaluationContext::evaluateHessian(
-    imu_match_scale_evaluation_t const& evaluation, double s) const {
+  Eigen::MatrixXd ImuMatchScaleEvaluationContext::evaluateHessian(
+    ImuMatchScaleEvaluation const& evaluation, double s) const {
     auto const& [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analysis;
     auto const& [mu, p, x_I, x_V] = evaluation;
 
     auto n_I = A_I.rows();
     auto m_I = x_I.size();
 
-    auto T_g = find_gravity_tangent(x_I.head(3));
+    auto T_g = findGravityTangent(x_I.head(3));
     auto A_g = A_I.leftCols(3).eval();
     auto A_q = A_I.rightCols(m_I - 3).eval();
 

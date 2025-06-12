@@ -21,25 +21,24 @@ namespace cyclops::measurement {
 
   static auto const O3x1 = Vector3d::Zero().eval();
 
-  static auto make_position_signal(std::mt19937& rgen) {
+  static auto makePositionSignal(std::mt19937& rgen) {
     Vector3d direction =
       perturbate(Vector3d::Zero().eval(), 1, rgen).normalized();
-    return [direction](timestamp_t t) -> Vector3d {
-      return direction * 0.05 * t * t;
-    };
+    return
+      [direction](Timestamp t) -> Vector3d { return direction * 0.05 * t * t; };
   }
 
-  static auto make_orientation_signal(std::mt19937& rgen) {
+  static auto makeOrientationSignal(std::mt19937& rgen) {
     Vector3d axis = perturbate(Vector3d::Zero().eval(), 1, rgen).normalized();
-    return [axis](timestamp_t t) -> Quaterniond {
+    return [axis](Timestamp t) -> Quaterniond {
       auto const theta = 0.05 * t * t;
       return Quaterniond(Eigen::AngleAxisd(theta, axis));
     };
   }
 
-  static auto evaluate_truth_integration_delta(
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e) {
-    auto integration_truth = make_imu_preintegration(pose_signal, t_s, t_e);
+  static auto evaluateTruthIntegrationDelta(
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e) {
+    auto integration_truth = makeImuPreintegration(pose_signal, t_s, t_e);
     auto y_q = integration_truth->rotation_delta;
     auto y_p = integration_truth->position_delta;
     auto y_v = integration_truth->velocity_delta;
@@ -47,15 +46,15 @@ namespace cyclops::measurement {
     return std::make_tuple(y_q, y_p, y_v);
   }
 
-  static auto sample_preintegration(
-    imu_mockup_sequence_t const& sequence, sensor_statistics_t const& noise,
+  static auto samplePreintegration(
+    ImuMockupSequence const& sequence, SensorStatistics const& noise,
     Vector3d const& b_a, Vector3d const& b_w) {
     auto n_data = static_cast<int>(sequence.size());
     auto slice = [&](auto a, auto b) { return sequence | views::slice(a, b); };
 
-    auto integration = std::make_unique<IMUPreintegration>(
+    auto integration = std::make_unique<ImuPreintegration>(
       Vector3d::Zero(), Vector3d::Zero(),
-      imu_noise_t {noise.acc_white_noise, noise.gyr_white_noise});
+      ImuNoise {noise.acc_white_noise, noise.gyr_white_noise});
 
     for (auto const& [f0, f1] :
          views::zip(slice(0, n_data - 1), slice(1, n_data))) {
@@ -69,17 +68,16 @@ namespace cyclops::measurement {
     return integration;
   }
 
-  static auto compute_imu_preintegration_covariance(
-    sensor_statistics_t const& noise, pose_signal_t pose_signal) {
+  static auto computeImuPreintegrationCovariance(
+    SensorStatistics const& noise, PoseSignal pose_signal) {
     auto imu_sequence =
-      generate_imu_data(pose_signal, linspace(0., 1., 200) | ranges::to_vector);
-    auto integration = sample_preintegration(imu_sequence, noise, O3x1, O3x1);
+      generateImuData(pose_signal, linspace(0., 1., 200) | ranges::to_vector);
+    auto integration = samplePreintegration(imu_sequence, noise, O3x1, O3x1);
     return integration->covariance;
   }
 
-  static auto sample_imu_preintegration_covariance(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    pose_signal_t pose_signal) {
+  static auto sampleImuPreintegrationCovariance(
+    std::mt19937& rgen, SensorStatistics const& noise, PoseSignal pose_signal) {
     auto covariance_sampled = Matrix9d::Zero().eval();
 
 #ifdef NDEBUG
@@ -90,12 +88,11 @@ namespace cyclops::measurement {
     for (auto _ = 0; _ < samples; _++) {
       auto timestamps = linspace(0., 1., 200) | ranges::to_vector;
       auto imu_raw_sequence =
-        generate_imu_data(pose_signal, timestamps, rgen, noise);
-      auto [y_q, y_p, y_v] =
-        evaluate_truth_integration_delta(pose_signal, 0., 1.);
+        generateImuData(pose_signal, timestamps, rgen, noise);
+      auto [y_q, y_p, y_v] = evaluateTruthIntegrationDelta(pose_signal, 0., 1.);
 
       auto integration =
-        sample_preintegration(imu_raw_sequence, noise, O3x1, O3x1);
+        samplePreintegration(imu_raw_sequence, noise, O3x1, O3x1);
       auto r = integration->evaluateError(y_q, y_p, y_v, O3x1, O3x1);
       covariance_sampled += r * r.transpose();
     }
@@ -106,11 +103,11 @@ namespace cyclops::measurement {
 
   TEST_CASE("IMU preintegration covariance computation") {
     auto rgen = std::mt19937(20210428);
-    auto pose_signal = pose_signal_t {
-      .position = make_position_signal(rgen),
-      .orientation = make_orientation_signal(rgen),
+    auto pose_signal = PoseSignal {
+      .position = makePositionSignal(rgen),
+      .orientation = makeOrientationSignal(rgen),
     };
-    auto noise = sensor_statistics_t {
+    auto noise = SensorStatistics {
       .acc_white_noise = 0.05,
       .gyr_white_noise = 0.05,
       .acc_random_walk = 0.,  // ignore bias drift
@@ -120,9 +117,9 @@ namespace cyclops::measurement {
     };
 
     auto covariance_computed =
-      compute_imu_preintegration_covariance(noise, pose_signal);
+      computeImuPreintegrationCovariance(noise, pose_signal);
     auto covariance_sampled =
-      sample_imu_preintegration_covariance(rgen, noise, pose_signal);
+      sampleImuPreintegrationCovariance(rgen, noise, pose_signal);
 
     CAPTURE(covariance_computed);
     CAPTURE(covariance_sampled);
@@ -134,9 +131,7 @@ namespace cyclops::measurement {
   }
 
   template <typename evaluator_t>
-  static auto differentiate_five_point_stencil(evaluator_t evaluator) {
-    using result_t = std::remove_reference_t<decltype(evaluator(0.0))>;
-
+  static auto differentiateFivePointStencil(evaluator_t evaluator) {
     auto constexpr epsilon = 1e-2;
 
     auto r1 = evaluator(-2 * epsilon);
@@ -144,34 +139,33 @@ namespace cyclops::measurement {
     auto r3 = evaluator(+epsilon);
     auto r4 = evaluator(+2 * epsilon);
 
-    result_t result = -(r1 - 8 * r2 + 8 * r3 - r4) / 12 / epsilon;
+    using Result = std::remove_reference_t<decltype(evaluator(0.0))>;
+    Result result = -(r1 - 8 * r2 + 8 * r3 - r4) / 12 / epsilon;
     return result;
   }
 
-  static auto make_vector3_unit(int i) {
+  static auto makeUnit3(int i) {
     auto x = Vector3d::Zero().eval();
     x(i) = 1;
     return x;
   }
 
-  static auto sample_numeric_bias_jacobian(
-    imu_mockup_sequence_t const& imu_sequence, sensor_statistics_t const& noise,
+  static auto sampleNumericBiasJacobian(
+    ImuMockupSequence const& imu_sequence, SensorStatistics const& noise,
     Quaterniond const& y_q, Vector3d const& y_p, Vector3d const& y_v) {
     Eigen::Matrix<double, 9, 6> G_numeric;
     for (int i = 0; i < 3; i++) {
-      G_numeric.col(i) = differentiate_five_point_stencil([&](auto h) {
-        auto b_a = (h * make_vector3_unit(i)).eval();
-        auto integration =
-          sample_preintegration(imu_sequence, noise, b_a, O3x1);
+      G_numeric.col(i) = differentiateFivePointStencil([&](auto h) {
+        auto b_a = (h * makeUnit3(i)).eval();
+        auto integration = samplePreintegration(imu_sequence, noise, b_a, O3x1);
         return integration->evaluateError(y_q, y_p, y_v, O3x1, O3x1);
       });
     }
 
     for (int i = 0; i < 3; i++) {
-      G_numeric.col(i + 3) = differentiate_five_point_stencil([&](auto h) {
-        auto b_w = (h * make_vector3_unit(i)).eval();
-        auto integration =
-          sample_preintegration(imu_sequence, noise, O3x1, b_w);
+      G_numeric.col(i + 3) = differentiateFivePointStencil([&](auto h) {
+        auto b_w = (h * makeUnit3(i)).eval();
+        auto integration = samplePreintegration(imu_sequence, noise, O3x1, b_w);
         return integration->evaluateError(y_q, y_p, y_v, O3x1, O3x1);
       });
     }
@@ -180,12 +174,12 @@ namespace cyclops::measurement {
 
   TEST_CASE("IMU preintegration bias Jacobian computation") {
     auto rgen = std::mt19937(20210428);
-    auto pose_signal = pose_signal_t {
-      .position = make_position_signal(rgen),
-      .orientation = make_orientation_signal(rgen),
+    auto pose_signal = PoseSignal {
+      .position = makePositionSignal(rgen),
+      .orientation = makeOrientationSignal(rgen),
     };
 
-    auto noise = sensor_statistics_t {
+    auto noise = SensorStatistics {
       .acc_white_noise = 0.0,  // ignore all noises
       .gyr_white_noise = 0.0,
       .acc_random_walk = 0.0,
@@ -196,17 +190,16 @@ namespace cyclops::measurement {
 
     auto timestamps = linspace(0., 1., 1000) | ranges::to_vector;
     auto imu_raw_sequence =
-      generate_imu_data(pose_signal, timestamps, rgen, noise);
-    auto [y_q, y_p, y_v] =
-      evaluate_truth_integration_delta(pose_signal, 0., 1.);
+      generateImuData(pose_signal, timestamps, rgen, noise);
+    auto [y_q, y_p, y_v] = evaluateTruthIntegrationDelta(pose_signal, 0., 1.);
 
     auto evaluator = [&](auto const& b_a, auto const& b_w) {
-      return sample_preintegration(imu_raw_sequence, noise, b_a, b_w);
+      return samplePreintegration(imu_raw_sequence, noise, b_a, b_w);
     };
 
     auto G_algebraic = evaluator(O3x1, O3x1)->bias_jacobian;
     auto G_numeric =
-      sample_numeric_bias_jacobian(imu_raw_sequence, noise, y_q, y_p, y_v);
+      sampleNumericBiasJacobian(imu_raw_sequence, noise, y_q, y_p, y_v);
 
     CAPTURE(G_numeric);
     CAPTURE(G_algebraic);

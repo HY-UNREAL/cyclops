@@ -20,30 +20,30 @@ namespace cyclops::initializer {
 
   static auto constexpr n_frames = 8;
 
-  static auto position_signal(timestamp_t t) {
+  static auto positionSignal(Timestamp t) {
     auto x = 3 * (1 - std::cos(t));
     return Vector3d(x, 0, 0);
   }
 
-  static auto orientation_signal(timestamp_t t) -> Quaterniond {
+  static auto orientationSignal(Timestamp t) -> Quaterniond {
     auto theta = atan2(1, cos(t));
-    auto q0 = make_default_camera_rotation();
+    auto q0 = makeDefaultCameraRotation();
     return Eigen::AngleAxisd(theta, Vector3d::UnitZ()) * q0;
   }
 
-  static auto make_multiview_landmark_observation(
-    std::mt19937& rgen, pose_signal_t pose_signal,
-    std::map<frame_id_t, timestamp_t> motion_timestamps) {
-    auto landmarks = generate_landmarks(
+  static auto makeMultiViewLandmarkObservation(
+    std::mt19937& rgen, PoseSignal pose_signal,
+    std::map<FrameID, Timestamp> motion_timestamps) {
+    auto landmarks = generateLandmarks(
       rgen, {200, Vector3d(3, 3, 0), Vector3d(1, 1, 1).asDiagonal()});
-    auto image_data = make_landmark_multiview_observation(
-      pose_signal, se3_transform_t::Identity(), landmarks, motion_timestamps);
+    auto image_data = makeLandmarkMultiviewObservation(
+      pose_signal, SE3Transform::Identity(), landmarks, motion_timestamps);
     return std::make_tuple(landmarks, image_data);
   }
 
-  static auto make_multiview_geometry_guess(
-    std::mt19937& rgen, std::map<frame_id_t, timestamp_t> motion_timestamps,
-    pose_signal_t pose_signal, landmark_positions_t const& landmarks) {
+  static auto makeMultiViewGeometryGuess(
+    std::mt19937& rgen, std::map<FrameID, Timestamp> motion_timestamps,
+    PoseSignal pose_signal, LandmarkPositions const& landmarks) {
     REQUIRE_FALSE(motion_timestamps.empty());
     auto [_, init_time] = *motion_timestamps.begin();
     auto init_pose = pose_signal.evaluate(init_time);
@@ -55,9 +55,9 @@ namespace cyclops::initializer {
         auto p_perturbed = perturbate((2 * p).eval(), 0.1, rgen);
         auto q_perturbed = perturbate(q, 0.1, rgen);
 
-        return std::make_pair(frame_id, se3_transform_t {p, q});
+        return std::make_pair(frame_id, SE3Transform {p, q});
       }) |
-      ranges::to<std::map<frame_id_t, se3_transform_t>>;
+      ranges::to<std::map<FrameID, SE3Transform>>;
 
     auto landmarks_estimated =  //
       landmarks | views::transform([&](auto const& id_landmark) {
@@ -68,9 +68,9 @@ namespace cyclops::initializer {
         return std::make_pair(
           landmark_id, perturbate((2 * f).eval(), 0.1, rgen));
       }) |
-      ranges::to<landmark_positions_t>;
+      ranges::to<LandmarkPositions>;
 
-    return multiview_geometry_t {camera_motions_estimated, landmarks_estimated};
+    return MultiViewGeometry {camera_motions_estimated, landmarks_estimated};
   }
 
   TEST_CASE("Bundle adjustment") {
@@ -78,18 +78,18 @@ namespace cyclops::initializer {
 
     auto timestamps = linspace(0, M_PI_2, n_frames) | ranges::to_vector;
     auto motion_frames = views::ints(0, n_frames) | ranges::to_vector;
-    auto motion_timestamps = make_dictionary<frame_id_t, timestamp_t>(
-      views::zip(motion_frames, timestamps));
-    auto pose_signal = pose_signal_t {position_signal, orientation_signal};
+    auto motion_timestamps =
+      makeDictionary<FrameID, Timestamp>(views::zip(motion_frames, timestamps));
+    auto pose_signal = PoseSignal {positionSignal, orientationSignal};
 
     auto [landmarks, image_data] =
-      make_multiview_landmark_observation(rgen, pose_signal, motion_timestamps);
-    auto geometry_guess = make_multiview_geometry_guess(
+      makeMultiViewLandmarkObservation(rgen, pose_signal, motion_timestamps);
+    auto geometry_guess = makeMultiViewGeometryGuess(
       rgen, motion_timestamps, pose_signal, landmarks);
 
-    auto config = config::initializer::vision_solver_config_t::createDefault();
+    auto config = config::initializer::VisionSolverConfig::CreateDefault();
     auto maybe_solution =
-      solve_bundle_adjustment(config, geometry_guess, image_data);
+      solveBundleAdjustment(config, geometry_guess, image_data);
     REQUIRE(maybe_solution.has_value());
 
     auto const& camera_motions = maybe_solution->geometry.camera_motions;
@@ -120,7 +120,7 @@ namespace cyclops::initializer {
     auto init_time = timestamps.front();
     auto last_time = timestamps.back();
     auto true_travel =
-      distance(position_signal(init_time), position_signal(last_time));
+      distance(positionSignal(init_time), positionSignal(last_time));
 
     auto init_frame = motion_frames.front();
     auto last_frame = motion_frames.back();

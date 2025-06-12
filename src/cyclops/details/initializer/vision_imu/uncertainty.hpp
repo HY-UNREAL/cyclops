@@ -4,14 +4,14 @@
 #include <optional>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct imu_match_translation_analysis_t;
-  struct imu_match_scale_sample_solution_t;
+  struct ImuTranslationMatchAnalysis;
+  struct ImuMatchScaleSampleSolution;
 
-  struct imu_match_translation_uncertainty_t {
+  struct ImuTranslationMatchUncertainty {
     double final_cost_significant_probability;
     double scale_log_deviation;
     Eigen::Vector2d gravity_tangent_deviation;
@@ -20,8 +20,8 @@ namespace cyclops::initializer {
     Eigen::VectorXd translation_scale_symmetric_deviation;
   };
 
-  std::optional<imu_match_translation_uncertainty_t>
-  imu_match_analyze_translation_uncertainty(
-    imu_match_translation_analysis_t const& analysis,
-    imu_match_scale_sample_solution_t const& solution);
+  std::optional<ImuTranslationMatchUncertainty>
+  analyzeImuTranslationMatchUncertainty(
+    ImuTranslationMatchAnalysis const& analysis,
+    ImuMatchScaleSampleSolution const& solution);
 }  // namespace cyclops::initializer

@@ -26,9 +26,9 @@ namespace cyclops::initializer {
    * [1] R. Hartley and A. Zisserman, "Multiple View Geometry in Computer
    * Vision", 2nd ed. Cambridge: Cambridge University Press, 2004.
    */
-  static std::optional<Matrix3d> compute_essential_matrix(
-    map<landmark_id_t, two_view_feature_pair_t> const& features,
-    set<landmark_id_t> const& inliers) {
+  static std::optional<Matrix3d> evaluateEssentialMatrix(
+    map<LandmarkID, TwoViewFeaturePair> const& features,
+    set<LandmarkID> const& inliers) {
     auto n = inliers.size();
     if (n < 8) {
       __logger__->warn("Degenerate Epipolar geometry (n_features = {})", n);
@@ -70,11 +70,11 @@ namespace cyclops::initializer {
     return U * s.asDiagonal() * V.transpose();
   }
 
-  static auto analyze_inliers(
+  static auto analyzeInliers(
     double sigma, Matrix3d const& E,
-    map<landmark_id_t, two_view_feature_pair_t> const& features) {
+    map<LandmarkID, TwoViewFeaturePair> const& features) {
     auto expected_inliers_count = 0.;
-    auto inliers = set<landmark_id_t>();
+    auto inliers = set<LandmarkID>();
 
     for (auto const& [feature_id, feature_pair] : features) {
       auto const& [f1, f2] = feature_pair;
@@ -92,8 +92,8 @@ namespace cyclops::initializer {
       auto error_2 = std::pow(g / a2.norm() / sigma, 2);
 
       // inlier probability of f1 and f2
-      auto p1 = std::max(0., 1 - chi_squared_cdf(2, error_1));
-      auto p2 = std::max(0., 1 - chi_squared_cdf(2, error_2));
+      auto p1 = std::max(0., 1 - chiSquaredCdf(2, error_1));
+      auto p2 = std::max(0., 1 - chiSquaredCdf(2, error_2));
 
       if (p1 >= 0.05 && p2 >= 0.05) {
         expected_inliers_count += std::sqrt(p1 * p2);
@@ -103,39 +103,39 @@ namespace cyclops::initializer {
     return std::make_tuple(expected_inliers_count, inliers);
   }
 
-  static epipolar_analysis_t analyze_two_view_epipolar(
-    double sigma, set<landmark_id_t> const& ransac_selection,
-    map<landmark_id_t, two_view_feature_pair_t> const& features) {
-    auto maybe_E = compute_essential_matrix(features, ransac_selection);
+  static EpipolarAnalysis analyzeTwoViewEpipolar(
+    double sigma, set<LandmarkID> const& ransac_selection,
+    map<LandmarkID, TwoViewFeaturePair> const& features) {
+    auto maybe_E = evaluateEssentialMatrix(features, ransac_selection);
     if (!maybe_E)
       return {-1, Matrix3d::Identity(), {}};
     auto const& E = *maybe_E;
 
-    auto [n_inliers, inliers] = analyze_inliers(sigma, E, features);
+    auto [n_inliers, inliers] = analyzeInliers(sigma, E, features);
     return {n_inliers, E, std::move(inliers)};
   }
 
-  epipolar_analysis_t analyze_two_view_epipolar(
-    double sigma, vector<set<landmark_id_t>> const& ransac_batch,
-    map<landmark_id_t, two_view_feature_pair_t> const& features) {
+  EpipolarAnalysis analyzeTwoViewEpipolar(
+    double sigma, vector<set<LandmarkID>> const& ransac_batch,
+    map<LandmarkID, TwoViewFeaturePair> const& features) {
     if (sigma <= 0) {
       __logger__->warn("Invalid landmark noise (<= 0)");
       return {-1, Matrix3d::Identity(), {}};
     }
 
-    epipolar_analysis_t best_epipolar = {0., Matrix3d::Zero(), {}};
+    EpipolarAnalysis best_epipolar = {0., Matrix3d::Zero(), {}};
     for (auto const& subset : ransac_batch) {
-      auto geometry = analyze_two_view_epipolar(sigma, subset, features);
+      auto geometry = analyzeTwoViewEpipolar(sigma, subset, features);
       if (geometry.expected_inliers > best_epipolar.expected_inliers)
         best_epipolar = std::move(geometry);
     }
     if (best_epipolar.inliers.size() < 8)
       return {-1, Matrix3d::Identity(), {}};
 
-    auto E_refined = refine_epipolar_geometry(
+    auto E_refined = refineEpipolarGeometry(
       best_epipolar.essential_matrix, best_epipolar.inliers, features);
 
-    auto [n_inliers, inliers] = analyze_inliers(sigma, E_refined, features);
+    auto [n_inliers, inliers] = analyzeInliers(sigma, E_refined, features);
     return {n_inliers, E_refined, inliers};
   }
 
@@ -149,7 +149,7 @@ namespace cyclops::initializer {
    * [1] R. Hartley and A. Zisserman, "Multiple View Geometry in Computer
    * Vision", 2nd ed. Cambridge: Cambridge University Press, 2004.
    */
-  vector<rotation_translation_matrix_pair_t> solve_epipolar_motion_hypothesis(
+  vector<RotationPositionPair> solveEpipolarMotionHypothesis(
     Matrix3d const& E) {
     Eigen::JacobiSVD<Matrix3d> svd(
       E, Eigen::ComputeFullU | Eigen::ComputeFullV);

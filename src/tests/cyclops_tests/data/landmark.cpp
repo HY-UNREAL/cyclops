@@ -19,21 +19,21 @@ namespace cyclops {
 
   namespace views = ranges::views;
 
-  using measurement::feature_tracks_t;
+  using measurement::FeatureTracks;
 
-  static Vector3d uniform_random_vector(std::mt19937& rgen) {
+  static Vector3d makeUniformRandom3(std::mt19937& rgen) {
     std::uniform_real_distribution<> rand(-1, 1);
     return Vector3d(rand(rgen), rand(rgen), rand(rgen));
   }
 
-  landmark_positions_t generate_landmarks(
-    std::mt19937& rgen, landmark_generation_argument_t const& arg) {
-    return generate_landmarks(rgen, landmark_generation_arguments_t {arg});
+  LandmarkPositions generateLandmarks(
+    std::mt19937& rgen, LandmarkGenerationArgument const& arg) {
+    return generateLandmarks(rgen, LandmarkGenerationArguments {arg});
   }
 
-  landmark_positions_t generate_landmarks(
-    std::mt19937& rgen, landmark_generation_arguments_t const& args) {
-    std::map<landmark_id_t, Vector3d> result;
+  LandmarkPositions generateLandmarks(
+    std::mt19937& rgen, LandmarkGenerationArguments const& args) {
+    std::map<LandmarkID, Vector3d> result;
 
     int _id = 0;
     auto id_generator = views::transform([&](auto _) {
@@ -44,22 +44,21 @@ namespace cyclops {
       for (auto const id : views::iota(0, arg.count) | id_generator) {
         auto const& A = arg.concentration;
         auto const& C = arg.center;
-        result.emplace(id, C + A * uniform_random_vector(rgen));
+        result.emplace(id, C + A * makeUniformRandom3(rgen));
       }
     }
     return result;
   }
 
-  landmark_positions_t generate_landmarks(
-    set<landmark_id_t> ids, function<Vector3d(landmark_id_t)> gen) {
+  LandmarkPositions generateLandmarks(
+    set<LandmarkID> ids, function<Vector3d(LandmarkID)> gen) {
     return ids |
       views::transform([gen](auto id) { return std::make_pair(id, gen(id)); }) |
-      ranges::to<std::map<landmark_id_t, Vector3d>>();
+      ranges::to<std::map<LandmarkID, Vector3d>>();
   }
 
-  static auto generate_landmark_observation_range(
-    Matrix3d const& R, Vector3d const& p,
-    landmark_positions_t const& landmarks) {
+  static auto makeLandmarkObservationRange(
+    Matrix3d const& R, Vector3d const& p, LandmarkPositions const& landmarks) {
     return views::for_each(landmarks, [&](auto const& id_landmark) {
       auto const& [id, landmark] = id_landmark;
       Vector3d const f = R.transpose() * (landmark - p);
@@ -72,87 +71,86 @@ namespace cyclops {
     });
   }
 
-  static Matrix2d make_default_landmark_weight() {
+  static Matrix2d makeDefaultLandmarkWeight() {
     return Vector2d(2.5e5, 2.5e5).asDiagonal();
   }
 
-  std::map<landmark_id_t, feature_point_t> generate_landmark_observations(
-    Matrix3d const& R, Vector3d const& p,
-    landmark_positions_t const& landmarks) {
+  std::map<LandmarkID, FeaturePoint> generateLandmarkObservations(
+    Matrix3d const& R, Vector3d const& p, LandmarkPositions const& landmarks) {
     // clang-format off
-    return generate_landmark_observation_range(R, p, landmarks)
+    return makeLandmarkObservationRange(R, p, landmarks)
       | views::transform([](auto const& id_point) {
           auto const& [id, u] = id_point;
           return std::make_pair(
-            id, feature_point_t {u, make_default_landmark_weight()});
+            id, FeaturePoint {u, makeDefaultLandmarkWeight()});
         })
-      | ranges::to<std::map<landmark_id_t, feature_point_t>>;
+      | ranges::to<std::map<LandmarkID, FeaturePoint>>;
     // clang-format on
   }
 
-  std::map<landmark_id_t, feature_point_t> generate_landmark_observations(
+  std::map<LandmarkID, FeaturePoint> generateLandmarkObservations(
     std::mt19937& rgen, Matrix2d const& cov, Matrix3d const& R,
-    Vector3d const& p, landmark_positions_t const& landmarks) {
+    Vector3d const& p, LandmarkPositions const& landmarks) {
     Matrix2d weight = cov.inverse();
     Matrix2d spread = cov.llt().matrixL();
 
     // clang-format off
-    return generate_landmark_observation_range(R, p, landmarks)
+    return makeLandmarkObservationRange(R, p, landmarks)
       | views::transform([&](auto const& id_point) {
           auto const& [id, u] = id_point;
           return std::make_pair(
-            id, feature_point_t {perturbate(u, spread, rgen), weight});
+            id, FeaturePoint {perturbate(u, spread, rgen), weight});
         })
-      | ranges::to<std::map<landmark_id_t, feature_point_t>>;
+      | ranges::to<std::map<LandmarkID, FeaturePoint>>;
     // clang-format on
   }
 
-  static auto make_landmark_frame(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks, timestamp_t t) {
+  static auto makeLandmarkFrame(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks, Timestamp t) {
     auto const [p, q] = pose_signal;
     auto const [p_c, q_c] = compose({p(t), q(t)}, extrinsic);
-    return generate_landmark_observations(q_c.matrix(), p_c, landmarks);
+    return generateLandmarkObservations(q_c.matrix(), p_c, landmarks);
   }
 
-  static auto make_landmark_frame(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks, timestamp_t t, std::mt19937& rgen,
+  static auto makeLandmarkFrame(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks, Timestamp t, std::mt19937& rgen,
     Matrix2d const& cov) {
     auto const [p, q] = pose_signal;
     auto const [p_c, q_c] = compose({p(t), q(t)}, extrinsic);
-    return generate_landmark_observations(
+    return generateLandmarkObservations(
       rgen, cov, q_c.matrix(), p_c, landmarks);
   }
 
-  vector<image_data_t> make_landmark_frames(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks, vector<timestamp_t> const& times) {
+  vector<ImageData> makeLandmarkFrames(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks, vector<Timestamp> const& times) {
     auto transform = views::transform([&](auto timestamp) {
-      return image_data_t {
+      return ImageData {
         timestamp,
-        make_landmark_frame(pose_signal, extrinsic, landmarks, timestamp)};
+        makeLandmarkFrame(pose_signal, extrinsic, landmarks, timestamp)};
     });
     return times | transform | ranges::to_vector;
   }
 
-  vector<image_data_t> make_landmark_frames(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks, vector<timestamp_t> const& times,
+  vector<ImageData> makeLandmarkFrames(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks, vector<Timestamp> const& times,
     std::mt19937& rgen, Matrix2d const& cov) {
     auto transform = views::transform([&](auto timestamp) {
-      return image_data_t {
+      return ImageData {
         timestamp,
-        make_landmark_frame(
+        makeLandmarkFrame(
           pose_signal, extrinsic, landmarks, timestamp, rgen, cov)};
     });
     return times | transform | ranges::to_vector;
   }
 
-  static feature_tracks_t make_landmark_tracks(
-    map<frame_id_t, timestamp_t> const& frames,
-    vector<image_data_t> const& landmark_frames) {
-    feature_tracks_t tracks;
+  static FeatureTracks makeLandmarkTracks(
+    map<FrameID, Timestamp> const& frames,
+    vector<ImageData> const& landmark_frames) {
+    FeatureTracks tracks;
     for (auto const& [frame_id, landmark_frame] :
          views::zip(frames | views::keys, landmark_frames)) {
       for (auto const& [feature_id, feature] : landmark_frame.features)
@@ -161,46 +159,43 @@ namespace cyclops {
     return tracks;
   }
 
-  feature_tracks_t make_landmark_tracks(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks,
-    map<frame_id_t, timestamp_t> const& frames) {
-    auto landmark_frames = make_landmark_frames(
+  FeatureTracks makeLandmarkTracks(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks, map<FrameID, Timestamp> const& frames) {
+    auto landmark_frames = makeLandmarkFrames(
       pose_signal, extrinsic, landmarks,
       frames | views::values | ranges::to_vector);
-    return make_landmark_tracks(frames, landmark_frames);
+    return makeLandmarkTracks(frames, landmark_frames);
   }
 
-  feature_tracks_t make_landmark_tracks(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks,
-    map<frame_id_t, timestamp_t> const& frames, std::mt19937& rgen,
-    Matrix2d const& cov) {
-    auto landmark_frames = make_landmark_frames(
+  FeatureTracks makeLandmarkTracks(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks, map<FrameID, Timestamp> const& frames,
+    std::mt19937& rgen, Matrix2d const& cov) {
+    auto landmark_frames = makeLandmarkFrames(
       pose_signal, extrinsic, landmarks,
       frames | views::values | ranges::to_vector, rgen, cov);
-    return make_landmark_tracks(frames, landmark_frames);
+    return makeLandmarkTracks(frames, landmark_frames);
   }
 
-  map<frame_id_t, map<landmark_id_t, feature_point_t>>
-  make_landmark_multiview_observation(
-    pose_signal_t pose_signal, se3_transform_t const& extrinsic,
-    landmark_positions_t const& landmarks,
-    std::map<frame_id_t, timestamp_t> const& frame_times) {
+  map<FrameID, map<LandmarkID, FeaturePoint>> makeLandmarkMultiviewObservation(
+    PoseSignal pose_signal, SE3Transform const& extrinsic,
+    LandmarkPositions const& landmarks,
+    std::map<FrameID, Timestamp> const& frame_times) {
     auto feature_observation_transform = views::transform([&](auto const& _) {
       auto const& [frame_id, timestamp] = _;
-      auto x = se3_transform_t {
+      auto x = SE3Transform {
         .translation = pose_signal.position(timestamp),
         .rotation = pose_signal.orientation(timestamp),
       };
       auto [p_c, q_c] = compose(x, extrinsic);
       auto R_c = q_c.matrix().eval();
 
-      auto features = generate_landmark_observations(R_c, p_c, landmarks);
+      auto features = generateLandmarkObservations(R_c, p_c, landmarks);
       return std::make_pair(frame_id, features);
     });
 
     return frame_times | feature_observation_transform |
-      ranges::to<map<frame_id_t, map<landmark_id_t, feature_point_t>>>;
+      ranges::to<map<FrameID, map<LandmarkID, FeaturePoint>>>;
   }
 }  // namespace cyclops

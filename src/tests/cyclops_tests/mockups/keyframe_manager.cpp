@@ -6,13 +6,13 @@ namespace cyclops::measurement {
     _pending_frames.clear();
   }
 
-  frame_id_t KeyframeManagerMock::createNewFrame(timestamp_t timestamp) {
+  FrameID KeyframeManagerMock::createNewFrame(Timestamp timestamp) {
     _last_frame_id++;
     _pending_frames.emplace(_last_frame_id, timestamp);
     return _last_frame_id;
   }
 
-  void KeyframeManagerMock::setKeyframe(frame_id_t id) {
+  void KeyframeManagerMock::setKeyframe(FrameID id) {
     auto i = _pending_frames.find(id);
     if (i == _pending_frames.end())
       return;
@@ -21,17 +21,17 @@ namespace cyclops::measurement {
     _pending_frames.erase(i);
   }
 
-  void KeyframeManagerMock::removeFrame(frame_id_t frame) {
+  void KeyframeManagerMock::removeFrame(FrameID frame) {
     _pending_frames.erase(frame);
     _keyframes.erase(frame);
   }
 
-  KeyframeManager::frame_sequence_t const& KeyframeManagerMock::keyframes()
+  KeyframeManager::FrameSequence const& KeyframeManagerMock::keyframes()
     const {
     return _keyframes;
   }
 
-  KeyframeManager::frame_sequence_t const& KeyframeManagerMock::pendingFrames()
+  KeyframeManager::FrameSequence const& KeyframeManagerMock::pendingFrames()
     const {
     return _pending_frames;
   }

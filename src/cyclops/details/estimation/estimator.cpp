@@ -57,7 +57,7 @@ namespace cyclops::estimation {
     return _sanity_discriminator->sanity();
   }
 
-  std::unique_ptr<EstimationFrameworkMain> EstimationFrameworkMain::create(
+  std::unique_ptr<EstimationFrameworkMain> EstimationFrameworkMain::Create(
     std::unique_ptr<LikelihoodOptimizer> optimizer,
     std::unique_ptr<MarginalizationManager> marginalizer,
     std::unique_ptr<EstimationSanityDiscriminator> sanity_discriminator) {

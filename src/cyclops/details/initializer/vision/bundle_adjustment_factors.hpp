@@ -8,7 +8,7 @@ namespace cyclops::initializer {
     Eigen::Vector2d const u;
     Eigen::Matrix2d const weight_sqrt;
 
-    LandmarkProjectionCost(feature_point_t const& feature);
+    LandmarkProjectionCost(FeaturePoint const& feature);
     bool Evaluate(
       double const* const* parameters, double* residuals,
       double** jacobians) const override;
@@ -24,10 +24,10 @@ namespace cyclops::initializer {
     bool operator()(
       scalar_t const* const x0, scalar_t const* const xn,
       scalar_t* const r) const {
-      using vector3_t = Eigen::Matrix<scalar_t, 3, 1>;
+      using Vector3 = Eigen::Matrix<scalar_t, 3, 1>;
 
-      vector3_t const p0(x0 + 4);
-      vector3_t const pn(xn + 4);
+      Vector3 const p0(x0 + 4);
+      Vector3 const pn(xn + 4);
 
       *r = ((pn - p0).norm() - scalar_t(1.0)) * scalar_t(weight);
       return true;

@@ -19,10 +19,12 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  using vision_solution_telemetry_digest_t =
-    telemetry::InitializerTelemetry::vision_solution_candidate_digest_t;
-  using imu_solution_telemetry_digest_t =
-    telemetry::InitializerTelemetry::imu_solution_candidate_digest_t;
+  using VisionTelemetryDigest =
+    telemetry::InitializerTelemetry::VisionSolutionCandidateDigest;
+  using ImuTelemetryDigest =
+    telemetry::InitializerTelemetry::ImuSolutionCandidateDigest;
+
+  using SolutionCandidate = InitializationSolverResult::SolutionCandidate;
 
   class InitializerMainImpl: public InitializerMain {
   private:
@@ -31,9 +33,8 @@ namespace cyclops::initializer {
     std::shared_ptr<measurement::KeyframeManager const> _keyframe_manager;
     std::shared_ptr<telemetry::InitializerTelemetry> _telemetry;
 
-    void reportFailureTelemetry(
-      initializer_internal_solution_t const& solution);
-    std::optional<imu_bootstrap_solution_t> solveAndReportTelemetry();
+    void reportFailureTelemetry(InitializationSolverResult const& solution);
+    std::optional<SolutionCandidate> solveAndReportTelemetry();
 
   public:
     InitializerMainImpl(
@@ -43,7 +44,7 @@ namespace cyclops::initializer {
     ~InitializerMainImpl();
     void reset() override;
 
-    std::optional<initialization_solution_t> solve() override;
+    std::optional<InitializationSolution> solve() override;
   };
 
   InitializerMainImpl::InitializerMainImpl(
@@ -63,10 +64,10 @@ namespace cyclops::initializer {
   }
 
   void InitializerMainImpl::reportFailureTelemetry(
-    initializer_internal_solution_t const& solution) {
+    InitializationSolverResult const& solution) {
     auto vision_solutions =  //
-      solution.vision_solutions | views::transform([](auto const& sol) {
-        return vision_solution_telemetry_digest_t {
+      solution.msfm_solutions | views::transform([](auto const& sol) {
+        return VisionTelemetryDigest {
           .acceptable = sol.acceptable,
           .keyframes =
             sol.geometry.camera_motions | views::keys | ranges::to<std::set>,
@@ -74,14 +75,13 @@ namespace cyclops::initializer {
       }) |
       ranges::to_vector;
 
-    auto imu_solutions =  //
-      solution.imu_solutions | views::transform([](auto const& index_sol_pair) {
-        auto const& [index, sol] = index_sol_pair;
-        return imu_solution_telemetry_digest_t {
-          .vision_solution_index = index,
-          .acceptable = sol.accept,
-          .scale = sol.scale,
-          .keyframes = sol.motions | views::keys | ranges::to<std::set>,
+    auto imu_solutions =
+      solution.solution_candidates | views::transform([](auto const& solution) {
+        return ImuTelemetryDigest {
+          .vision_solution_index = solution.msfm_solution_index,
+          .acceptable = solution.acceptance,
+          .scale = solution.scale,
+          .keyframes = solution.motions | views::keys | ranges::to<std::set>,
         };
       }) |
       ranges::to_vector;
@@ -94,36 +94,37 @@ namespace cyclops::initializer {
     __logger__->debug("Reported failure.");
   }
 
-  std::optional<imu_bootstrap_solution_t>
+  std::optional<SolutionCandidate>
   InitializerMainImpl::solveAndReportTelemetry() {
     auto solution = _solver_internal->solve();
     __logger__->debug("Initialization solution obtained.");
 
-    if (solution.imu_solutions.empty()) {
+    if (solution.solution_candidates.empty()) {
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
-    if (solution.imu_solutions.size() > 1) {
-      reportFailureTelemetry(solution);
-      return std::nullopt;
-    }
-
-    auto const& [solution_index, imu_solution] = solution.imu_solutions.front();
-    auto const& vision_solution = solution.vision_solutions.at(solution_index);
-
-    if (!imu_solution.accept || !vision_solution.acceptable) {
+    if (solution.solution_candidates.size() > 1) {
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
 
-    if (imu_solution.motions.empty()) {
+    auto const& candidate = solution.solution_candidates.front();
+    auto const& vision_solution =
+      solution.msfm_solutions.at(candidate.msfm_solution_index);
+
+    if (!candidate.acceptance || !vision_solution.acceptable) {
+      reportFailureTelemetry(solution);
+      return std::nullopt;
+    }
+
+    if (candidate.motions.empty()) {
       __logger__->error("IMU bootstrap returned empty motion.");
 
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
 
-    auto initial_motion_frame_id = imu_solution.motions.begin()->first;
+    auto initial_motion_frame_id = candidate.motions.begin()->first;
     auto initial_motion_frame_timestamp =
       _keyframe_manager->keyframes().at(initial_motion_frame_id);
 
@@ -131,12 +132,12 @@ namespace cyclops::initializer {
       .initial_motion_frame_id = initial_motion_frame_id,
       .initial_motion_frame_timestamp = initial_motion_frame_timestamp,
       .sfm_camera_pose = vision_solution.geometry.camera_motions,
-      .cost = imu_solution.cost,
-      .scale = imu_solution.scale,
-      .gravity = imu_solution.gravity,
-      .motions = imu_solution.motions,
+      .cost = candidate.cost,
+      .scale = candidate.scale,
+      .gravity = candidate.gravity,
+      .motions = candidate.motions,
     });
-    return imu_solution;
+    return candidate;
   }
 
   /**
@@ -144,7 +145,7 @@ namespace cyclops::initializer {
    * matches the given argument `g`, and the first column (the x direction) lies
    * within the plane spanned by the given arguments `g` and `x`.
    */
-  static Matrix3d solve_vision_origin_to_world_origin_rotation(
+  static Matrix3d solveVisionOriginRotation(
     Vector3d const& g, Vector3d const& x) {
     Vector3d r3 = g.normalized();
     Vector3d r2 = r3.cross(x).normalized();
@@ -161,13 +162,13 @@ namespace cyclops::initializer {
     return R;
   }
 
-  struct initialization_gravity_rotation_t {
-    landmark_positions_t landmarks;
-    std::map<frame_id_t, imu_motion_state_t> motions;
+  struct InitializationGravityRotation {
+    LandmarkPositions landmarks;
+    std::map<FrameID, ImuMotionState> motions;
   };
 
-  static initialization_gravity_rotation_t rotate_gravity(
-    imu_bootstrap_solution_t const& imu_matching) {
+  static InitializationGravityRotation rotateGravity(
+    SolutionCandidate const& imu_matching) {
     auto const& g = imu_matching.gravity;
 
     auto R_vb0 = [&]() -> Matrix3d {
@@ -178,13 +179,12 @@ namespace cyclops::initializer {
       return x_vb0.orientation.matrix();
     }();
 
-    auto R_vw = solve_vision_origin_to_world_origin_rotation(g, R_vb0.col(0));
+    auto R_vw = solveVisionOriginRotation(g, R_vb0.col(0));
     auto q_vw = Quaterniond(R_vw);
     auto q_wv = q_vw.conjugate();
 
-    std::map<frame_id_t, imu_motion_state_t> motions =
-      std::move(imu_matching.motions);
-    landmark_positions_t landmarks = std::move(imu_matching.landmarks);
+    std::map<FrameID, ImuMotionState> motions = std::move(imu_matching.motions);
+    LandmarkPositions landmarks = std::move(imu_matching.landmarks);
 
     for (auto& [_, motion] : motions) {
       motion.orientation = q_wv * motion.orientation;
@@ -196,15 +196,15 @@ namespace cyclops::initializer {
     return {landmarks, motions};
   }
 
-  std::optional<initialization_solution_t> InitializerMainImpl::solve() {
+  std::optional<InitializationSolution> InitializerMainImpl::solve() {
     auto maybe_imu_match = solveAndReportTelemetry();
     if (!maybe_imu_match)
       return std::nullopt;
 
     auto const& imu_match = *maybe_imu_match;
-    auto [landmarks, motions] = rotate_gravity(imu_match);
+    auto [landmarks, motions] = rotateGravity(imu_match);
 
-    return initialization_solution_t {
+    return InitializationSolution {
       .acc_bias = imu_match.acc_bias,
       .gyr_bias = imu_match.gyr_bias,
       .landmarks = std::move(landmarks),
@@ -212,7 +212,7 @@ namespace cyclops::initializer {
     };
   }
 
-  std::unique_ptr<InitializerMain> InitializerMain::create(
+  std::unique_ptr<InitializerMain> InitializerMain::Create(
     std::unique_ptr<InitializationSolverInternal> solver_internal,
     std::shared_ptr<measurement::KeyframeManager const> keyframe_manager,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {

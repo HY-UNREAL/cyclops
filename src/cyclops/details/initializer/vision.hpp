@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }  // namespace cyclops
 
 namespace cyclops::telemetry {
@@ -16,26 +16,25 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct vision_bootstrap_solution_t;
-  struct two_view_imu_rotation_constraint_t;
+  struct MSfMSolution;
+  struct TwoViewImuRotationConstraint;
 
   class VisionBootstrapSolver {
   public:
-    using multiview_image_data_t =
-      std::map<frame_id_t, std::map<landmark_id_t, feature_point_t>>;
-    using camera_rotations_t =
-      std::map<frame_id_t, two_view_imu_rotation_constraint_t>;
+    using MultiViewImageData =
+      std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+    using CameraRotations = std::map<FrameID, TwoViewImuRotationConstraint>;
 
   public:
     virtual ~VisionBootstrapSolver() = default;
     virtual void reset() = 0;
 
-    virtual std::vector<vision_bootstrap_solution_t> solve(
-      multiview_image_data_t const& image_data,
-      camera_rotations_t const& camera_rotation_prior) = 0;
+    virtual std::vector<MSfMSolution> solve(
+      MultiViewImageData const& image_data,
+      CameraRotations const& camera_rotation_prior) = 0;
 
-    static std::unique_ptr<VisionBootstrapSolver> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<VisionBootstrapSolver> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<std::mt19937> rgen,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };

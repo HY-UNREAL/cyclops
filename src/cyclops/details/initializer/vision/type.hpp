@@ -6,47 +6,47 @@
 #include <tuple>
 
 namespace cyclops::initializer {
-  struct two_view_imu_rotation_data_t {
+  using TwoViewFeaturePair = std::tuple<Eigen::Vector2d, Eigen::Vector2d>;
+
+  struct TwoViewImuRotationData {
     Eigen::Quaterniond value;
     Eigen::Matrix3d covariance;
   };
 
-  struct two_view_imu_rotation_constraint_t {
-    frame_id_t init_frame_id;
-    frame_id_t term_frame_id;
+  struct TwoViewImuRotationConstraint {
+    FrameID init_frame_id;
+    FrameID term_frame_id;
 
-    two_view_imu_rotation_data_t rotation;
+    TwoViewImuRotationData rotation;
   };
 
-  using two_view_feature_pair_t = std::tuple<Eigen::Vector2d, Eigen::Vector2d>;
-
-  struct two_view_correspondence_data_t {
-    two_view_imu_rotation_data_t rotation_prior;
-    std::map<landmark_id_t, two_view_feature_pair_t> features;
+  struct TwoViewCorrespondenceData {
+    TwoViewImuRotationData rotation_prior;
+    std::map<LandmarkID, TwoViewFeaturePair> features;
   };
 
-  struct multiview_correspondences_t {
-    frame_id_t reference_frame;
-    std::map<frame_id_t, two_view_correspondence_data_t> view_frames;
+  struct MultiViewCorrespondences {
+    FrameID reference_frame;
+    std::map<FrameID, TwoViewCorrespondenceData> view_frames;
   };
 
-  struct two_view_geometry_t {
-    se3_transform_t camera_motion;
-    landmark_positions_t landmarks;
+  struct TwoViewGeometry {
+    SE3Transform camera_motion;
+    LandmarkPositions landmarks;
   };
 
-  struct multiview_geometry_t {
-    std::map<frame_id_t, se3_transform_t> camera_motions;
-    landmark_positions_t landmarks;
+  struct MultiViewGeometry {
+    std::map<FrameID, SE3Transform> camera_motions;
+    LandmarkPositions landmarks;
   };
 
-  struct vision_bootstrap_solution_t {
+  struct MSfMSolution {
     bool acceptable;
 
     double solution_significant_probability;
     double measurement_inlier_ratio;
 
-    multiview_geometry_t geometry;
+    MultiViewGeometry geometry;
     Eigen::MatrixXd motion_information_weight;
   };
 }  // namespace cyclops::initializer

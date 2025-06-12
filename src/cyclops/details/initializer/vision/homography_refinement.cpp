@@ -64,22 +64,22 @@ namespace cyclops::initializer {
     }
   };
 
-  static std::array<double, 9> make_homography_parameter_block(
+  static std::array<double, 9> makeHomographyParameterBlock(
     Matrix3d const& guess) {
     std::array<double, 9> data;
     (Map<Matrix3d>(data.data())) = guess;
     return data;
   }
 
-  static std::vector<two_view_feature_pair_t> flatten_features(
-    std::set<landmark_id_t> const& ids,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& features) {
+  static std::vector<TwoViewFeaturePair> flattenFeatures(
+    std::set<LandmarkID> const& ids,
+    std::map<LandmarkID, TwoViewFeaturePair> const& features) {
     return ids | views::transform([&](auto id) { return features.at(id); }) |
       ranges::to_vector;
   }
 
-  static std::vector<std::array<double, 2>> make_feature_parameter_blocks(
-    std::vector<two_view_feature_pair_t> const& features_flatten) {
+  static std::vector<std::array<double, 2>> makeFeatureParameterBlocks(
+    std::vector<TwoViewFeaturePair> const& features_flatten) {
     return  //
       features_flatten | views::transform([](auto const& x) {
         auto const& [u, _] = x;
@@ -88,16 +88,16 @@ namespace cyclops::initializer {
       ranges::to_vector;
   }
 
-  Matrix3d refine_homography_geometry(
+  Matrix3d refineHomographyGeometry(
     double sigma,  //
-    Matrix3d const& H_initial, std::set<landmark_id_t> const& ids,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& features) {
+    Matrix3d const& H_initial, std::set<LandmarkID> const& ids,
+    std::map<LandmarkID, TwoViewFeaturePair> const& features) {
     auto tic = ::cyclops::tic();
     ceres::Problem problem;
 
-    auto features_flatten = flatten_features(ids, features);
-    auto u_blocks = make_feature_parameter_blocks(features_flatten);
-    auto H_block = make_homography_parameter_block(H_initial);
+    auto features_flatten = flattenFeatures(ids, features);
+    auto u_blocks = makeFeatureParameterBlocks(features_flatten);
+    auto H_block = makeHomographyParameterBlock(H_initial);
 
     for (auto& u : u_blocks)
       problem.AddParameterBlock(u.data(), u.size());

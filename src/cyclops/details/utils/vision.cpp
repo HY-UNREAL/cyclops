@@ -11,12 +11,12 @@ namespace cyclops {
   using Matrix34d = Eigen::Matrix<double, 3, 4>;
   using MatrixX4d = Eigen::Matrix<double, Eigen::Dynamic, 4>;
 
-  using measurement::feature_track_t;
-  using measurement::feature_tracks_t;
+  using measurement::FeatureTrack;
+  using measurement::FeatureTracks;
 
-  image_frame_motion_statistics_t compute_image_frame_motion_statistics(
-    feature_tracks_t const& tracks, frame_id_t frame1, frame_id_t frame2) {
-    image_frame_motion_statistics_t result = {0, 0, 0};
+  KeyframeMotionStatistics evaluateKeyframeMotionStatistics(
+    FeatureTracks const& tracks, FrameID frame1, FrameID frame2) {
+    KeyframeMotionStatistics result = {0, 0, 0};
 
     double parallax_sum = 0;
     for (auto const& [feature_id, track] : tracks) {
@@ -41,10 +41,10 @@ namespace cyclops {
     return result;
   }
 
-  image_frame_motion_statistics_t compute_image_frame_motion_statistics(
-    std::map<landmark_id_t, feature_point_t> const& frame1,
-    std::map<landmark_id_t, feature_point_t> const& frame2) {
-    image_frame_motion_statistics_t result = {0, 0, 0};
+  KeyframeMotionStatistics evaluateKeyframeMotionStatistics(
+    std::map<LandmarkID, FeaturePoint> const& frame1,
+    std::map<LandmarkID, FeaturePoint> const& frame2) {
+    KeyframeMotionStatistics result = {0, 0, 0};
 
     int new_landmarks = 0;
     for (auto const& [landmark_id, f2] : frame2) {
@@ -64,18 +64,17 @@ namespace cyclops {
     return result;
   }
 
-  static Matrix34d camera_projection(Matrix3d const& R, Vector3d const& p) {
+  static Matrix34d cameraProjection(Matrix3d const& R, Vector3d const& p) {
     Matrix34d result;
     result << R.transpose(), -R.transpose() * p;
     return result;
   }
 
-  using camera_pose_t = rotation_translation_matrix_pair_t;
-  using camera_pose_lookup_t = std::map<frame_id_t, camera_pose_t>;
+  using CameraPose = RotationPositionPair;
+  using CameraPoseLookup = std::map<FrameID, CameraPose>;
 
-  std::optional<Vector3d> triangulate_point(
-    feature_track_t const& track,
-    camera_pose_lookup_t const& camera_pose_lookup) {
+  std::optional<Vector3d> triangulatePoint(
+    FeatureTrack const& track, CameraPoseLookup const& camera_pose_lookup) {
     if (track.size() < 2)
       return std::nullopt;
 
@@ -89,7 +88,7 @@ namespace cyclops {
 
       auto const x = f.x();
       auto const y = f.y();
-      auto const P = camera_projection(R, p);
+      auto const P = cameraProjection(R, p);
 
       A.row(2 * i) = x * P.row(2) - P.row(0);
       A.row(2 * i + 1) = y * P.row(2) - P.row(1);
@@ -104,11 +103,11 @@ namespace cyclops {
     return X.head<3>() / X.w();
   }
 
-  std::map<landmark_id_t, std::tuple<Vector2d, Vector2d>>
-  make_two_view_feature_pairs(
-    std::map<landmark_id_t, feature_point_t> const& frame1,
-    std::map<landmark_id_t, feature_point_t> const& frame2) {
-    std::map<landmark_id_t, std::tuple<Vector2d, Vector2d>> result;
+  std::map<LandmarkID, std::tuple<Vector2d, Vector2d>>
+  compileTwoViewFeaturePairs(
+    std::map<LandmarkID, FeaturePoint> const& frame1,
+    std::map<LandmarkID, FeaturePoint> const& frame2) {
+    std::map<LandmarkID, std::tuple<Vector2d, Vector2d>> result;
 
     for (auto const& [landmark_id, f1] : frame1) {
       auto i = frame2.find(landmark_id);

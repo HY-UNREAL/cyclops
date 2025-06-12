@@ -4,14 +4,14 @@
 #include <optional>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::initializer {
-  struct imu_match_translation_analysis_t;
-  struct IMUMatchTranslationAnalysisCache;
+  struct ImuTranslationMatchAnalysis;
+  struct ImuTranslationMatchAnalysisCache;
 
-  struct imu_match_scale_evaluation_t {
+  struct ImuMatchScaleEvaluation {
     double multiplier;
     double cost;
 
@@ -27,22 +27,22 @@ namespace cyclops::initializer {
     Eigen::VectorXd visual_solution;
   };
 
-  class IMUMatchScaleEvaluationContext {
+  class ImuMatchScaleEvaluationContext {
   private:
     double const gravity_norm;
-    imu_match_translation_analysis_t const& analysis;
-    IMUMatchTranslationAnalysisCache const& cache;
+    ImuTranslationMatchAnalysis const& analysis;
+    ImuTranslationMatchAnalysisCache const& cache;
 
   public:
-    IMUMatchScaleEvaluationContext(
-      double gravity_norm, imu_match_translation_analysis_t const& analysis,
-      IMUMatchTranslationAnalysisCache const& cache);
+    ImuMatchScaleEvaluationContext(
+      double gravity_norm, ImuTranslationMatchAnalysis const& analysis,
+      ImuTranslationMatchAnalysisCache const& cache);
 
-    std::optional<imu_match_scale_evaluation_t> evaluate(double scale) const;
+    std::optional<ImuMatchScaleEvaluation> evaluate(double scale) const;
 
     double evaluateDerivative(
-      imu_match_scale_evaluation_t const& evaluation, double scale) const;
+      ImuMatchScaleEvaluation const& evaluation, double scale) const;
     Eigen::MatrixXd evaluateHessian(
-      imu_match_scale_evaluation_t const& evaluation, double scale) const;
+      ImuMatchScaleEvaluation const& evaluation, double scale) const;
   };
 }  // namespace cyclops::initializer

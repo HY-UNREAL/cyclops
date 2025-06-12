@@ -4,31 +4,31 @@
 #include <memory>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct IMUMatchScaleEvaluationContext;
+  struct ImuMatchScaleEvaluationContext;
 
-  struct imu_match_scale_refinement_t {
+  struct ImuMatchScaleRefinement {
     double scale;
     double cost;
   };
 
-  class IMUMatchTranslationLocalOptimizer {
+  class ImuTranslationMatchLocalOptimizer {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
 
   public:
-    explicit IMUMatchTranslationLocalOptimizer(
-      std::shared_ptr<cyclops_global_config_t const> config);
-    ~IMUMatchTranslationLocalOptimizer();
+    explicit ImuTranslationMatchLocalOptimizer(
+      std::shared_ptr<CyclopsConfig const> config);
+    ~ImuTranslationMatchLocalOptimizer();
     void reset();
 
-    std::optional<imu_match_scale_refinement_t> optimize(
-      IMUMatchScaleEvaluationContext const& evaluator, double s0);
+    std::optional<ImuMatchScaleRefinement> optimize(
+      ImuMatchScaleEvaluationContext const& evaluator, double s0);
 
-    static std::unique_ptr<IMUMatchTranslationLocalOptimizer> create(
-      std::shared_ptr<cyclops_global_config_t const> config);
+    static std::unique_ptr<ImuTranslationMatchLocalOptimizer> Create(
+      std::shared_ptr<CyclopsConfig const> config);
   };
 }  // namespace cyclops::initializer

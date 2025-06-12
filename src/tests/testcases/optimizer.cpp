@@ -31,18 +31,18 @@ namespace cyclops::estimation {
 
   TEST_CASE("Measurement probability optimization with mockup data") {
     auto rgen = std::make_shared<std::mt19937>(20240516001);
-    auto config = make_default_config();
+    auto config = makeDefaultConfig();
 
     GIVEN("Random-sampled landmark positions and sinusoidal inertial motion") {
-      auto landmarks = generate_landmarks(
+      auto landmarks = generateLandmarks(
         *rgen, {50, Vector3d(3, 3, 0), 2 * Matrix3d::Identity()});
 
-      auto pose_signal = pose_signal_t {
+      auto pose_signal = PoseSignal {
         .position =
           [](auto t) { return Vector3d(3 * (1 - std::cos(t)), 0, 0); },
-        .orientation = yaw_rotation([](auto t) { return atan2(1, cos(t)); }),
+        .orientation = yawRotation([](auto t) { return atan2(1, cos(t)); }),
       };
-      auto timestamps = make_dictionary<frame_id_t, timestamp_t>(
+      auto timestamps = makeDictionary<FrameID, Timestamp>(
         views::enumerate(linspace(0, M_PI_2, 16)));
 
       auto state = std::make_shared<StateVariableInternal>();
@@ -51,7 +51,7 @@ namespace cyclops::estimation {
       auto state_writer = std::make_shared<StateVariableWriteAccessor>(state);
 
       GIVEN("Perfectly correct visual-inertial measurement data") {
-        auto data_provider = measurement::make_measurement_provider_mockup(
+        auto data_provider = measurement::makeMeasurementProviderMockup(
           pose_signal, config->extrinsics.imu_camera_transform, landmarks,
           timestamps);
 
@@ -59,7 +59,7 @@ namespace cyclops::estimation {
           auto initializer =
             std::make_unique<OptimizerSolutionGuessPredictorMock>(
               rgen, landmarks, pose_signal, timestamps);
-          auto optimizer = LikelihoodOptimizer::create(
+          auto optimizer = LikelihoodOptimizer::Create(
             std::move(initializer), config, state_writer,
             std::move(data_provider));
 
@@ -75,7 +75,7 @@ namespace cyclops::estimation {
                 auto maybe_frame = state_reader->motionFrame(frame_id);
                 REQUIRE(maybe_frame.has_value());
 
-                auto x_got = se3_of_motion_frame_block(maybe_frame->get());
+                auto x_got = getSE3Transform(maybe_frame->get());
 
                 CAPTURE(x_got.translation.transpose());
                 CAPTURE(x_sol.translation.transpose());

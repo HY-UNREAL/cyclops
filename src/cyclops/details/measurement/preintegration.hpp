@@ -6,26 +6,26 @@
 #include <vector>
 
 namespace cyclops::measurement {
-  struct imu_noise_t {
+  struct ImuNoise {
     double acc_white_noise;
     double gyr_white_noise;
   };
 
-  class IMUPreintegration {
+  class ImuPreintegration {
   private:
-    imu_noise_t const _noise;
+    ImuNoise const _noise;
 
     Eigen::Vector3d _b_a;
     Eigen::Vector3d _b_w;
 
-    struct imu_data_t {
+    struct ImuData {
       double dt;
       Eigen::Vector3d a;
       Eigen::Vector3d w;
     };
-    std::vector<imu_data_t> _history;
+    std::vector<ImuData> _history;
 
-    void integrate(imu_data_t const& data);
+    void integrate(ImuData const& data);
     void reset();
     void repropagate();
     void updateCovariance(Eigen::Matrix<double, 9, 9> const& F, double dt);
@@ -41,11 +41,11 @@ namespace cyclops::measurement {
     using Quaternion = Eigen::Quaternion<scalar_t>;
 
   public:
-    using UniquePtr = std::unique_ptr<IMUPreintegration>;
+    using UniquePtr = std::unique_ptr<ImuPreintegration>;
 
-    IMUPreintegration(
+    ImuPreintegration(
       Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr,
-      imu_noise_t const& noise)
+      ImuNoise const& noise)
         : _noise(noise), _b_a(bias_acc), _b_w(bias_gyr) {
       reset();
     }

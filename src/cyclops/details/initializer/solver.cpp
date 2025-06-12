@@ -14,47 +14,50 @@
 namespace cyclops::initializer {
   namespace views = ranges::views;
 
-  using Eigen::Matrix3d;
-
   using measurement::MeasurementDataProvider;
-  using imu_motion_refs_t = std::vector<measurement::imu_motion_ref_t>;
-  using frame_id_set_t = std::set<frame_id_t>;
 
-  using multiview_image_observations_t =
-    std::map<frame_id_t, std::map<landmark_id_t, feature_point_t>>;
-  using camera_rotation_prior_lookup_t =
-    std::map<frame_id_t, two_view_imu_rotation_constraint_t>;
+  using FrameIDs = std::set<FrameID>;
+  using ImuMotionRefs = std::vector<measurement::ImuMotionRef>;
+
+  using MultiViewFeatures =
+    std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+  using CameraRotationPriorLookup =
+    std::map<FrameID, TwoViewImuRotationConstraint>;
 
   class InitializationSolverInternalImpl: public InitializationSolverInternal {
   private:
     std::unique_ptr<VisionBootstrapSolver> _vision_solver;
-    std::unique_ptr<IMUBootstrapSolver> _imu_solver;
+    std::unique_ptr<ImuMatchSolver> _imu_solver;
 
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<MeasurementDataProvider const> _data_provider;
 
-    multiview_image_observations_t reorderMultiviewImageObservations() const;
-    imu_motion_refs_t filterImageObservedIMU(frame_id_set_t image_frames) const;
+    MultiViewFeatures reorderMultiviewImageObservations() const;
+    ImuMotionRefs filterImageObservedIMU(FrameIDs image_frames) const;
 
-    camera_rotation_prior_lookup_t makeCameraRotationPriorLookup(
-      imu_motion_refs_t const& imu_motions) const;
+    CameraRotationPriorLookup makeCameraRotationPriorLookup(
+      ImuMotionRefs const& imu_motions) const;
+
+    InitializationSolverResult::SolutionCandidate parseSolutionCandidate(
+      int msfm_index, MSfMSolution const& msfm_solution,
+      ImuMatchSolution const& imu_match) const;
 
   public:
     InitializationSolverInternalImpl(
       std::unique_ptr<initializer::VisionBootstrapSolver> vision_solver,
-      std::unique_ptr<IMUBootstrapSolver> imu_solver,
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::unique_ptr<ImuMatchSolver> imu_solver,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<MeasurementDataProvider const> data_provider);
     ~InitializationSolverInternalImpl();
     void reset() override;
 
-    initializer_internal_solution_t solve() override;
+    InitializationSolverResult solve() override;
   };
 
   InitializationSolverInternalImpl::InitializationSolverInternalImpl(
     std::unique_ptr<initializer::VisionBootstrapSolver> vision_solver,
-    std::unique_ptr<IMUBootstrapSolver> imu_solver,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::unique_ptr<ImuMatchSolver> imu_solver,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataProvider const> data_provider)
       : _vision_solver(std::move(vision_solver)),
         _imu_solver(std::move(imu_solver)),
@@ -70,9 +73,9 @@ namespace cyclops::initializer {
     _imu_solver->reset();
   }
 
-  multiview_image_observations_t
+  MultiViewFeatures
   InitializationSolverInternalImpl::reorderMultiviewImageObservations() const {
-    multiview_image_observations_t result;
+    MultiViewFeatures result;
 
     for (auto const& [landmark_id, track] : _data_provider->tracks()) {
       for (auto const& [frame_id, feature] : track)
@@ -81,8 +84,8 @@ namespace cyclops::initializer {
     return result;
   }
 
-  imu_motion_refs_t InitializationSolverInternalImpl::filterImageObservedIMU(
-    frame_id_set_t image_frames) const {
+  ImuMotionRefs InitializationSolverInternalImpl::filterImageObservedIMU(
+    FrameIDs image_frames) const {
     return  //
       _data_provider->imu() | views::filter([&](auto const& motion) {
         auto init_frame_exists =
@@ -93,13 +96,13 @@ namespace cyclops::initializer {
         return init_frame_exists && term_frame_exists;
       }) |
       views::transform(
-        [](auto const& _) -> measurement::imu_motion_ref_t { return _; }) |
+        [](auto const& _) -> measurement::ImuMotionRef { return _; }) |
       ranges::to_vector;
   }
 
-  camera_rotation_prior_lookup_t
+  CameraRotationPriorLookup
   InitializationSolverInternalImpl::makeCameraRotationPriorLookup(
-    imu_motion_refs_t const& imu_motions) const {
+    ImuMotionRefs const& imu_motions) const {
     return  //
       imu_motions | views::transform([&](auto const& ref) {
         auto const& data = ref.get();
@@ -107,14 +110,14 @@ namespace cyclops::initializer {
         auto const& q = data.data->rotation_delta;
         auto const& q_ext = _config->extrinsics.imu_camera_transform.rotation;
 
-        Matrix3d P = data.data->covariance.template topLeftCorner<3, 3>();
-        Matrix3d R_ext = q_ext.matrix();
+        auto P = data.data->covariance.template topLeftCorner<3, 3>().eval();
+        auto R_ext = q_ext.matrix().eval();
 
-        auto rotation_data = two_view_imu_rotation_data_t {
+        auto rotation_data = TwoViewImuRotationData {
           .value = q_ext.conjugate() * q * q_ext,
           .covariance = R_ext.transpose() * P * R_ext};
 
-        return two_view_imu_rotation_constraint_t {
+        return TwoViewImuRotationConstraint {
           .init_frame_id = data.from,
           .term_frame_id = data.to,
           .rotation = rotation_data};
@@ -122,38 +125,89 @@ namespace cyclops::initializer {
       views::transform([](auto const& rotation) {
         return std::make_pair(rotation.init_frame_id, rotation);
       }) |
-      ranges::to<camera_rotation_prior_lookup_t>;
+      ranges::to<CameraRotationPriorLookup>;
   }
 
-  initializer_internal_solution_t InitializationSolverInternalImpl::solve() {
+  InitializationSolverResult::SolutionCandidate
+  InitializationSolverInternalImpl::parseSolutionCandidate(
+    int msfm_index, MSfMSolution const& msfm_solution,
+    ImuMatchSolution const& imu_match) const {
+    auto const& rotation_match = imu_match.rotation_match;
+    auto const& [acceptance, translation_match] = imu_match.translation_match;
+
+    auto s = translation_match.scale;
+
+    auto landmarks =  //
+      msfm_solution.geometry.landmarks |
+      views::transform([&](auto const& id_landmark) {
+        auto [landmark_id, f] = id_landmark;
+        return std::make_pair(landmark_id, (s * f).eval());
+      }) |
+      ranges::to<LandmarkPositions>;
+
+    auto motions =
+      views::zip(
+        translation_match.imu_body_velocities | views::keys,
+        rotation_match.body_orientations | views::values,
+        translation_match.imu_body_velocities | views::values,
+        translation_match.sfm_positions | views::values) |
+      views::transform([&](auto const& pair) {
+        auto const& [frame_id, q_b, v_body, p_c] = pair;
+        auto v = (q_b * v_body).eval();
+
+        auto const& [p_bc, _] = _config->extrinsics.imu_camera_transform;
+        Eigen::Vector3d p = p_c * s - q_b * p_bc;
+        return std::make_pair(frame_id, ImuMotionState {q_b, p, v});
+      }) |
+      ranges::to<std::map<FrameID, ImuMotionState>>;
+
+    return {
+      .msfm_solution_index = msfm_index,
+
+      .acceptance = acceptance,
+      .cost = translation_match.cost,
+      .scale = translation_match.scale,
+      .gravity = translation_match.gravity,
+
+      .gyr_bias = rotation_match.gyro_bias,
+      .acc_bias = translation_match.acc_bias,
+
+      .landmarks = landmarks,
+      .motions = motions,
+    };
+  }
+
+  InitializationSolverResult InitializationSolverInternalImpl::solve() {
     auto image_data = reorderMultiviewImageObservations();
     auto image_motion_frames = image_data | views::keys | ranges::to<std::set>;
     auto imu_motions = filterImageObservedIMU(image_motion_frames);
 
     auto rotation_prior = makeCameraRotationPriorLookup(imu_motions);
 
-    initializer_internal_solution_t result;
-    result.vision_solutions = _vision_solver->solve(image_data, rotation_prior);
-    result.imu_solutions.reserve(result.vision_solutions.size());
+    InitializationSolverResult result;
+    result.msfm_solutions = _vision_solver->solve(image_data, rotation_prior);
+    result.solution_candidates.reserve(result.msfm_solutions.size());
 
-    for (int i = 0; i < result.vision_solutions.size(); i++) {
-      auto const& vision_solution = result.vision_solutions.at(i);
+    for (int i = 0; i < result.msfm_solutions.size(); i++) {
+      auto const& msfm_solution = result.msfm_solutions.at(i);
+      auto imu_match = _imu_solver->solve(msfm_solution, imu_motions);
+      if (!imu_match.has_value())
+        continue;
 
-      auto imu_solution = _imu_solver->solve(vision_solution, imu_motions);
-      if (imu_solution.has_value())
-        result.imu_solutions.emplace_back(std::make_tuple(i, *imu_solution));
+      result.solution_candidates.emplace_back(
+        parseSolutionCandidate(i, msfm_solution, imu_match.value()));
     }
     return result;
   }
 
   std::unique_ptr<InitializationSolverInternal>
-  InitializationSolverInternal::create(
+  InitializationSolverInternal::Create(
     std::shared_ptr<std::mt19937> rgen,
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataProvider const> data_provider,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
     return std::make_unique<InitializationSolverInternalImpl>(
-      initializer::VisionBootstrapSolver::create(config, rgen, telemetry),
-      IMUBootstrapSolver::create(config, telemetry), config, data_provider);
+      initializer::VisionBootstrapSolver::Create(config, rgen, telemetry),
+      ImuMatchSolver::Create(config, telemetry), config, data_provider);
   }
 }  // namespace cyclops::initializer

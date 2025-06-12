@@ -5,7 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <range/v3/all.hpp>
 
-namespace cyclops::initializer {
+namespace cyclops::initializer::twoview {
   using Eigen::Matrix2d;
   using Eigen::Matrix3d;
   using Eigen::Vector2d;
@@ -15,13 +15,13 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  struct two_view_selection_geometry_estimation_t {
+  struct TwoViewSelectionGeometryEstimation {
     Vector3d translation;
     std::vector<std::optional<double>> second_view_depths;
   };
 
   template <typename value_t, typename outvalue_t>
-  static auto fmap_partial(std::function<outvalue_t(value_t)> f) {
+  static auto fmapPartial(std::function<outvalue_t(value_t)> f) {
     return [f](std::optional<value_t> const& x) -> std::optional<outvalue_t> {
       if (!x.has_value())
         return std::nullopt;
@@ -70,9 +70,8 @@ namespace cyclops::initializer {
    * a suboptimal selection of the initialization view, which is anyway expected
    * to be better than a heuristic selection.
    */
-  static std::optional<two_view_selection_geometry_estimation_t>
-  two_view_selection_estimate_geometry(
-    two_view_correspondence_data_t const& view) {
+  static std::optional<TwoViewSelectionGeometryEstimation> estimateGeometry(
+    TwoViewCorrespondenceData const& view) {
     Matrix3d translation_schur_complement = Matrix3d::Zero();
 
     std::vector<std::optional<Matrix2x3d>> depth_translation_correlations;
@@ -107,15 +106,15 @@ namespace cyclops::initializer {
 
     auto p = translation_eigensolver.eigenvectors().col(0).eval();
     auto second_view_depths = depth_translation_correlations |
-      views::transform(fmap_partial<Matrix2x3d, Vector2d>(
+      views::transform(fmapPartial<Matrix2x3d, Vector2d>(
         [&](auto const& L) { return L * p; })) |
-      views::transform(fmap_partial<Vector2d, double>(
+      views::transform(fmapPartial<Vector2d, double>(
         [&](auto const& depth) { return depth.y(); })) |
       ranges::to_vector;
-    return two_view_selection_geometry_estimation_t {p, second_view_depths};
+    return TwoViewSelectionGeometryEstimation {p, second_view_depths};
   }
 
-  static void update_rotation_fisher_information(
+  static void updateRotationFisherInformation(
     Matrix3d& information, Vector2d const& feature) {
     auto ux = feature.x();
     auto uy = feature.y();
@@ -128,7 +127,7 @@ namespace cyclops::initializer {
     information += J.transpose() * J;
   }
 
-  static void update_position_fisher_information(
+  static void updatePositionFisherInformation(
     Matrix3d& information, double s, Vector2d const& v) {
     information.topLeftCorner<2, 2>() += Matrix2d::Identity() / s / s;
     information.topRightCorner<2, 1>() -= v / s / s;
@@ -136,9 +135,9 @@ namespace cyclops::initializer {
     information(2, 2) += v.dot(v) / s / s;
   }
 
-  static double analyze_two_view_observability_score(
-    two_view_correspondence_data_t const& two_view) {
-    auto maybe_geometry = two_view_selection_estimate_geometry(two_view);
+  static double analyzeTwoViewObservabilityScore(
+    TwoViewCorrespondenceData const& two_view) {
+    auto maybe_geometry = estimateGeometry(two_view);
     if (!maybe_geometry.has_value())
       return -1.0;
     auto const& geometry = *maybe_geometry;
@@ -146,7 +145,7 @@ namespace cyclops::initializer {
     Matrix3d rotation_information = Matrix3d::Zero();
     for (auto const& feature : two_view.features | views::values) {
       auto const& [u, v] = feature;
-      update_rotation_fisher_information(rotation_information, v);
+      updateRotationFisherInformation(rotation_information, v);
     }
 
     Matrix3d position_information = Matrix3d::Zero();
@@ -157,7 +156,7 @@ namespace cyclops::initializer {
 
       auto const& [u, v] = feature;
       auto s = *maybe_depth;
-      update_position_fisher_information(position_information, s, v);
+      updatePositionFisherInformation(position_information, s, v);
     }
 
     auto min_eigenvalue = [](Matrix3d const& matrix) {
@@ -168,10 +167,14 @@ namespace cyclops::initializer {
     auto position_score = std::max(0., min_eigenvalue(position_information));
     return std::sqrt(rotation_score * position_score);
   }
+}  // namespace cyclops::initializer::twoview
+
+namespace cyclops::initializer {
+  namespace views = ranges::views;
 
   std::optional<std::reference_wrapper<
-    std::pair<frame_id_t const, two_view_correspondence_data_t> const>>
-  select_best_two_view_pair(multiview_correspondences_t const& multiviews) {
+    std::pair<FrameID const, TwoViewCorrespondenceData> const>>
+  selectBestTwoViewPair(MultiViewCorrespondences const& multiviews) {
     auto n_views = multiviews.view_frames.size() + 1;
     if (n_views < 2) {
       __logger__->error("Not enough motion frames ({} < 2).", n_views);
@@ -179,7 +182,7 @@ namespace cyclops::initializer {
     }
 
     auto view_scores = multiviews.view_frames | views::values |
-      views::transform(analyze_two_view_observability_score);
+      views::transform(twoview::analyzeTwoViewObservabilityScore);
 
     auto best_candidates = views::zip(multiviews.view_frames, view_scores) |
       views::filter([&](auto const& pair) { return std::get<1>(pair) >= 0; });

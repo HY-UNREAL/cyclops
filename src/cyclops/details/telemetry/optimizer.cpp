@@ -9,7 +9,7 @@ namespace cyclops::telemetry {
   }
 
   void OptimizerTelemetry::onSanityStatistics(
-    sanity_statistics_t const& statistics) {
+    SanityStatistics const& statistics) {
     __logger__->info(
       "================== VIO optimizer sanity statistics: ==================");
 
@@ -33,7 +33,7 @@ namespace cyclops::telemetry {
 
   static void print_bad_reason(
     bool landmark_bad, bool cost_bad,
-    OptimizerTelemetry::sanity_statistics_t const& statistics) {
+    OptimizerTelemetry::SanityStatistics const& statistics) {
     int reasons_count = 0;
     if (landmark_bad) {
       __logger__->warn("Reason 1: bad landmark update");
@@ -59,7 +59,7 @@ namespace cyclops::telemetry {
   }
 
   void OptimizerTelemetry::onSanityBad(
-    bad_reason_t reason, sanity_statistics_t const& statistics) {
+    BadReason reason, SanityStatistics const& statistics) {
     __logger__->warn("VIO optimizer bad sanity.");
 
     print_bad_reason(
@@ -67,7 +67,7 @@ namespace cyclops::telemetry {
   }
 
   void OptimizerTelemetry::onSanityFailure(
-    failure_reason_t reason, sanity_statistics_t const& statistics) {
+    FailureReason reason, SanityStatistics const& statistics) {
     __logger__->error("VIO optimization failed.");
 
     print_bad_reason(
@@ -79,7 +79,7 @@ namespace cyclops::telemetry {
     __logger__->error("User reset request");
   }
 
-  std::unique_ptr<OptimizerTelemetry> OptimizerTelemetry::createDefault() {
+  std::unique_ptr<OptimizerTelemetry> OptimizerTelemetry::CreateDefault() {
     return std::make_unique<OptimizerTelemetry>();
   }
 }  // namespace cyclops::telemetry

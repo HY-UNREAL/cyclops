@@ -20,7 +20,7 @@ namespace cyclops::estimation {
   using MatrixXdR =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-  static Matrix3x4d axisangle_quaternion_derivative(Vector3d const& theta) {
+  static Matrix3x4d axisAngleQuaternionDerivative(Vector3d const& theta) {
     auto a = theta.norm();
     auto s = std::sin(a / 2);
     auto c = std::cos(a / 2);
@@ -67,7 +67,7 @@ namespace cyclops::estimation {
     return M.colPivHouseholderQr().solve(A_T);
   }
 
-  static Matrix3d se3_log_translation_rotation_derivative(
+  static Matrix3d se3LogTranslationRotationDerivative(
     Vector3d const& theta, Vector3d const& p) {
     auto a = theta.norm();
     auto s = std::sin(a);
@@ -123,7 +123,7 @@ namespace cyclops::estimation {
     // clang-format on
   }
 
-  static Matrix4d quaternion_left_multiplication_matrix(Quaterniond const& q) {
+  static Matrix4d quaternionLeftMultiplicationMatrix(Quaterniond const& q) {
     Matrix4d L = q.w() * Matrix4d::Identity();
     L.block<3, 3>(0, 0) += skew3d<double>(q.vec());
     L.block<3, 1>(0, 3) += q.vec();
@@ -131,13 +131,13 @@ namespace cyclops::estimation {
     return L;
   }
 
-  static Vector9d evaluate_motion_error(
+  static Vector9d evaluateMotionError(
     double* maybe_jacobian, MatrixXd const& nominal_jacobian, int param_index,
     double const* x, double const* x_hat) {
     Map<Quaterniond const> q(x);
     Map<Quaterniond const> q_hat(x_hat);
-    auto delta_theta = so3_logmap(q_hat.conjugate() * q);
-    auto N_inv = so3_left_jacobian_inverse(delta_theta);
+    auto delta_theta = so3Logmap(q_hat.conjugate() * q);
+    auto N_inv = so3LeftJacobianInverse(delta_theta);
 
     Map<Vector3d const> p(x + 4);
     Map<Vector3d const> p_hat(x_hat + 4);
@@ -149,16 +149,16 @@ namespace cyclops::estimation {
 
     if (maybe_jacobian != nullptr) {
       Matrix3x4d const delta_theta_over_q =
-        axisangle_quaternion_derivative(delta_theta) *
-        quaternion_left_multiplication_matrix(q_hat.conjugate());
+        axisAngleQuaternionDerivative(delta_theta) *
+        quaternionLeftMultiplicationMatrix(q_hat.conjugate());
 
       Matrix3x4d const delta_p_over_q = N_inv *
-        se3_log_translation_rotation_derivative(delta_theta, delta_p) *
+        se3LogTranslationRotationDerivative(delta_theta, delta_p) *
         delta_theta_over_q;
       Matrix3d const delta_p_over_p = N_inv * q_hat.matrix().transpose();
 
       Matrix3x4d const delta_v_over_q = N_inv *
-        se3_log_translation_rotation_derivative(delta_theta, delta_v) *
+        se3LogTranslationRotationDerivative(delta_theta, delta_v) *
         delta_theta_over_q;
       Matrix3d const delta_v_over_v = N_inv * q_hat.matrix().transpose();
 
@@ -178,22 +178,21 @@ namespace cyclops::estimation {
   }
 
   template <int dimension>
-  static auto evaluate_euclidean_error(
+  static auto evaluateEuclideanError(
     double* maybe_jacobian, MatrixXd const& nominal_jacobian, int param_index,
     double const* param, double const* param_hat) {
-    using vector_t = Eigen::Matrix<double, dimension, 1>;
+    using Vector = Eigen::Matrix<double, dimension, 1>;
 
     if (maybe_jacobian != nullptr) {
       auto rows = nominal_jacobian.rows();
       Map<MatrixXdR>(maybe_jacobian, rows, dimension) =
         nominal_jacobian.middleCols(param_index, dimension);
     }
-    vector_t error =
-      Map<vector_t const>(param) - Map<vector_t const>(param_hat);
+    Vector error = Map<Vector const>(param) - Map<Vector const>(param_hat);
     return error;
   }
 
-  GaussianPriorCost::GaussianPriorCost(gaussian_prior_t prior)
+  GaussianPriorCost::GaussianPriorCost(GaussianPrior prior)
       : _prior(std::move(prior)) {
     auto& parameter_sizes = *mutable_parameter_block_sizes();
 
@@ -216,7 +215,7 @@ namespace cyclops::estimation {
         auto x = parameters[i];
         auto x_hat = &_prior.nominal_parameters.at(index_param);
 
-        auto n_manif = node.manifold_dimension();
+        auto n_manif = node.localDimension();
         auto n_param = node.dimension();
         auto jacobian = jacobians != nullptr ? jacobians[i] : nullptr;
         error.segment(index_manif, n_manif) =
@@ -229,15 +228,13 @@ namespace cyclops::estimation {
 
       std::visit(
         overloaded {
-          [&](node_t::frame_t const& _) {
-            visitor_common(_, evaluate_motion_error);
-          },
-          [&](node_t::bias_t const& _) {
-            auto evaluator = evaluate_euclidean_error<6>;
+          [&](Node::Frame const& _) { visitor_common(_, evaluateMotionError); },
+          [&](Node::Bias const& _) {
+            auto evaluator = evaluateEuclideanError<6>;
             visitor_common(_, evaluator);
           },
-          [&](node_t::landmark_t const& _) {
-            auto evaluator = evaluate_euclidean_error<3>;
+          [&](Node::Landmark const& _) {
+            auto evaluator = evaluateEuclideanError<3>;
             visitor_common(_, evaluator);
           },
         },

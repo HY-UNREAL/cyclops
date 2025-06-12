@@ -30,96 +30,89 @@ namespace cyclops::estimation {
 
   using ceres::AutoDiffCostFunction;
 
-  using measurement::feature_track_t;
-  using measurement::imu_motion_t;
-  using measurement::IMUPreintegration;
+  using measurement::FeatureTrack;
+  using measurement::ImuMotion;
+  using measurement::ImuPreintegration;
 
   namespace views = ranges::views;
 
-  using node_context_id_t = std::pair<node_t, graph_node_context_ref_t>;
-  using node_context_id_set_t = std::vector<node_context_id_t>;
+  using NodeContextID = std::pair<Node, GraphNodeContext::Ref>;
+  using NodeContextIDSet = std::vector<NodeContextID>;
 
-  using ACCEPTED = landmark_acceptance_t::accepted;
-  using UNINITIALIZED =
-    landmark_acceptance_t::rejected__uninitialized_landmark_state;
-  using NO_INLIER = landmark_acceptance_t::rejected__no_inlier_observation;
-  using INFORMATION_DEFICIENT =
-    landmark_acceptance_t::rejected__deficient_information_weight;
-
-  enum feature_uncertainty_analysis_status_t {
+  enum FeatureUncertaintyAnalysisStatus {
     ANALYSIS_SUCCESS,
     ANALYSIS_FAIL_UNINITIALIZED_MOTION_STATE,
     ANALYSIS_FAIL_TOO_CLOSE,
     ANALYSIS_FAIL_LARGE_PROJECTION_ERROR,
   };
 
-  struct feature_uncertainty_t {
-    node_context_id_t input_frame;
+  struct FeatureUncertainty {
+    NodeContextID input_frame;
 
     double depth;
     double mahalanobis_norm;
     Matrix3d information;
   };
 
-  struct landmark_node_uncertainty_analysis_t {
-    feature_uncertainty_analysis_status_t status;
-    std::optional<feature_uncertainty_t> value = std::nullopt;
+  struct LandmarkNodeUncertaintyAnalysis {
+    FeatureUncertaintyAnalysisStatus status;
+    std::optional<FeatureUncertainty> value = std::nullopt;
   };
 
-  struct landmark_node_observation_skeleton_t {
-    std::reference_wrapper<feature_point_t const> data;
+  struct LandmarkNodeObservationSkeleton {
+    std::reference_wrapper<FeaturePoint const> data;
 
-    factor_t factor;
-    node_context_id_t keyframe_node;
+    Factor factor;
+    NodeContextID keyframe_node;
   };
 
-  struct landmark_node_multiview_skeleton_t {
-    node_context_id_t landmark_node;
-    std::vector<landmark_node_observation_skeleton_t> observations;
+  struct LandmarkNodeMultiViewSkeleton {
+    NodeContextID landmark_node;
+    std::vector<LandmarkNodeObservationSkeleton> observations;
   };
 
-  struct landmark_node_multiview_skeleton_analysis_t {
-    landmark_acceptance_t acceptance;
-    std::optional<landmark_node_multiview_skeleton_t> skeleton = std::nullopt;
+  struct LandmarkNodeMultiViewSkeletonAnalysis {
+    LandmarkAcceptance acceptance;
+    std::optional<LandmarkNodeMultiViewSkeleton> skeleton = std::nullopt;
   };
 
   class FactorGraphCostUpdater::Impl {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<FactorGraphStateNodeMap> _node_map;
 
     void addImuPreintegrationCost(
-      ceres::Problem& problem, node_context_id_set_t const& inputs,
-      frame_id_t from, frame_id_t to, IMUPreintegration const* data);
+      ceres::Problem& problem, NodeContextIDSet const& inputs, FrameID from,
+      FrameID to, ImuPreintegration const* data);
     void addImuRandomWalkCost(
-      ceres::Problem& problem, node_context_id_set_t const& inputs,
-      frame_id_t from, frame_id_t to, double dt);
+      ceres::Problem& problem, NodeContextIDSet const& inputs, FrameID from,
+      FrameID to, double dt);
 
-    landmark_node_uncertainty_analysis_t analyzeLandmarkUncertainty(
-      Vector3d const& f, feature_point_t const& feature, frame_id_t frame_id);
-    landmark_node_multiview_skeleton_analysis_t makeLandmarkCostBatchArgument(
-      std::set<frame_id_t> const& solvable_motions, landmark_id_t feature_id,
-      feature_track_t const& track);
+    LandmarkNodeUncertaintyAnalysis analyzeLandmarkUncertainty(
+      Vector3d const& f, FeaturePoint const& feature, FrameID frame_id);
+    LandmarkNodeMultiViewSkeletonAnalysis makeLandmarkCostBatchArgument(
+      std::set<FrameID> const& solvable_motions, LandmarkID feature_id,
+      FeatureTrack const& track);
 
   public:
     Impl(
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<FactorGraphStateNodeMap> node_map)
         : _config(config), _node_map(node_map) {
     }
 
-    bool addImuCost(ceres::Problem& problem, imu_motion_t const& imu_motion);
-    bool addBiasPriorCost(ceres::Problem& problem, frame_id_t frame_id);
+    bool addImuCost(ceres::Problem& problem, ImuMotion const& imu_motion);
+    bool addBiasPriorCost(ceres::Problem& problem, FrameID frame_id);
 
-    landmark_acceptance_t addLandmarkCostBatch(
-      ceres::Problem& problem, std::set<frame_id_t> const& solvable_motions,
-      landmark_id_t landmark_id, feature_track_t const& track);
+    LandmarkAcceptance addLandmarkCostBatch(
+      ceres::Problem& problem, std::set<FrameID> const& solvable_motions,
+      LandmarkID landmark_id, FeatureTrack const& track);
   };
 
   template <typename evaluator_t, int... dimensions>
-  static void create_autodiff_factor(
+  static void makeFactorFromEvaluator(
     ceres::Problem& problem, FactorGraphStateNodeMap& node_map,
-    evaluator_t* evaluator, factor_t factor, node_context_id_set_t const& nodes,
+    evaluator_t* evaluator, Factor factor, NodeContextIDSet const& nodes,
     ceres::LossFunction* loss = nullptr) {
     auto parameters =  //
       nodes | views::transform([](auto const& input) {
@@ -134,9 +127,9 @@ namespace cyclops::estimation {
     node_map.createFactor(std::make_tuple(residual, factor), nodes);
   }
 
-  static std::optional<node_context_id_set_t> query_node_contexts(
-    FactorGraphStateNodeMap& node_map, std::vector<node_t> const& nodes) {
-    node_context_id_set_t result;
+  static std::optional<NodeContextIDSet> queryNodeContexts(
+    FactorGraphStateNodeMap& node_map, std::vector<Node> const& nodes) {
+    NodeContextIDSet result;
     for (auto const& node : nodes) {
       auto maybe_ctxt = node_map.findContext(node);
       if (!maybe_ctxt.has_value()) {
@@ -149,38 +142,39 @@ namespace cyclops::estimation {
   }
 
   void FactorGraphCostUpdater::Impl::addImuPreintegrationCost(
-    ceres::Problem& problem, node_context_id_set_t const& input_nodes,
-    frame_id_t from, frame_id_t to, IMUPreintegration const* data) {
-    create_autodiff_factor<IMUPreintegrationCostEvaluator, 9, 10, 10, 6>(
+    ceres::Problem& problem, NodeContextIDSet const& input_nodes, FrameID from,
+    FrameID to, ImuPreintegration const* data) {
+    makeFactorFromEvaluator<ImuPreintegrationCostEvaluator, 9, 10, 10, 6>(
       problem, *_node_map,
-      new IMUPreintegrationCostEvaluator(data, _config->gravity_norm),
-      factor::imu(from, to), input_nodes);
+      new ImuPreintegrationCostEvaluator(data, _config->gravity_norm),
+      factor::makeImu(from, to), input_nodes);
   }
 
   void FactorGraphCostUpdater::Impl::addImuRandomWalkCost(
-    ceres::Problem& problem, node_context_id_set_t const& input_nodes,
-    frame_id_t from, frame_id_t to, double dt) {
-    create_autodiff_factor<IMUBiasRandomWalkCostEvaluator, 6, 6, 6>(
+    ceres::Problem& problem, NodeContextIDSet const& input_nodes, FrameID from,
+    FrameID to, double dt) {
+    makeFactorFromEvaluator<ImuBiasRandomWalkCostEvaluator, 6, 6, 6>(
       problem, *_node_map,
-      new IMUBiasRandomWalkCostEvaluator(
+      new ImuBiasRandomWalkCostEvaluator(
         dt, _config->noise.acc_random_walk, _config->noise.gyr_random_walk),
-      factor::bias_walk(from, to), input_nodes);
+      factor::makeBiasWalk(from, to), input_nodes);
   }
 
   bool FactorGraphCostUpdater::Impl::addImuCost(
-    ceres::Problem& problem, imu_motion_t const& imu_motion) {
+    ceres::Problem& problem, ImuMotion const& imu_motion) {
     auto const& [from, to, data] = imu_motion;
     if (data->time_delta <= 0) {
       __logger__->error("IMU dt <= 0 (frame: {} -> {})", from, to);
       return false;
     }
-    auto maybe_preintegration_inputs = query_node_contexts(
-      *_node_map, {node::frame(from), node::frame(to), node::bias(from)});
+    auto maybe_preintegration_inputs = queryNodeContexts(
+      *_node_map,
+      {node::makeFrame(from), node::makeFrame(to), node::makeBias(from)});
     if (!maybe_preintegration_inputs)
       return false;
 
     auto maybe_bias_walk_inputs =
-      query_node_contexts(*_node_map, {node::bias(from), node::bias(to)});
+      queryNodeContexts(*_node_map, {node::makeBias(from), node::makeBias(to)});
     if (!maybe_bias_walk_inputs)
       return false;
     __logger__->trace("Adding IMU cost {} -> {}", from, to);
@@ -193,18 +187,19 @@ namespace cyclops::estimation {
   }
 
   bool FactorGraphCostUpdater::Impl::addBiasPriorCost(
-    ceres::Problem& problem, frame_id_t frame_id) {
-    auto maybe_inputs = query_node_contexts(*_node_map, {node::bias(frame_id)});
+    ceres::Problem& problem, FrameID frame_id) {
+    auto maybe_inputs =
+      queryNodeContexts(*_node_map, {node::makeBias(frame_id)});
     if (!maybe_inputs)
       return false;
     __logger__->trace("Adding bias prior cost {}", frame_id);
 
-    create_autodiff_factor<IMUBiasPriorCostEvaluator, 6, 6>(
+    makeFactorFromEvaluator<ImuBiasPriorCostEvaluator, 6, 6>(
       problem, *_node_map,
-      new IMUBiasPriorCostEvaluator(
+      new ImuBiasPriorCostEvaluator(
         _config->noise.acc_bias_prior_stddev,
         _config->noise.gyr_bias_prior_stddev),
-      factor::bias_prior(frame_id), *maybe_inputs);
+      factor::makeBiasPrior(frame_id), *maybe_inputs);
     return true;
   }
 
@@ -214,10 +209,10 @@ namespace cyclops::estimation {
     return result;
   }
 
-  landmark_node_uncertainty_analysis_t
+  LandmarkNodeUncertaintyAnalysis
   FactorGraphCostUpdater::Impl::analyzeLandmarkUncertainty(
-    Vector3d const& f, feature_point_t const& feature, frame_id_t frame_id) {
-    auto frame_node = node::frame(frame_id);
+    Vector3d const& f, FeaturePoint const& feature, FrameID frame_id) {
+    auto frame_node = node::makeFrame(frame_id);
     auto maybe_x_ctxt = _node_map->findContext(frame_node);
     if (!maybe_x_ctxt) {
       __logger__->error(
@@ -226,9 +221,13 @@ namespace cyclops::estimation {
         frame_id);
       return {ANALYSIS_FAIL_UNINITIALIZED_MOTION_STATE};
     }
-    auto x = maybe_x_ctxt->get().parameter;
-    auto [p_cam, q_cam] = compose(
-      se3_of_motion_frame_ptr(x), _config->extrinsics.imu_camera_transform);
+
+    auto x_block = maybe_x_ctxt->get().parameter;
+    auto x = buffer::motion_frame::getSE3Transform(x_block);
+
+    auto x_cam = compose(x, _config->extrinsics.imu_camera_transform);
+    auto const& [p_cam, q_cam] = x_cam;
+
     auto z = (q_cam.conjugate() * (f - p_cam)).eval();
 
     auto d = z.z();
@@ -251,7 +250,7 @@ namespace cyclops::estimation {
 
     return {
       ANALYSIS_SUCCESS,
-      feature_uncertainty_t {
+      FeatureUncertainty {
         .input_frame = std::make_pair(frame_node, *maybe_x_ctxt),
         .depth = d,
         .mahalanobis_norm = mnorm,
@@ -259,16 +258,16 @@ namespace cyclops::estimation {
       }};
   }
 
-  landmark_node_multiview_skeleton_analysis_t
+  LandmarkNodeMultiViewSkeletonAnalysis
   FactorGraphCostUpdater::Impl::makeLandmarkCostBatchArgument(
-    std::set<frame_id_t> const& solvable_motions, landmark_id_t landmark_id,
-    feature_track_t const& track) {
-    auto landmark_node = node::landmark(landmark_id);
+    std::set<FrameID> const& solvable_motions, LandmarkID landmark_id,
+    FeatureTrack const& track) {
+    auto landmark_node = node::makeLandmark(landmark_id);
     auto maybe_f_ctxt = _node_map->findContext(landmark_node);
     if (!maybe_f_ctxt)
-      return {UNINITIALIZED {}};
+      return {LandmarkAcceptance::Uninitialized {}};
 
-    landmark_node_multiview_skeleton_t result = {
+    LandmarkNodeMultiViewSkeleton result = {
       .landmark_node = std::make_pair(landmark_node, *maybe_f_ctxt),
       .observations = {},
     };
@@ -294,9 +293,9 @@ namespace cyclops::estimation {
         valid_track_count++;
         total_information += H;
         depth_sumsquare += d * d;
-        result.observations.emplace_back(landmark_node_observation_skeleton_t {
+        result.observations.emplace_back(LandmarkNodeObservationSkeleton {
           .data = feature,
-          .factor = factor::feature(frame_id, landmark_id),
+          .factor = factor::makeFeature(frame_id, landmark_id),
           .keyframe_node = input_frame,
         });
         break;
@@ -314,7 +313,7 @@ namespace cyclops::estimation {
       }
     }
     if (valid_track_count == 0) {
-      return {NO_INLIER {
+      return {LandmarkAcceptance::NoInlier {
         .observation_count = observations_count,
         .depth_threshold_failure_count = depth_test_failure_count,
         .mahalanobis_norm_test_failure_count = mnorm_test_failure_count,
@@ -329,22 +328,22 @@ namespace cyclops::estimation {
       information_index >
       _config->estimation.landmark_acceptance.inlier_min_information_index) {
       return {
-        ACCEPTED {
+        LandmarkAcceptance::Accepted {
           .observation_count = observations_count,
           .accepted_count = result.observations.size(),
         },
         result,
       };
     }
-    return {INFORMATION_DEFICIENT {
+    return {LandmarkAcceptance::DeficientInformation {
       .observation_count = observations_count,
       .information_index = information_index,
     }};
   }
 
-  landmark_acceptance_t FactorGraphCostUpdater::Impl::addLandmarkCostBatch(
-    ceres::Problem& problem, std::set<frame_id_t> const& solvable_motions,
-    landmark_id_t feature_id, feature_track_t const& track) {
+  LandmarkAcceptance FactorGraphCostUpdater::Impl::addLandmarkCostBatch(
+    ceres::Problem& problem, std::set<FrameID> const& solvable_motions,
+    LandmarkID feature_id, FeatureTrack const& track) {
     auto [acceptance, maybe_skeleton] =
       makeLandmarkCostBatchArgument(solvable_motions, feature_id, track);
     if (!maybe_skeleton)  // failed. just return.
@@ -353,7 +352,7 @@ namespace cyclops::estimation {
     auto const& skeleton = *maybe_skeleton;
 
     for (auto const& [data, factor, frame_node] : skeleton.observations) {
-      create_autodiff_factor<LandmarkProjectionCostEvaluator, 2, 10, 3>(
+      makeFactorFromEvaluator<LandmarkProjectionCostEvaluator, 2, 10, 3>(
         problem, *_node_map,
         new LandmarkProjectionCostEvaluator(
           data.get(), _config->extrinsics.imu_camera_transform),
@@ -364,7 +363,7 @@ namespace cyclops::estimation {
   }
 
   FactorGraphCostUpdater::FactorGraphCostUpdater(
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<FactorGraphStateNodeMap> node_map)
       : _pimpl(std::make_unique<Impl>(config, node_map)) {
   }
@@ -372,18 +371,18 @@ namespace cyclops::estimation {
   FactorGraphCostUpdater::~FactorGraphCostUpdater() = default;
 
   bool FactorGraphCostUpdater::addImuCost(
-    ceres::Problem& problem, imu_motion_t const& imu_motion) {
+    ceres::Problem& problem, ImuMotion const& imu_motion) {
     return _pimpl->addImuCost(problem, imu_motion);
   }
 
   bool FactorGraphCostUpdater::addBiasPriorCost(
-    ceres::Problem& problem, frame_id_t frame_id) {
+    ceres::Problem& problem, FrameID frame_id) {
     return _pimpl->addBiasPriorCost(problem, frame_id);
   }
 
-  landmark_acceptance_t FactorGraphCostUpdater::addLandmarkCostBatch(
-    ceres::Problem& problem, std::set<frame_id_t> const& solvable_motions,
-    landmark_id_t feature_id, feature_track_t const& track) {
+  LandmarkAcceptance FactorGraphCostUpdater::addLandmarkCostBatch(
+    ceres::Problem& problem, std::set<FrameID> const& solvable_motions,
+    LandmarkID feature_id, FeatureTrack const& track) {
     return _pimpl->addLandmarkCostBatch(
       problem, solvable_motions, feature_id, track);
   }

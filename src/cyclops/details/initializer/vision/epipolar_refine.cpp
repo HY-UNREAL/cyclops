@@ -14,36 +14,34 @@ namespace cyclops::initializer {
   using Matrix9d = Eigen::Matrix<double, 9, 9>;
   using Matrix9x8d = Eigen::Matrix<double, 9, 8>;
 
-  using flatten_feature_pairs_t = vector<Vector4d>;
+  using FlattenFeaturePairs = vector<Vector4d>;
 
   namespace views = ranges::views;
 
   class EpipolarGeometrySQPRefinementContext {
   private:
-    flatten_feature_pairs_t const _features_hat;
+    FlattenFeaturePairs const _features_hat;
+    FlattenFeaturePairs _features;
 
     Matrix3d _E;
-    flatten_feature_pairs_t _features;
 
-    vector<Vector4d> solveFeatureErrors() const;
-    vector<Vector4d> solveConstraintFeaturePerturbationJacobians() const;
-    vector<Vector9d> solveConstraintEssentialMatrixJacobians() const;
-    vector<double> solveEpipolarConstraintViolationComplements(
+    vector<Vector4d> evaluateErrors() const;
+    vector<double> evaluateEpipolarConstraintViolationComplements(
       vector<Vector4d> const& feature_jacobians,
       vector<Vector4d> const& feature_errors) const;
 
-    optional<Vector9d> solveEssentialMatrixUpdate(
+    optional<Vector9d> evaluateEssentialMatrixUpdate(
       vector<double> const& feature_weights,
       vector<double> const& constraint_violation_complements,
       vector<Vector9d> const& constraint_essential_matrix_jacobians) const;
 
-    vector<double> solveMultipliers(
+    vector<double> evaluateMultipliers(
       vector<double> const& feature_weights,
       vector<double> const& constraint_violation_complements,
       vector<Vector9d> const& constraint_essential_matrix_jacobians,
       Vector9d const& essential_matrix_update) const;
 
-    vector<Vector4d> solveFeatureUpdate(
+    vector<Vector4d> evaluateFeatureUpdate(
       vector<Vector4d> const& constraint_feature_perturbation_jacobians,
       vector<Vector4d> const& feature_errors,
       vector<double> const& multipliers) const;
@@ -51,11 +49,11 @@ namespace cyclops::initializer {
 
   public:
     EpipolarGeometrySQPRefinementContext(
-      Matrix3d const& E, flatten_feature_pairs_t const& features_hat);
+      FlattenFeaturePairs const& features_hat, Matrix3d const& E);
     Matrix3d const& solve(int max_iterations);
   };
 
-  vector<Vector4d> EpipolarGeometrySQPRefinementContext::solveFeatureErrors()
+  vector<Vector4d> EpipolarGeometrySQPRefinementContext::evaluateErrors()
     const {
     return  //
       views::zip(_features, _features_hat) |
@@ -66,8 +64,8 @@ namespace cyclops::initializer {
       ranges::to_vector;
   }
 
-  static auto solve_constraint_feature_perturbation_jacobians(
-    Matrix3d const& E, flatten_feature_pairs_t const& features) {
+  static auto evaluateConstraintPerturbationJacobians(
+    Matrix3d const& E, FlattenFeaturePairs const& features) {
     return  //
       features | views::transform([&](Vector4d const& pair) -> Vector4d {
         auto E1 = [&]() { return E.leftCols<2>(); };
@@ -83,17 +81,10 @@ namespace cyclops::initializer {
       });
   }
 
-  vector<Vector4d> EpipolarGeometrySQPRefinementContext::
-    solveConstraintFeaturePerturbationJacobians() const {
-    return solve_constraint_feature_perturbation_jacobians(_E, _features) |
-      ranges::to_vector;
-  }
-
-  vector<Vector9d> EpipolarGeometrySQPRefinementContext::
-    solveConstraintEssentialMatrixJacobians() const {
+  static auto evaluateConstraintEssentialMatrixJacobians(
+    FlattenFeaturePairs const& features) {
     return  //
-      _features |
-      views::transform([](Vector4d const& feature_pair) -> Vector9d {
+      features | views::transform([](Vector4d const& feature_pair) -> Vector9d {
         auto u_h = [&]() { return feature_pair.head<2>().homogeneous(); };
         auto v_h = [&]() { return feature_pair.tail<2>().homogeneous(); };
 
@@ -105,7 +96,7 @@ namespace cyclops::initializer {
   }
 
   vector<double> EpipolarGeometrySQPRefinementContext::
-    solveEpipolarConstraintViolationComplements(
+    evaluateEpipolarConstraintViolationComplements(
       vector<Vector4d> const& feature_jacobians,
       vector<Vector4d> const& feature_errors) const {
     return  //
@@ -120,7 +111,7 @@ namespace cyclops::initializer {
   }
 
   optional<Vector9d>
-  EpipolarGeometrySQPRefinementContext::solveEssentialMatrixUpdate(
+  EpipolarGeometrySQPRefinementContext::evaluateEssentialMatrixUpdate(
     vector<double> const& feature_weights,
     vector<double> const& constraint_violation_complements,
     vector<Vector9d> const& constraint_essential_matrix_jacobians) const {
@@ -148,7 +139,7 @@ namespace cyclops::initializer {
     return -Te * A_bar_inv.solve(b_bar);
   }
 
-  vector<double> EpipolarGeometrySQPRefinementContext::solveMultipliers(
+  vector<double> EpipolarGeometrySQPRefinementContext::evaluateMultipliers(
     vector<double> const& feature_weights,
     vector<double> const& constraint_violation_complements,
     vector<Vector9d> const& constraint_essential_matrix_jacobians,
@@ -167,7 +158,7 @@ namespace cyclops::initializer {
       ranges::to_vector;
   }
 
-  vector<Vector4d> EpipolarGeometrySQPRefinementContext::solveFeatureUpdate(
+  vector<Vector4d> EpipolarGeometrySQPRefinementContext::evaluateFeatureUpdate(
     vector<Vector4d> const& constraint_feature_perturbation_jacobians,
     vector<Vector4d> const& feature_errors,
     vector<double> const& multipliers) const {
@@ -184,23 +175,25 @@ namespace cyclops::initializer {
   }
 
   bool EpipolarGeometrySQPRefinementContext::iterate() {
-    auto r_range = solveFeatureErrors();
-    auto ge_range = solveConstraintEssentialMatrixJacobians();
-    auto gx_range = solveConstraintFeaturePerturbationJacobians();
+    auto r_range = evaluateErrors();
+    auto ge_range = evaluateConstraintEssentialMatrixJacobians(_features);
+    auto gx_range = evaluateConstraintPerturbationJacobians(_E, _features) |
+      ranges::to_vector;
 
     auto w_range = gx_range |
       views::transform([](Vector4d const& gx) { return gx.dot(gx); }) |
       ranges::to_vector;
     auto h_range =
-      solveEpipolarConstraintViolationComplements(gx_range, r_range);
+      evaluateEpipolarConstraintViolationComplements(gx_range, r_range);
 
-    auto maybe_delta_e = solveEssentialMatrixUpdate(w_range, h_range, ge_range);
+    auto maybe_delta_e =
+      evaluateEssentialMatrixUpdate(w_range, h_range, ge_range);
     if (!maybe_delta_e.has_value())
       return false;
     auto const& delta_e = *maybe_delta_e;
 
-    auto multipliers = solveMultipliers(w_range, h_range, ge_range, delta_e);
-    auto delta_x_range = solveFeatureUpdate(gx_range, r_range, multipliers);
+    auto multipliers = evaluateMultipliers(w_range, h_range, ge_range, delta_e);
+    auto delta_x_range = evaluateFeatureUpdate(gx_range, r_range, multipliers);
 
     _E.col(0) += delta_e.segment<3>(0);
     _E.col(1) += delta_e.segment<3>(3);
@@ -214,8 +207,8 @@ namespace cyclops::initializer {
   }
 
   EpipolarGeometrySQPRefinementContext::EpipolarGeometrySQPRefinementContext(
-    Matrix3d const& E, flatten_feature_pairs_t const& features_hat)
-      : _E(E), _features_hat(features_hat), _features(features_hat) {
+    FlattenFeaturePairs const& features_hat, Matrix3d const& E)
+      : _features_hat(features_hat), _features(features_hat), _E(E) {
   }
 
   Matrix3d const& EpipolarGeometrySQPRefinementContext::solve(
@@ -227,9 +220,9 @@ namespace cyclops::initializer {
     return _E;
   }
 
-  static auto flatten_features(
-    Eigen::Matrix3d const& E, std::set<landmark_id_t> const& ids,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& features) {
+  static auto flattenFeatures(
+    Eigen::Matrix3d const& E, std::set<LandmarkID> const& ids,
+    std::map<LandmarkID, TwoViewFeaturePair> const& features) {
     auto flat_transform = [](auto const& feature_pair) {
       auto const& [u, v] = feature_pair;
       return (Vector4d() << u, v).finished().eval();
@@ -239,7 +232,7 @@ namespace cyclops::initializer {
       views::transform([&](auto id) { return features.at(id); }) |
       views::transform(flat_transform) | ranges::to_vector;
     auto feature_sanities =
-      solve_constraint_feature_perturbation_jacobians(E, features_flatten) |
+      evaluateConstraintPerturbationJacobians(E, features_flatten) |
       views::transform([](auto const& Ju) { return Ju.dot(Ju); }) |
       views::transform([](auto w) { return std::abs(w) > 1e-6; }) |
       ranges::to_vector;
@@ -258,12 +251,12 @@ namespace cyclops::initializer {
     return std::make_tuple(ids_filtered, features_flatten_filtered);
   }
 
-  Matrix3d refine_epipolar_geometry(
-    Matrix3d const& E_initial, std::set<landmark_id_t> const& ids,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& features) {
+  Matrix3d refineEpipolarGeometry(
+    Matrix3d const& E_initial, std::set<LandmarkID> const& ids,
+    std::map<LandmarkID, TwoViewFeaturePair> const& features) {
     auto E = (E_initial / E_initial.norm()).eval();
-    auto [ids_filtered, features_flatten] = flatten_features(E, ids, features);
-    auto context = EpipolarGeometrySQPRefinementContext(E, features_flatten);
+    auto [ids_filtered, features_flatten] = flattenFeatures(E, ids, features);
+    auto context = EpipolarGeometrySQPRefinementContext(features_flatten, E);
     return context.solve(8);
   }
 }  // namespace cyclops::initializer

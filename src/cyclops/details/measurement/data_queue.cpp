@@ -19,51 +19,50 @@ namespace cyclops::measurement {
 
   class MeasurementDataQueueImpl: public MeasurementDataQueue {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<MeasurementDataProvider> _data_provider;
     std::shared_ptr<KeyframeManager> _keyframe_manager;
     std::shared_ptr<estimation::StateVariableReadAccessor const> _state;
 
-    std::map<timestamp_t, imu_data_t> _imu_history;
+    std::map<Timestamp, ImuData> _imu_history;
 
-    std::unique_ptr<IMUPreintegration> popImuPreintegration(
-      timestamp_t start_time, timestamp_t end_time,
-      Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr);
-    std::optional<frame_id_t> queryFrame(
-      timestamp_t timestamp, double max_dt) const;
+    std::unique_ptr<ImuPreintegration> popImuPreintegration(
+      Timestamp start_time, Timestamp end_time, Eigen::Vector3d const& bias_acc,
+      Eigen::Vector3d const& bias_gyr);
+    std::optional<FrameID> queryFrame(Timestamp timestamp, double max_dt) const;
 
-    std::map<frame_id_t, timestamp_t> allFrames() const;
+    std::map<FrameID, Timestamp> allFrames() const;
 
   public:
     MeasurementDataQueueImpl(
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<MeasurementDataProvider> measurements,
       std::shared_ptr<KeyframeManager> keyframe_manager,
       std::shared_ptr<estimation::StateVariableReadAccessor const> state);
     ~MeasurementDataQueueImpl();
     void reset() override;
 
-    void updateImu(imu_data_t const&) override;
-    std::optional<frame_id_t> updateLandmark(image_data_t const&) override;
+    void updateImu(ImuData const&) override;
+    std::optional<FrameID> updateLandmark(ImageData const&) override;
 
-    bool detectKeyframe(frame_id_t candidate_frame) const override;
+    bool detectKeyframe(FrameID candidate_frame) const override;
     void acceptCurrentPendingKeyframe() override;
 
-    void marginalize(frame_id_t drop_frame) override;
+    void marginalize(FrameID drop_frame) override;
     void marginalizeKeyframe(
-      frame_id_t drop_frame, set<landmark_id_t> const& drop_landmarks,
-      frame_id_t inserted_keyframe) override;
+      FrameID drop_frame, set<LandmarkID> const& drop_landmarks,
+      FrameID inserted_keyframe) override;
     void marginalizePendingFrame(
-      frame_id_t drop_frame, set<landmark_id_t> const& drop_landmarks) override;
+      FrameID drop_frame, set<LandmarkID> const& drop_landmarks) override;
 
-    std::map<frame_id_t, timestamp_t> const& keyframes() const override;
-    std::map<frame_id_t, timestamp_t> const& pendingFrames() const override;
+    std::map<FrameID, Timestamp> const& keyframes() const override;
+    std::map<FrameID, Timestamp> const& pendingFrames() const override;
   };
 
   MeasurementDataQueueImpl::~MeasurementDataQueueImpl() = default;
 
   MeasurementDataQueueImpl::MeasurementDataQueueImpl(
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataProvider> measurements,
     std::shared_ptr<KeyframeManager> keyframe_manager,
     std::shared_ptr<estimation::StateVariableReadAccessor const> state)
@@ -79,18 +78,17 @@ namespace cyclops::measurement {
     _keyframe_manager->reset();
   }
 
-  std::map<frame_id_t, timestamp_t> MeasurementDataQueueImpl::allFrames()
-    const {
+  std::map<FrameID, Timestamp> MeasurementDataQueueImpl::allFrames() const {
     return views::concat(keyframes(), pendingFrames()) |
-      ranges::to<std::map<frame_id_t, timestamp_t>>;
+      ranges::to<std::map<FrameID, Timestamp>>;
   }
 
-  IMUPreintegration::UniquePtr MeasurementDataQueueImpl::popImuPreintegration(
-    timestamp_t t_s, timestamp_t t_e, Eigen::Vector3d const& b_a,
+  ImuPreintegration::UniquePtr MeasurementDataQueueImpl::popImuPreintegration(
+    Timestamp t_s, Timestamp t_e, Eigen::Vector3d const& b_a,
     Eigen::Vector3d const& b_w) {
-    auto result = std::make_unique<IMUPreintegration>(
+    auto result = std::make_unique<ImuPreintegration>(
       b_a, b_w,
-      imu_noise_t {
+      ImuNoise {
         .acc_white_noise = _config->noise.acc_white_noise,
         .gyr_white_noise = _config->noise.gyr_white_noise,
       });
@@ -129,12 +127,12 @@ namespace cyclops::measurement {
     return result;
   }
 
-  void MeasurementDataQueueImpl::updateImu(imu_data_t const& imu) {
+  void MeasurementDataQueueImpl::updateImu(ImuData const& imu) {
     _imu_history.emplace(imu.timestamp, imu);
   }
 
-  std::optional<frame_id_t> MeasurementDataQueueImpl::updateLandmark(
-    image_data_t const& landmark) {
+  std::optional<FrameID> MeasurementDataQueueImpl::updateLandmark(
+    ImageData const& landmark) {
     auto frames = allFrames();
     if (frames.empty()) {
       auto frame_id = _keyframe_manager->createNewFrame(landmark.timestamp);
@@ -151,12 +149,10 @@ namespace cyclops::measurement {
     auto zero = Eigen::Vector3d::Zero().eval();
     auto b_a = _state->motionFrames().empty()
       ? zero
-      : estimation::acc_bias_of_motion_frame_block(
-          _state->lastMotionFrameBlock());
+      : estimation::getAccBias(_state->lastMotionFrameBlock());
     auto b_w = _state->motionFrames().empty()
       ? zero
-      : estimation::gyr_bias_of_motion_frame_block(
-          _state->lastMotionFrameBlock());
+      : estimation::getGyrBias(_state->lastMotionFrameBlock());
 
     auto preintegration = popImuPreintegration(prev_t, curr_t, b_a, b_w);
     if (preintegration == nullptr) {
@@ -179,8 +175,8 @@ namespace cyclops::measurement {
     return curr_frame_id;
   }
 
-  std::optional<frame_id_t> MeasurementDataQueueImpl::queryFrame(
-    timestamp_t timestamp, double max_dt) const {
+  std::optional<FrameID> MeasurementDataQueueImpl::queryFrame(
+    Timestamp timestamp, double max_dt) const {
     auto frames = allFrames();
     if (frames.empty())
       return std::nullopt;
@@ -190,7 +186,7 @@ namespace cyclops::measurement {
         auto const& [frame_id, frame_timestamp] = _;
         return std::make_pair(frame_timestamp, frame_id);
       }) |
-      ranges::to<std::map<timestamp_t, frame_id_t>>;
+      ranges::to<std::map<Timestamp, FrameID>>;
 
     auto e = time_sorted_frames.upper_bound(timestamp);
     auto s = e;
@@ -214,16 +210,15 @@ namespace cyclops::measurement {
     return std::nullopt;
   }
 
-  bool MeasurementDataQueueImpl::detectKeyframe(
-    frame_id_t candidate_frame) const {
+  bool MeasurementDataQueueImpl::detectKeyframe(FrameID candidate_frame) const {
     auto const& tracks = _data_provider->tracks();
     if (keyframes().empty())
       return false;
 
     auto [last_keyframe, _] = *keyframes().rbegin();
 
-    auto motion_statistics = compute_image_frame_motion_statistics(
-      tracks, last_keyframe, candidate_frame);
+    auto motion_statistics =
+      evaluateKeyframeMotionStatistics(tracks, last_keyframe, candidate_frame);
 
     auto const& threshold = _config->keyframe_detection;
     auto min_novel_landmarks = threshold.min_novel_landmarks;
@@ -241,7 +236,7 @@ namespace cyclops::measurement {
     _keyframe_manager->setKeyframe(curr_pending_frame);
   }
 
-  void MeasurementDataQueueImpl::marginalize(frame_id_t drop_frame) {
+  void MeasurementDataQueueImpl::marginalize(FrameID drop_frame) {
     auto drop_landmarks =  //
       _data_provider->tracks() | views::filter([&](auto const& id_track) {
         auto const& [_, track] = id_track;
@@ -257,31 +252,31 @@ namespace cyclops::measurement {
   }
 
   void MeasurementDataQueueImpl::marginalizeKeyframe(
-    frame_id_t drop_frame, set<landmark_id_t> const& drop_landmarks,
-    frame_id_t new_keyframe) {
+    FrameID drop_frame, set<LandmarkID> const& drop_landmarks,
+    FrameID new_keyframe) {
     _data_provider->marginalize(drop_frame, drop_landmarks);
     _keyframe_manager->removeFrame(drop_frame);
     _keyframe_manager->setKeyframe(new_keyframe);
   }
 
   void MeasurementDataQueueImpl::marginalizePendingFrame(
-    frame_id_t drop_frame, set<landmark_id_t> const& drop_landmarks) {
+    FrameID drop_frame, set<LandmarkID> const& drop_landmarks) {
     _data_provider->marginalize(drop_frame, drop_landmarks);
     _keyframe_manager->removeFrame(drop_frame);
   }
 
-  std::map<frame_id_t, timestamp_t> const& MeasurementDataQueueImpl::keyframes()
+  std::map<FrameID, Timestamp> const& MeasurementDataQueueImpl::keyframes()
     const {
     return _keyframe_manager->keyframes();
   }
 
-  std::map<frame_id_t, timestamp_t> const&
-  MeasurementDataQueueImpl::pendingFrames() const {
+  std::map<FrameID, Timestamp> const& MeasurementDataQueueImpl::pendingFrames()
+    const {
     return _keyframe_manager->pendingFrames();
   }
 
-  std::unique_ptr<MeasurementDataQueue> MeasurementDataQueue::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<MeasurementDataQueue> MeasurementDataQueue::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataProvider> measurements,
     std::shared_ptr<KeyframeManager> keyframe_manager,
     std::shared_ptr<estimation::StateVariableReadAccessor const> state) {

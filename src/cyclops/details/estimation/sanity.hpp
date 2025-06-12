@@ -3,7 +3,7 @@
 #include <memory>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::telemetry {
@@ -11,7 +11,7 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::estimation {
-  struct landmark_sanity_statistics_t {
+  struct LandmarkSanityStatistics {
     size_t landmark_observations;
     size_t landmark_accepts;
     size_t uninitialized_landmarks;
@@ -19,7 +19,7 @@ namespace cyclops::estimation {
     size_t mnorm_threshold_failures;
   };
 
-  struct optimizer_sanity_statistics_t {
+  struct OptimizerSanityStatistics {
     double final_cost;
     int num_residuals;
     int num_parameters;
@@ -31,13 +31,13 @@ namespace cyclops::estimation {
 
     virtual void reset() = 0;
     virtual void update(
-      landmark_sanity_statistics_t const& landmark_sanity,
-      optimizer_sanity_statistics_t const& optimizer_sanity) = 0;
+      LandmarkSanityStatistics const& landmark_sanity,
+      OptimizerSanityStatistics const& optimizer_sanity) = 0;
 
     virtual bool sanity() const = 0;
 
-    static std::unique_ptr<EstimationSanityDiscriminator> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<EstimationSanityDiscriminator> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::OptimizerTelemetry> telemetry = nullptr);
   };
 }  // namespace cyclops::estimation

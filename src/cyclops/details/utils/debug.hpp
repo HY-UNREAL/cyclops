@@ -12,11 +12,11 @@ namespace cyclops {
   double toc(std::chrono::time_point<std::chrono::steady_clock> const& tic);
 
   template <typename value_t>
-  static std::string set_to_string(std::set<value_t> const& s);
+  static std::string setToString(std::set<value_t> const& s);
 
   template <typename vectorxd_t>
-  static std::string vector_to_string(vectorxd_t const& v);
+  static std::string vectorToString(vectorxd_t const& v);
 
   template <typename matrixxd_t>
-  static std::string matrix_to_string(matrixxd_t const& M);
+  static std::string matrixToString(matrixxd_t const& M);
 }  // namespace cyclops

@@ -69,8 +69,8 @@ namespace cyclops::initializer {
 
   static auto const zero = Vector3d(0., 0., 0.);
 
-  static Vector12d select_control_points(
-    map<landmark_id_t, pnp_image_point_t> const& image_points) {
+  static Vector12d selectControlPoints(
+    map<LandmarkID, PnpImagePoint> const& image_points) {
     auto landmark_positions = image_points | views::values |
       views::transform([](auto const& info) { return info.position; }) |
       ranges::to<vector<Vector3d>>;
@@ -99,9 +99,8 @@ namespace cyclops::initializer {
     return x_w.segment<3>(3 * i);
   }
 
-  static Matrix4Xd compute_alpha(
-    Vector12d const& x_w,
-    map<landmark_id_t, pnp_image_point_t> const& image_points) {
+  static Matrix4Xd evaluateAlpha(
+    Vector12d const& x_w, map<LandmarkID, PnpImagePoint> const& image_points) {
     auto n = image_points.size();
 
     Matrix3d CC;
@@ -129,9 +128,9 @@ namespace cyclops::initializer {
     return result;
   }
 
-  static MatrixX12d compute_M(
+  static MatrixX12d evaluateM(
     Matrix4Xd const& alpha,
-    map<landmark_id_t, pnp_image_point_t> const& image_points) {
+    map<LandmarkID, PnpImagePoint> const& image_points) {
     auto n = image_points.size();
 
     MatrixX12d M(2 * n, 12);
@@ -161,7 +160,7 @@ namespace cyclops::initializer {
     return M;
   }
 
-  static Matrix6_10d compute_L_6x10(Matrix12d const& U) {
+  static Matrix6_10d evaluateL6x10(Matrix12d const& U) {
     Matrix6_10d L;
 
     Vector12d v[4] = {U.col(11), U.col(10), U.col(9), U.col(8)};
@@ -200,7 +199,7 @@ namespace cyclops::initializer {
     return dv.dot(dv);
   }
 
-  static Vector6d compute_rho(Vector12d const& x_w) {
+  static Vector6d evaluateRho(Vector12d const& x_w) {
     Vector6d rho;
     // clang-format off
     rho <<
@@ -215,8 +214,7 @@ namespace cyclops::initializer {
     return rho;
   }
 
-  static Vector4d find_betas_approx_1(
-    Matrix6_10d const& L, Vector6d const& rho) {
+  static Vector4d findBetasApprox1(Matrix6_10d const& L, Vector6d const& rho) {
     Matrix6_4d L_6x4;
     L_6x4 << L.col(0), L.col(1), L.col(3), L.col(6);
     Vector4d b4 =
@@ -230,8 +228,7 @@ namespace cyclops::initializer {
     return beta;
   }
 
-  static Vector4d find_betas_approx_2(
-    Matrix6_10d const& L, Vector6d const& rho) {
+  static Vector4d findBetasApprox2(Matrix6_10d const& L, Vector6d const& rho) {
     Matrix6_3d L_6x3 = L.leftCols<3>();
     Vector3d b3 =
       L_6x3.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV).solve(rho);
@@ -248,8 +245,7 @@ namespace cyclops::initializer {
     return beta;
   }
 
-  static Vector4d find_betas_approx_3(
-    Matrix6_10d const& L, Vector6d const& rho) {
+  static Vector4d findBetasApprox3(Matrix6_10d const& L, Vector6d const& rho) {
     Matrix6_5d L_6x5 = L.leftCols<5>();
     Vector5d b5 =
       L_6x5.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV).solve(rho);
@@ -266,28 +262,28 @@ namespace cyclops::initializer {
     return beta;
   }
 
-  static Vector4d find_betas_approx(
+  static Vector4d findBetasApprox(
     int N, Matrix6_10d const& L, Vector6d const& rho) {
     switch (N) {
     case 0:
-      return find_betas_approx_1(L, rho);
+      return findBetasApprox1(L, rho);
     case 1:
-      return find_betas_approx_2(L, rho);
+      return findBetasApprox2(L, rho);
     case 2:
-      return find_betas_approx_3(L, rho);
+      return findBetasApprox3(L, rho);
     default:
       throw "unallowed case N";
     }
   }
 
-  struct gauss_newton_linearization_t {
+  struct GaussNewtonLinearization {
     Matrix6_4d A;
     Vector6d b;
   };
 
-  static gauss_newton_linearization_t epnp_gauss_newton_linearize(
+  static GaussNewtonLinearization epnpLinearizeGaussNewton(
     Matrix6_10d const& L_6x10, Vector6d const& rho, Vector4d const& beta) {
-    gauss_newton_linearization_t result;
+    GaussNewtonLinearization result;
     for (int i = 0; i < 6; i++) {
       Matrix4d F;
       // clang-format off
@@ -322,16 +318,16 @@ namespace cyclops::initializer {
     return result;
   }
 
-  static void epnp_gauss_newton(
+  static void epnpGaussNewton(
     Vector4d& beta, Matrix6_10d const& L_6x10, Vector6d const& rho,
     size_t iterations = 5) {
     for (int _ = 0; _ < iterations; _++) {
-      auto [A, b] = epnp_gauss_newton_linearize(L_6x10, rho, beta);
+      auto [A, b] = epnpLinearizeGaussNewton(L_6x10, rho, beta);
       beta += A.fullPivHouseholderQr().solve(b);
     }
   }
 
-  static Matrix3_4d compute_ccs(Matrix12d const& U, Vector4d const& beta) {
+  static Matrix3_4d evaluateCcs(Matrix12d const& U, Vector4d const& beta) {
     Matrix3_4d result = Matrix3_4d::Zero();
     for (size_t i = 0; i < 4; i++) {
       for (size_t j = 0; j < 4; j++)
@@ -340,7 +336,7 @@ namespace cyclops::initializer {
     return result;
   }
 
-  static vector<Vector3d> compute_pcs(
+  static vector<Vector3d> evaluatePcs(
     Matrix4Xd const& alpha, Matrix3_4d const& ccs, int n) {
     vector<Vector3d> result;
     result.reserve(n);
@@ -349,7 +345,7 @@ namespace cyclops::initializer {
     return result;
   }
 
-  static void resolve_sign(vector<Vector3d>& pcs, Matrix3_4d& ccs) {
+  static void resolveSign(vector<Vector3d>& pcs, Matrix3_4d& ccs) {
     if (pcs.front().z() < 0.0) {
       ccs = -ccs;
       for (auto& pc_i : pcs)
@@ -357,9 +353,9 @@ namespace cyclops::initializer {
     }
   }
 
-  static double compute_reprojection_error(
+  static double evaluateReprojectionError(
     Matrix3d const& R, Vector3d const& t,
-    map<landmark_id_t, pnp_image_point_t> const& image_points) {
+    map<LandmarkID, PnpImagePoint> const& image_points) {
     auto result = 0.;
     for (auto const& info : image_points | views::values) {
       auto const& p_w = info.position;
@@ -371,14 +367,14 @@ namespace cyclops::initializer {
     return std::sqrt(std::max(result / image_points.size(), 0.));
   }
 
-  struct pnp_solution_t {
+  struct PnpSolution {
     double error;
-    rotation_translation_matrix_pair_t camera_pose;
+    RotationPositionPair camera_pose;
   };
 
-  static pnp_solution_t pnp_solve_camera_pose(
+  static PnpSolution pnpSolveCameraPose(
     Matrix3_4d const& ccs, vector<Vector3d> const& pcs,
-    map<landmark_id_t, pnp_image_point_t> const& image_points) {
+    map<LandmarkID, PnpImagePoint> const& image_points) {
     int n = image_points.size();
 
     auto landmark_positions = image_points | views::values |
@@ -401,50 +397,50 @@ namespace cyclops::initializer {
       R.row(2) = -R.row(2);
     Vector3d t = pc0 - R * pw0;
 
-    auto error = compute_reprojection_error(R, t, image_points);
-    return pnp_solution_t {
+    auto error = evaluateReprojectionError(R, t, image_points);
+    return PnpSolution {
       .error = error,
       .camera_pose = {R.transpose(), -R.transpose() * t},
     };
   }
 
-  static pnp_solution_t pnp_solve_camera_pose(
+  static PnpSolution pnpSolveCameraPose(
     Matrix4Xd const& alpha, Matrix12d const& U, Vector4d const& beta,
-    map<landmark_id_t, pnp_image_point_t> const& image_points) {
+    map<LandmarkID, PnpImagePoint> const& image_points) {
     int n = image_points.size();
-    auto ccs = compute_ccs(U, beta);
-    auto pcs = compute_pcs(alpha, ccs, n);
-    resolve_sign(pcs, ccs);
-    return pnp_solve_camera_pose(ccs, pcs, image_points);
+    auto ccs = evaluateCcs(U, beta);
+    auto pcs = evaluatePcs(alpha, ccs, n);
+    resolveSign(pcs, ccs);
+    return pnpSolveCameraPose(ccs, pcs, image_points);
   }
 
-  static vector<pnp_solution_t> make_pnp_solution_candidates(
-    map<landmark_id_t, pnp_image_point_t> const& image_points,
+  static vector<PnpSolution> makePnpSolutionCandidates(
+    map<LandmarkID, PnpImagePoint> const& image_points,
     int gauss_newton_max_iterations) {
-    auto x_w = select_control_points(image_points);
-    auto alpha = compute_alpha(x_w, image_points);
-    auto M = compute_M(alpha, image_points);
+    auto x_w = selectControlPoints(image_points);
+    auto alpha = evaluateAlpha(x_w, image_points);
+    auto M = evaluateM(alpha, image_points);
     Matrix12d MT_M = M.transpose() * M;
 
     Eigen::JacobiSVD<Matrix12d> svd(MT_M, Eigen::ComputeFullU);
     auto const& U = svd.matrixU();
 
-    auto L = compute_L_6x10(U);
-    auto rho = compute_rho(x_w);
+    auto L = evaluateL6x10(U);
+    auto rho = evaluateRho(x_w);
 
     // clang-format off
     return views::ints(0, 3)
       | views::transform([&](auto N) {
-        auto beta = find_betas_approx(N, L, rho);
-        epnp_gauss_newton(beta, L, rho, gauss_newton_max_iterations);
-        return pnp_solve_camera_pose(alpha, U, beta, image_points);
+        auto beta = findBetasApprox(N, L, rho);
+        epnpGaussNewton(beta, L, rho, gauss_newton_max_iterations);
+        return pnpSolveCameraPose(alpha, U, beta, image_points);
       })
-      | ranges::to<vector<pnp_solution_t>>;
+      | ranges::to<vector<PnpSolution>>;
     // clang-format on
   }
 
-  std::optional<rotation_translation_matrix_pair_t> solve_pnp_camera_pose(
-    std::map<landmark_id_t, pnp_image_point_t> const& image_point_set,
+  std::optional<RotationPositionPair> solvePnpCameraPose(
+    std::map<LandmarkID, PnpImagePoint> const& image_point_set,
     int iterations) {
     if (iterations < 0) {
       __logger__->critical(
@@ -457,7 +453,7 @@ namespace cyclops::initializer {
       return std::nullopt;
     }
 
-    auto candidates = make_pnp_solution_candidates(image_point_set, iterations);
+    auto candidates = makePnpSolutionCandidates(image_point_set, iterations);
     if (candidates.empty())
       return std::nullopt;
 

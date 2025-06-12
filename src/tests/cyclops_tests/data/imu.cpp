@@ -12,32 +12,32 @@ namespace cyclops {
 
   using Eigen::Vector3d;
 
-  using measurement::imu_motion_t;
-  using measurement::imu_motions_t;
-  using measurement::imu_noise_t;
-  using measurement::IMUPreintegration;
+  using measurement::ImuMotion;
+  using measurement::ImuMotions;
+  using measurement::ImuNoise;
+  using measurement::ImuPreintegration;
 
   namespace views = ranges::views;
 
-  static auto make_imu_signal(pose_signal_t const& pose_signal) {
-    auto a = numeric_second_derivative(pose_signal.position);
+  static auto makeImuSignal(PoseSignal const& pose_signal) {
+    auto a = numericSecondDerivative(pose_signal.position);
     auto q = pose_signal.orientation;
 
-    auto a_b = [a, q](timestamp_t t) {
+    auto a_b = [a, q](Timestamp t) {
       auto g = Vector3d(0, 0, 9.81);
       return (q(t).inverse() * (a(t) + g)).eval();
     };
-    auto w_b = numeric_derivative(q);
+    auto w_b = numericDerivative(q);
     return std::make_tuple(a_b, w_b);
   }
 
   template <typename imu_data_gen_t>
-  static imu_mockup_sequence_t make_imu_mockup(
-    vector<timestamp_t> const& timestamps, imu_data_gen_t&& gen) {
+  static ImuMockupSequence makeImuMockup(
+    vector<Timestamp> const& timestamps, imu_data_gen_t&& gen) {
     if (timestamps.empty())
       return {};
 
-    imu_mockup_sequence_t result;
+    ImuMockupSequence result;
 
     auto const t_s = timestamps.front();
     auto const t_e = timestamps.back();
@@ -47,22 +47,22 @@ namespace cyclops {
     return result;
   }
 
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, std::vector<timestamp_t> const& timestamps,
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, std::vector<Timestamp> const& timestamps,
     Vector3d const& bias_acc, Vector3d const& bias_gyr, std::mt19937& rgen,
-    sensor_statistics_t const& noise) {
-    auto signal = make_imu_signal(pose_signal);
+    SensorStatistics const& noise) {
+    auto signal = makeImuSignal(pose_signal);
     Vector3d b_a = bias_acc;
     Vector3d b_w = bias_gyr;
 
-    return make_imu_mockup(timestamps, [&](timestamp_t t, timestamp_t dt) {
+    return makeImuMockup(timestamps, [&](Timestamp t, Timestamp dt) {
       auto const& [a, w] = signal;
       auto const a_m =
         perturbate((a(t) + b_a).eval(), noise.acc_white_noise, rgen);
       auto const w_m =
         perturbate((w(t) + b_w).eval(), noise.gyr_white_noise, rgen);
 
-      auto const data_frame = imu_mockup_t {
+      auto const data_frame = ImuMockup {
         .bias_acc = b_a,
         .bias_gyr = b_w,
         .measurement = {t, a_m, w_m},
@@ -73,23 +73,23 @@ namespace cyclops {
     });
   }
 
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, vector<timestamp_t> const& timestamps,
-    std::mt19937& rgen, sensor_statistics_t const& noise) {
-    return generate_imu_data(
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, vector<Timestamp> const& timestamps,
+    std::mt19937& rgen, SensorStatistics const& noise) {
+    return generateImuData(
       pose_signal, timestamps, Vector3d::Zero(), Vector3d::Zero(), rgen, noise);
   }
 
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, std::vector<timestamp_t> const& timestamps,
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, std::vector<Timestamp> const& timestamps,
     Vector3d const& bias_acc, Vector3d const& bias_gyr) {
-    auto signal = make_imu_signal(pose_signal);
+    auto signal = makeImuSignal(pose_signal);
 
-    return make_imu_mockup(timestamps, [&](timestamp_t t, timestamp_t dt) {
+    return makeImuMockup(timestamps, [&](Timestamp t, Timestamp dt) {
       auto const& [a, w] = signal;
       auto const a_m = (a(t) + bias_acc).eval();
       auto const w_m = (w(t) + bias_gyr).eval();
-      auto const data_frame = imu_mockup_t {
+      auto const data_frame = ImuMockup {
         .bias_acc = bias_acc,
         .bias_gyr = bias_gyr,
         .measurement = {t, a_m, w_m},
@@ -98,12 +98,12 @@ namespace cyclops {
     });
   }
 
-  imu_mockup_sequence_t generate_imu_data(
-    pose_signal_t pose_signal, vector<timestamp_t> const& timestamps) {
-    auto signal = make_imu_signal(pose_signal);
-    return make_imu_mockup(timestamps, [&](timestamp_t t, timestamp_t dt) {
+  ImuMockupSequence generateImuData(
+    PoseSignal pose_signal, vector<Timestamp> const& timestamps) {
+    auto signal = makeImuSignal(pose_signal);
+    return makeImuMockup(timestamps, [&](Timestamp t, Timestamp dt) {
       auto const& [a, w] = signal;
-      return imu_mockup_t {
+      return ImuMockup {
         .bias_acc = Vector3d::Zero(),
         .bias_gyr = Vector3d::Zero(),
         .measurement = {t, a(t), w(t)},
@@ -111,16 +111,16 @@ namespace cyclops {
     });
   }
 
-  static std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    imu_noise_t const& noise, imu_mockup_sequence_t const& imu_sequence) {
+  static std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    ImuNoise const& noise, ImuMockupSequence const& imu_sequence) {
     auto samples = imu_sequence.size();
     if (samples <= 1) {
-      return std::make_unique<IMUPreintegration>(
+      return std::make_unique<ImuPreintegration>(
         Vector3d::Zero(), Vector3d::Zero(), noise);
     }
 
     auto const& [_, i0] = *imu_sequence.begin();
-    auto result = std::make_unique<IMUPreintegration>(
+    auto result = std::make_unique<ImuPreintegration>(
       Vector3d::Zero(), Vector3d::Zero(), noise);
     for (auto const& [prev, curr] : views::zip(
            views::slice(imu_sequence, 0, samples - 1),
@@ -138,11 +138,11 @@ namespace cyclops {
     return result;
   }
 
-  static std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    imu_noise_t const& noise, imu_mockup_sequence_t const& imu_sequence,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e) {
+  static std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    ImuNoise const& noise, ImuMockupSequence const& imu_sequence,
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e) {
     auto [p, q] = pose_signal;
-    auto v = numeric_derivative(p);
+    auto v = numericDerivative(p);
     auto p_s = p(t_s);
     auto v_s = v(t_s);
     auto q_s = q(t_s);
@@ -159,7 +159,7 @@ namespace cyclops {
       (q_s.conjugate() * (p_e - p_s - v_s * dt + 0.5 * g * dt * dt)).eval();
     auto y_v = (q_s.conjugate() * (v_e - v_s + g * dt)).eval();
 
-    auto data = make_imu_preintegration(noise, imu_sequence);
+    auto data = makeImuPreintegration(noise, imu_sequence);
     data->rotation_delta = y_q;
     data->position_delta = y_p;
     data->velocity_delta = y_v;
@@ -167,71 +167,71 @@ namespace cyclops {
     return data;
   }
 
-  static auto make_imu_timestamps(timestamp_t t_s, timestamp_t t_e) {
+  static auto makeImuTimestamps(Timestamp t_s, Timestamp t_e) {
     auto timedelta = t_e - t_s;
     auto samples = std::max(20, static_cast<int>(timedelta * 200));
     return linspace(t_s, t_e, samples) | ranges::to_vector;
   }
 
-  std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    Vector3d const& bias_acc, Vector3d const& bias_gyr,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e) {
-    auto imu_sequence = generate_imu_data(
-      pose_signal, make_imu_timestamps(t_s, t_e), bias_acc, bias_gyr, rgen,
+  std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    std::mt19937& rgen, SensorStatistics const& noise, Vector3d const& bias_acc,
+    Vector3d const& bias_gyr, PoseSignal pose_signal, Timestamp t_s,
+    Timestamp t_e) {
+    auto imu_sequence = generateImuData(
+      pose_signal, makeImuTimestamps(t_s, t_e), bias_acc, bias_gyr, rgen,
       noise);
-    return make_imu_preintegration(
-      imu_noise_t {
+    return makeImuPreintegration(
+      ImuNoise {
         .acc_white_noise = noise.acc_white_noise,
         .gyr_white_noise = noise.gyr_white_noise,
       },
       imu_sequence);
   }
 
-  std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e) {
-    auto imu_sequence = generate_imu_data(
-      pose_signal, make_imu_timestamps(t_s, t_e), rgen, noise);
-    return make_imu_preintegration(
-      imu_noise_t {
+  std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    std::mt19937& rgen, SensorStatistics const& noise, PoseSignal pose_signal,
+    Timestamp t_s, Timestamp t_e) {
+    auto imu_sequence =
+      generateImuData(pose_signal, makeImuTimestamps(t_s, t_e), rgen, noise);
+    return makeImuPreintegration(
+      ImuNoise {
         .acc_white_noise = noise.acc_white_noise,
         .gyr_white_noise = noise.gyr_white_noise,
       },
       imu_sequence);
   }
 
-  std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    Vector3d const& bias_acc, Vector3d const& bias_gyr,
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e) {
-    auto imu_sequence = generate_imu_data(
-      pose_signal, make_imu_timestamps(t_s, t_e), bias_acc, bias_gyr);
-    return make_imu_preintegration(imu_noise_t {1e-3, 1e-3}, imu_sequence);
+  std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    Vector3d const& bias_acc, Vector3d const& bias_gyr, PoseSignal pose_signal,
+    Timestamp t_s, Timestamp t_e) {
+    auto imu_sequence = generateImuData(
+      pose_signal, makeImuTimestamps(t_s, t_e), bias_acc, bias_gyr);
+    return makeImuPreintegration(ImuNoise {1e-3, 1e-3}, imu_sequence);
   }
 
-  std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    sensor_statistics_t const& noise, pose_signal_t pose_signal,
-    timestamp_t t_s, timestamp_t t_e) {
-    auto imu_noise = imu_noise_t {
+  std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    SensorStatistics const& noise, PoseSignal pose_signal, Timestamp t_s,
+    Timestamp t_e) {
+    auto imu_noise = ImuNoise {
       .acc_white_noise = noise.acc_white_noise,
       .gyr_white_noise = noise.gyr_white_noise,
     };
-    return make_imu_preintegration(
-      imu_noise, generate_imu_data(pose_signal, make_imu_timestamps(t_s, t_e)),
+    return makeImuPreintegration(
+      imu_noise, generateImuData(pose_signal, makeImuTimestamps(t_s, t_e)),
       pose_signal, t_s, t_e);
   }
 
-  std::unique_ptr<IMUPreintegration> make_imu_preintegration(
-    pose_signal_t pose_signal, timestamp_t t_s, timestamp_t t_e) {
+  std::unique_ptr<ImuPreintegration> makeImuPreintegration(
+    PoseSignal pose_signal, Timestamp t_s, Timestamp t_e) {
     auto imu_sequence =
-      generate_imu_data(pose_signal, make_imu_timestamps(t_s, t_e));
-    auto noise = imu_noise_t {1e-3, 1e-3};
-    return make_imu_preintegration(noise, imu_sequence, pose_signal, t_s, t_e);
+      generateImuData(pose_signal, makeImuTimestamps(t_s, t_e));
+    auto noise = ImuNoise {1e-3, 1e-3};
+    return makeImuPreintegration(noise, imu_sequence, pose_signal, t_s, t_e);
   }
 
   template <typename preintegrator_t>
-  static auto make_imu_motions(
-    map<frame_id_t, timestamp_t> const& frames,
+  static auto makeImuMotions(
+    map<FrameID, Timestamp> const& frames,
     preintegrator_t const& preintegrator) {
     auto n = frames.size();
     auto prevs = views::slice(frames, 0, n - 1);
@@ -241,53 +241,52 @@ namespace cyclops {
       auto const& [s, e] = frame_pair;
       auto const& [id_s, t_s] = s;
       auto const& [id_e, t_e] = e;
-      return imu_motion_t {
+      return ImuMotion {
         .from = id_s,
         .to = id_e,
         .data = preintegrator(t_s, t_e),
       };
     });
-    return views::zip(prevs, currs) | transform | ranges::to<imu_motions_t>;
+    return views::zip(prevs, currs) | transform | ranges::to<ImuMotions>;
   }
 
-  imu_motions_t make_imu_motions(
-    pose_signal_t pose_signal, map<frame_id_t, timestamp_t> const& frames) {
-    return make_imu_motions(frames, [&](auto t_s, auto t_e) {
-      return make_imu_preintegration(pose_signal, t_s, t_e);
+  ImuMotions makeImuMotions(
+    PoseSignal pose_signal, map<FrameID, Timestamp> const& frames) {
+    return makeImuMotions(frames, [&](auto t_s, auto t_e) {
+      return makeImuPreintegration(pose_signal, t_s, t_e);
     });
   }
 
-  imu_motions_t make_imu_motions(
-    sensor_statistics_t const& noise, pose_signal_t pose_signal,
-    map<frame_id_t, timestamp_t> const& frames) {
-    return make_imu_motions(frames, [&](auto t_s, auto t_e) {
-      return make_imu_preintegration(noise, pose_signal, t_s, t_e);
+  ImuMotions makeImuMotions(
+    SensorStatistics const& noise, PoseSignal pose_signal,
+    map<FrameID, Timestamp> const& frames) {
+    return makeImuMotions(frames, [&](auto t_s, auto t_e) {
+      return makeImuPreintegration(noise, pose_signal, t_s, t_e);
     });
   }
 
-  imu_motions_t make_imu_motions(
-    Vector3d const& b_a, Vector3d const& b_w, pose_signal_t pose_signal,
-    map<frame_id_t, timestamp_t> const& frames) {
-    return make_imu_motions(frames, [&](auto t_s, auto t_e) {
-      return make_imu_preintegration(b_a, b_w, pose_signal, t_s, t_e);
+  ImuMotions makeImuMotions(
+    Vector3d const& b_a, Vector3d const& b_w, PoseSignal pose_signal,
+    map<FrameID, Timestamp> const& frames) {
+    return makeImuMotions(frames, [&](auto t_s, auto t_e) {
+      return makeImuPreintegration(b_a, b_w, pose_signal, t_s, t_e);
     });
   }
 
-  imu_motions_t make_imu_motions(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    pose_signal_t pose_signal, map<frame_id_t, timestamp_t> const& frames) {
-    return make_imu_motions(frames, [&](auto t_s, auto t_e) {
-      return make_imu_preintegration(rgen, noise, pose_signal, t_s, t_e);
+  ImuMotions makeImuMotions(
+    std::mt19937& rgen, SensorStatistics const& noise, PoseSignal pose_signal,
+    map<FrameID, Timestamp> const& frames) {
+    return makeImuMotions(frames, [&](auto t_s, auto t_e) {
+      return makeImuPreintegration(rgen, noise, pose_signal, t_s, t_e);
     });
   }
 
-  imu_motions_t make_imu_motions(
-    std::mt19937& rgen, sensor_statistics_t const& noise,
-    Vector3d const& bias_acc, Vector3d const& bias_gyr,
-    pose_signal_t pose_signal,
-    std::map<frame_id_t, timestamp_t> const& frames) {
-    return make_imu_motions(frames, [&](auto t_s, auto t_e) {
-      return make_imu_preintegration(
+  ImuMotions makeImuMotions(
+    std::mt19937& rgen, SensorStatistics const& noise, Vector3d const& bias_acc,
+    Vector3d const& bias_gyr, PoseSignal pose_signal,
+    std::map<FrameID, Timestamp> const& frames) {
+    return makeImuMotions(frames, [&](auto t_s, auto t_e) {
+      return makeImuPreintegration(
         rgen, noise, bias_acc, bias_gyr, pose_signal, t_s, t_e);
     });
   }

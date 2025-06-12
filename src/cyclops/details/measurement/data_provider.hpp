@@ -6,7 +6,7 @@
 #include <set>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::estimation {
@@ -20,23 +20,23 @@ namespace cyclops::measurement {
     virtual void reset() = 0;
 
     virtual void updateFrame(
-      frame_id_t frame_id, image_data_t const& image_data) = 0;
+      FrameID frame_id, ImageData const& image_data) = 0;
     virtual void updateFrame(
-      frame_id_t prev_frame_id, frame_id_t curr_frame_id,
-      image_data_t const& image, std::unique_ptr<IMUPreintegration> imu) = 0;
+      FrameID prev_frame_id, FrameID curr_frame_id,
+      ImageData const& image, std::unique_ptr<ImuPreintegration> imu) = 0;
 
     virtual void updateImuBias() = 0;
     virtual void updateImuBias(
       Eigen::Vector3d const& bias_acc, Eigen::Vector3d const& bias_gyr) = 0;
 
     virtual void marginalize(
-      frame_id_t drop_frame, std::set<landmark_id_t> const& drop_landmarks) = 0;
+      FrameID drop_frame, std::set<LandmarkID> const& drop_landmarks) = 0;
 
-    virtual imu_motions_t const& imu() const = 0;
-    virtual feature_tracks_t const& tracks() const = 0;
+    virtual ImuMotions const& imu() const = 0;
+    virtual FeatureTracks const& tracks() const = 0;
 
-    static std::unique_ptr<MeasurementDataProvider> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<MeasurementDataProvider> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<estimation::StateVariableReadAccessor const> state);
   };
 }  // namespace cyclops::measurement

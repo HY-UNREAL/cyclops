@@ -16,11 +16,11 @@ namespace cyclops::telemetry {
 namespace cyclops::initializer {
   class InitializationSolverInternal;
 
-  struct initialization_solution_t {
+  struct InitializationSolution {
     Eigen::Vector3d acc_bias;
     Eigen::Vector3d gyr_bias;
-    landmark_positions_t landmarks;
-    std::map<frame_id_t, imu_motion_state_t> motions;
+    LandmarkPositions landmarks;
+    std::map<FrameID, ImuMotionState> motions;
   };
 
   class InitializerMain {
@@ -28,9 +28,9 @@ namespace cyclops::initializer {
     virtual ~InitializerMain() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<initialization_solution_t> solve() = 0;
+    virtual std::optional<InitializationSolution> solve() = 0;
 
-    static std::unique_ptr<InitializerMain> create(
+    static std::unique_ptr<InitializerMain> Create(
       std::unique_ptr<InitializationSolverInternal> solver_internal,
       std::shared_ptr<measurement::KeyframeManager const> keyframe_manager,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);

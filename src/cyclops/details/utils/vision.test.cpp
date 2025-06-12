@@ -22,12 +22,11 @@ namespace cyclops {
 
         auto rotation = Eigen::AngleAxisd(theta, Vector3d::UnitY());
         auto position = Vector3d(x, 0, 0);
-        auto pose =
-          rotation_translation_matrix_pair_t {rotation.matrix(), position};
+        auto pose = RotationPositionPair {rotation.matrix(), position};
 
         return std::make_pair(i, pose);
       }) |
-      ranges::to<std::map<frame_id_t, rotation_translation_matrix_pair_t>>;
+      ranges::to<std::map<FrameID, RotationPositionPair>>;
 
     auto f = Vector3d(1.0, 0, 1);
     auto features =  //
@@ -36,11 +35,11 @@ namespace cyclops {
         auto const& [R, p] = pose;
         auto point = project(R.transpose() * (f - p));
         return std::make_pair(
-          id, feature_point_t {point, Eigen::Matrix2d::Identity()});
+          id, FeaturePoint {point, Eigen::Matrix2d::Identity()});
       }) |
-      ranges::to<std::map<frame_id_t, feature_point_t>>;
+      ranges::to<std::map<FrameID, FeaturePoint>>;
 
-    auto const maybe_f_got = triangulate_point(features, pose_sequence);
+    auto const maybe_f_got = triangulatePoint(features, pose_sequence);
     REQUIRE(static_cast<bool>(maybe_f_got));
 
     auto const& f_got = *maybe_f_got;

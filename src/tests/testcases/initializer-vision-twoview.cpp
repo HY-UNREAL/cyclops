@@ -39,8 +39,8 @@ namespace cyclops::initializer {
 
       GIVEN("Random-generated landmarks and their two-view observations") {
         auto rgen = std::make_shared<std::mt19937>(20240513004);
-        auto landmarks = generate_landmarks(
-          views::ints(0, 200) | ranges::to<set<landmark_id_t>>,
+        auto landmarks = generateLandmarks(
+          views::ints(0, 200) | ranges::to<set<LandmarkID>>,
           [&](auto _) -> Vector3d {
             auto dist = std::uniform_real_distribution<>(-1, 1);
             Vector3d const origin = Vector3d(0.5, 0., 1);
@@ -48,11 +48,11 @@ namespace cyclops::initializer {
               0.5 * Vector3d(dist(*rgen), dist(*rgen), dist(*rgen));
           });
 
-        auto view0 = generate_landmark_observations(
+        auto view0 = generateLandmarkObservations(
           Matrix3d::Identity(), Vector3d::Zero(), landmarks);
-        auto view1 = generate_landmark_observations(R, p, landmarks);
+        auto view1 = generateLandmarkObservations(R, p, landmarks);
 
-        auto correspondence = two_view_correspondence_data_t {
+        auto correspondence = TwoViewCorrespondenceData {
           .rotation_prior =
             {Eigen::Quaterniond(R), 1e-6 * Matrix3d::Identity()},
           .features =
@@ -64,12 +64,12 @@ namespace cyclops::initializer {
 
               return std::make_pair(landmark_id, feature_pair);
             }) |
-            ranges::to<std::map<landmark_id_t, two_view_feature_pair_t>>,
+            ranges::to<std::map<LandmarkID, TwoViewFeaturePair>>,
         };
 
         WHEN("Solved for possible motion geometry") {
-          auto config = make_default_config();
-          auto solver = TwoViewVisionGeometrySolver::create(config, rgen);
+          auto config = makeDefaultConfig();
+          auto solver = TwoViewVisionGeometrySolver::Create(config, rgen);
           auto possible_solutions = solver->solve(correspondence);
           REQUIRE_FALSE(possible_solutions.empty());
 

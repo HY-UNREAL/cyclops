@@ -27,7 +27,7 @@
 #include <mutex>
 
 namespace cyclops {
-  using maybe_frame_id_t = std::optional<frame_id_t>;
+  using MaybeFrameID = std::optional<FrameID>;
 
   using measurement::KeyframeManager;
   using measurement::MeasurementDataProvider;
@@ -36,7 +36,7 @@ namespace cyclops {
 
   using estimation::EstimationFrameworkMain;
   using estimation::EstimationSanityDiscriminator;
-  using estimation::IMUPropagationUpdateHandler;
+  using estimation::ImuPropagationUpdateHandler;
   using estimation::LikelihoodOptimizer;
   using estimation::MarginalizationManager;
   using estimation::StateVariableAccessor;
@@ -47,22 +47,22 @@ namespace cyclops {
     std::unique_ptr<MeasurementDataUpdater> _measurement_updater;
     std::unique_ptr<EstimationFrameworkMain> _estimation_core;
 
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
 
     std::atomic<bool> _reset_request = false;
     std::mutex mutable _imu_mutex;
     std::mutex mutable _landmark_mutex;
 
-    std::deque<image_data_t> _landmark_buffer;
-    timestamp_t _last_imu_timestamp = 0;
+    std::deque<ImageData> _landmark_buffer;
+    Timestamp _last_imu_timestamp = 0;
 
-    maybe_frame_id_t consumeLandmarkData(image_data_t const& data);
+    MaybeFrameID consumeLandmarkData(ImageData const& data);
 
-    maybe_frame_id_t insertLandmarkFrame(image_data_t const& data);
+    MaybeFrameID insertLandmarkFrame(ImageData const& data);
     void invokeOptimization();
-    void repropagate(frame_id_t frame, timestamp_t timestamp);
+    void repropagate(FrameID frame, Timestamp timestamp);
     bool checkOptimizerSanity();
-    std::optional<image_data_t> popActiveLandmark();
+    std::optional<ImageData> popActiveLandmark();
 
     void reset();
     bool handleResetRequest();
@@ -72,37 +72,37 @@ namespace cyclops {
       std::unique_ptr<StateVariableAccessor> state_accessor,
       std::unique_ptr<MeasurementDataUpdater> measurement_updater,
       std::unique_ptr<EstimationFrameworkMain> estimation_core,
-      std::shared_ptr<cyclops_global_config_t const> config);
+      std::shared_ptr<CyclopsConfig const> config);
 
-    cyclops_estimation_update_result_t updateEstimation() override;
+    EstimationUpdateResult updateEstimation() override;
 
-    void enqueueIMUData(imu_data_t const& imu) override;
-    void enqueueLandmarkData(image_data_t const& feature) override;
+    void enqueueImuData(ImuData const& imu) override;
+    void enqueueLandmarkData(ImageData const& feature) override;
     void enqueueResetRequest() override;
 
-    landmark_positions_t mappedLandmarks() const override;
-    std::map<frame_id_t, cyclops_keyframe_state_t> motions() const override;
-    std::optional<cyclops_propagation_state_t> propagation() const override;
+    LandmarkPositions mappedLandmarks() const override;
+    std::map<FrameID, KeyframeState> motions() const override;
+    std::optional<PropagationState> propagation() const override;
   };
 
   MainImpl::MainImpl(
     std::unique_ptr<StateVariableAccessor> state_accessor,
     std::unique_ptr<MeasurementDataUpdater> measurement_updater,
     std::unique_ptr<EstimationFrameworkMain> estimation_core,
-    std::shared_ptr<cyclops_global_config_t const> config)
+    std::shared_ptr<CyclopsConfig const> config)
       : _state_accessor(std::move(state_accessor)),
         _measurement_updater(std::move(measurement_updater)),
         _estimation_core(std::move(estimation_core)),
         _config(config) {
   }
 
-  void MainImpl::enqueueIMUData(imu_data_t const& data) {
+  void MainImpl::enqueueImuData(ImuData const& data) {
     std::scoped_lock _(_imu_mutex);
     _last_imu_timestamp = data.timestamp;
     _measurement_updater->updateImu(data);
   }
 
-  void MainImpl::enqueueLandmarkData(image_data_t const& data) {
+  void MainImpl::enqueueLandmarkData(ImageData const& data) {
     if (data.features.empty())
       return;
 
@@ -114,7 +114,7 @@ namespace cyclops {
     _reset_request = true;
   }
 
-  std::optional<image_data_t> MainImpl::popActiveLandmark() {
+  std::optional<ImageData> MainImpl::popActiveLandmark() {
     std::scoped_lock _(_imu_mutex, _landmark_mutex);
 
     auto current = _landmark_buffer.begin();
@@ -137,7 +137,7 @@ namespace cyclops {
     return std::nullopt;
   }
 
-  maybe_frame_id_t MainImpl::insertLandmarkFrame(image_data_t const& data) {
+  MaybeFrameID MainImpl::insertLandmarkFrame(ImageData const& data) {
     std::scoped_lock _(_imu_mutex, _landmark_mutex);
     return _measurement_updater->updateLandmark(data);
   }
@@ -147,7 +147,7 @@ namespace cyclops {
     _estimation_core->updateEstimation();
   }
 
-  void MainImpl::repropagate(frame_id_t frame, timestamp_t timestamp) {
+  void MainImpl::repropagate(FrameID frame, Timestamp timestamp) {
     std::scoped_lock _(_imu_mutex, _landmark_mutex);
     _measurement_updater->repropagate(frame, timestamp);
   }
@@ -157,7 +157,7 @@ namespace cyclops {
     return _estimation_core->sanity();
   }
 
-  maybe_frame_id_t MainImpl::consumeLandmarkData(image_data_t const& data) {
+  MaybeFrameID MainImpl::consumeLandmarkData(ImageData const& data) {
     auto tic = ::cyclops::tic();
 
     auto maybe_inserted_frame = insertLandmarkFrame(data);
@@ -187,9 +187,8 @@ namespace cyclops {
     return true;
   }
 
-  cyclops_estimation_update_result_t MainImpl::updateEstimation() {
-    cyclops_estimation_update_result_t result = {
-      .reset = false, .update_handles = {}};
+  EstimationUpdateResult MainImpl::updateEstimation() {
+    EstimationUpdateResult result = {.reset = false, .update_handles = {}};
 
     while (true) {
       auto maybe_data = popActiveLandmark();
@@ -204,7 +203,7 @@ namespace cyclops {
         continue;
 
       result.update_handles.emplace_back(
-        cyclops_image_update_handle_t {*maybe_inserted_frame, timestamp});
+        ImageUpdateHandle {*maybe_inserted_frame, timestamp});
 
       if (handleResetRequest())
         return {.reset = true, .update_handles = {}};
@@ -229,34 +228,33 @@ namespace cyclops {
     _estimation_core->reset();
   }
 
-  landmark_positions_t MainImpl::mappedLandmarks() const {
+  LandmarkPositions MainImpl::mappedLandmarks() const {
     std::scoped_lock _(_landmark_mutex);
     return _state_accessor->mappedLandmarks();
   }
 
-  std::map<frame_id_t, cyclops_keyframe_state_t> MainImpl::motions() const {
+  std::map<FrameID, KeyframeState> MainImpl::motions() const {
     std::scoped_lock _(_landmark_mutex);
     auto frames = _measurement_updater->frames();
 
-    std::map<frame_id_t, cyclops_keyframe_state_t> result;
+    std::map<FrameID, KeyframeState> result;
     for (auto [frame_id, timestamp] : frames) {
       auto maybe_x = _state_accessor->motionFrame(frame_id);
       if (!maybe_x.has_value())
         continue;
 
-      auto keyframe_state = cyclops_keyframe_state_t {
+      auto keyframe_state = KeyframeState {
         .timestamp = timestamp,
-        .acc_bias = estimation::acc_bias_of_motion_frame_block(*maybe_x),
-        .gyr_bias = estimation::gyr_bias_of_motion_frame_block(*maybe_x),
-        .motion_state =
-          estimation::motion_state_of_motion_frame_block(*maybe_x),
+        .acc_bias = estimation::getAccBias(*maybe_x),
+        .gyr_bias = estimation::getGyrBias(*maybe_x),
+        .motion_state = estimation::getMotionState(*maybe_x),
       };
       result.emplace(frame_id, keyframe_state);
     }
     return result;
   }
 
-  std::optional<cyclops_propagation_state_t> MainImpl::propagation() const {
+  std::optional<PropagationState> MainImpl::propagation() const {
     std::scoped_lock _(_imu_mutex);
 
     auto maybe_propagation = _state_accessor->propagatedState();
@@ -264,65 +262,64 @@ namespace cyclops {
       return std::nullopt;
 
     auto const& [timestamp, motion_state] = *maybe_propagation;
-    return cyclops_propagation_state_t {timestamp, motion_state};
+    return PropagationState {timestamp, motion_state};
   }
 
-  static void initialize_argument_defaults(cyclops_main_argument_t& args) {
+  static void initialize_argument_defaults(MainArgument& args) {
     if (!args.seed.has_value())
       args.seed = std::random_device()();
 
     if (args.optimizer_telemetry == nullptr)
-      args.optimizer_telemetry = OptimizerTelemetry::createDefault();
+      args.optimizer_telemetry = OptimizerTelemetry::CreateDefault();
 
     if (args.keyframe_telemetry == nullptr)
-      args.keyframe_telemetry = KeyframeTelemetry::createDefault();
+      args.keyframe_telemetry = KeyframeTelemetry::CreateDefault();
 
     if (args.initializer_telemetry == nullptr)
-      args.initializer_telemetry = InitializerTelemetry::createDefault();
+      args.initializer_telemetry = InitializerTelemetry::CreateDefault();
   }
 
-  std::unique_ptr<CyclopsMain> CyclopsMain::create(
-    cyclops_main_argument_t args) {
+  std::unique_ptr<CyclopsMain> CyclopsMain::Create(MainArgument args) {
     if (args.config == nullptr)
       return nullptr;
     initialize_argument_defaults(args);
     __logger__->debug("Running with seed: {}", args.seed.value());
 
     std::shared_ptr propagator =
-      IMUPropagationUpdateHandler::create(args.config);
+      ImuPropagationUpdateHandler::Create(args.config);
 
     auto state_accessor =
-      StateVariableAccessor::create(args.config, propagator);
+      StateVariableAccessor::Create(args.config, propagator);
     std::shared_ptr state_reader = state_accessor->deriveReader();
     std::shared_ptr state_writer = state_accessor->deriveWriter();
 
     std::shared_ptr data_provider =
-      MeasurementDataProvider::create(args.config, state_reader);
+      MeasurementDataProvider::Create(args.config, state_reader);
     std::shared_ptr frame_manager =
-      KeyframeManager::create(args.keyframe_telemetry);
+      KeyframeManager::Create(args.keyframe_telemetry);
 
-    std::shared_ptr data_queue = MeasurementDataQueue::create(
+    std::shared_ptr data_queue = MeasurementDataQueue::Create(
       args.config, data_provider, frame_manager, state_reader);
 
     auto rgen = std::make_shared<std::mt19937>(args.seed.value());
-    auto bootstrap_internal = initializer::InitializationSolverInternal::create(
+    auto bootstrap_internal = initializer::InitializationSolverInternal::Create(
       rgen, args.config, data_provider, args.initializer_telemetry);
-    auto bootstrap_solver = initializer::InitializerMain::create(
+    auto bootstrap_solver = initializer::InitializerMain::Create(
       std::move(bootstrap_internal), frame_manager, args.initializer_telemetry);
 
-    auto optimizer = LikelihoodOptimizer::create(
-      estimation::OptimizerSolutionGuessPredictor::create(
+    auto optimizer = LikelihoodOptimizer::Create(
+      estimation::OptimizerSolutionGuessPredictor::Create(
         std::move(bootstrap_solver), args.config, state_reader, data_provider),
       args.config, state_writer, data_provider);
-    auto estimation_core = EstimationFrameworkMain::create(
+    auto estimation_core = EstimationFrameworkMain::Create(
       std::move(optimizer),
-      MarginalizationManager::create(args.config, state_reader, data_queue),
-      EstimationSanityDiscriminator::create(
+      MarginalizationManager::Create(args.config, state_reader, data_queue),
+      EstimationSanityDiscriminator::Create(
         args.config, args.optimizer_telemetry));
 
     auto cyclops = std::make_unique<MainImpl>(
       std::move(state_accessor),
-      MeasurementDataUpdater::create(
+      MeasurementDataUpdater::Create(
         args.config, data_queue, propagator, state_reader),
       std::move(estimation_core), args.config);
     return std::move(cyclops);

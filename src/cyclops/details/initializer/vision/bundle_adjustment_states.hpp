@@ -7,11 +7,11 @@
 #include <functional>
 
 namespace cyclops {
-  struct se3_transform_t;
+  struct SE3Transform;
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct multiview_geometry_t;
+  struct MultiViewGeometry;
 
   class BundleAdjustmentCameraMotionStateBlock {
   private:
@@ -19,8 +19,7 @@ namespace cyclops::initializer {
       _data_block;
 
   public:
-    explicit BundleAdjustmentCameraMotionStateBlock(
-      se3_transform_t const& guess);
+    explicit BundleAdjustmentCameraMotionStateBlock(SE3Transform const& guess);
 
     Eigen::Map<Eigen::Quaterniond> orientation();
     Eigen::Map<Eigen::Quaterniond const> orientation() const;
@@ -36,7 +35,7 @@ namespace cyclops::initializer {
     static Eigen::Map<Eigen::Vector3d> position(double* data);
     static Eigen::Map<Eigen::Vector3d const> position(double const* data);
 
-    se3_transform_t asSE3Transform() const;
+    SE3Transform asSE3Transform() const;
   };
 
   class BundleAdjustmentLandmarkPositionStateBlock {
@@ -63,16 +62,16 @@ namespace cyclops::initializer {
     using LandmarkBlock = BundleAdjustmentLandmarkPositionStateBlock;
 
     explicit BundleAdjustmentOptimizationState(
-      multiview_geometry_t const& initial_guess);
+      MultiViewGeometry const& initial_guess);
 
-    std::map<frame_id_t, MotionBlock> camera_motions;
-    std::map<landmark_id_t, LandmarkBlock> landmark_positions;
+    std::map<FrameID, MotionBlock> camera_motions;
+    std::map<LandmarkID, LandmarkBlock> landmark_positions;
 
     using MotionBlockRef = std::reference_wrapper<MotionBlock>;
     using MotionBlockRefPair = std::tuple<MotionBlockRef, MotionBlockRef>;
 
     std::optional<MotionBlockRefPair> normalize();
 
-    multiview_geometry_t as_multi_view_geometry() const;
+    MultiViewGeometry asMultiViewGeometry() const;
   };
 }  // namespace cyclops::initializer

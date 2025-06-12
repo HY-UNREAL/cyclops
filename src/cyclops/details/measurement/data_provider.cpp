@@ -19,41 +19,41 @@ namespace cyclops::measurement {
 
   class MeasurementDataProviderImpl: public MeasurementDataProvider {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<StateVariableReadAccessor const> _state;
 
-    imu_motions_t _imu_motions;
-    feature_tracks_t _feature_tracks;
+    ImuMotions _imu_motions;
+    FeatureTracks _feature_tracks;
 
-    void updateLandmark(frame_id_t frame_id, image_data_t const& image_data);
+    void updateLandmark(FrameID frame_id, ImageData const& image_data);
 
   public:
     MeasurementDataProviderImpl(
-      std::shared_ptr<cyclops_global_config_t const> config,
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<StateVariableReadAccessor const> state);
     ~MeasurementDataProviderImpl();
     void reset() override;
 
-    void updateFrame(frame_id_t frame_id, image_data_t const& image) override;
+    void updateFrame(FrameID frame_id, ImageData const& image) override;
     void updateFrame(
-      frame_id_t prev_frame_id, frame_id_t curr_frame_id,
-      image_data_t const& image, IMUPreintegration::UniquePtr imu) override;
+      FrameID prev_frame_id, FrameID curr_frame_id, ImageData const& image,
+      ImuPreintegration::UniquePtr imu) override;
 
     void updateImuBias() override;
     void updateImuBias(
       Vector3d const& bias_acc, Vector3d const& bias_gyr) override;
 
     void marginalize(
-      frame_id_t drop_frame, set<landmark_id_t> const& drop_landmarks) override;
+      FrameID drop_frame, set<LandmarkID> const& drop_landmarks) override;
 
-    imu_motions_t const& imu() const override;
-    feature_tracks_t const& tracks() const override;
+    ImuMotions const& imu() const override;
+    FeatureTracks const& tracks() const override;
   };
 
   MeasurementDataProviderImpl::~MeasurementDataProviderImpl() = default;
 
   MeasurementDataProviderImpl::MeasurementDataProviderImpl(
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<StateVariableReadAccessor const> state)
       : _config(config), _state(state) {
   }
@@ -64,19 +64,19 @@ namespace cyclops::measurement {
   }
 
   void MeasurementDataProviderImpl::updateLandmark(
-    frame_id_t frame_id, image_data_t const& image) {
+    FrameID frame_id, ImageData const& image) {
     for (auto const& [feature_id, feature] : image.features)
       _feature_tracks[feature_id].emplace(frame_id, feature);
   }
 
   void MeasurementDataProviderImpl::updateFrame(
-    frame_id_t frame_id, image_data_t const& image) {
+    FrameID frame_id, ImageData const& image) {
     updateLandmark(frame_id, image);
   }
 
   void MeasurementDataProviderImpl::updateFrame(
-    frame_id_t prev_frame_id, frame_id_t curr_frame_id,
-    image_data_t const& image_data, IMUPreintegration::UniquePtr imu_data) {
+    FrameID prev_frame_id, FrameID curr_frame_id, ImageData const& image_data,
+    ImuPreintegration::UniquePtr imu_data) {
     updateLandmark(curr_frame_id, image_data);
     _imu_motions.push_back({
       .from = prev_frame_id,
@@ -101,8 +101,8 @@ namespace cyclops::measurement {
       }
       auto const& [_, x] = *i;
 
-      auto b_a = estimation::acc_bias_of_motion_frame_block(x);
-      auto b_w = estimation::gyr_bias_of_motion_frame_block(x);
+      auto b_a = estimation::getAccBias(x);
+      auto b_w = estimation::getGyrBias(x);
       __logger__->trace(
         "Updating IMU bias for frame {} -> {}: {}, {}", imu_motion.from,
         imu_motion.to, b_a.transpose(), b_w.transpose());
@@ -118,7 +118,7 @@ namespace cyclops::measurement {
   }
 
   void MeasurementDataProviderImpl::marginalize(
-    frame_id_t drop_frame, set<landmark_id_t> const& drop_landmarks) {
+    FrameID drop_frame, set<LandmarkID> const& drop_landmarks) {
     ranges::actions::remove_if(_imu_motions, [&](auto const& _) {
       return _.from == drop_frame || _.to == drop_frame;
     });
@@ -138,16 +138,16 @@ namespace cyclops::measurement {
     }
   }
 
-  imu_motions_t const& MeasurementDataProviderImpl::imu() const {
+  ImuMotions const& MeasurementDataProviderImpl::imu() const {
     return _imu_motions;
   }
 
-  feature_tracks_t const& MeasurementDataProviderImpl::tracks() const {
+  FeatureTracks const& MeasurementDataProviderImpl::tracks() const {
     return _feature_tracks;
   }
 
-  std::unique_ptr<MeasurementDataProvider> MeasurementDataProvider::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  std::unique_ptr<MeasurementDataProvider> MeasurementDataProvider::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<StateVariableReadAccessor const> state) {
     return std::make_unique<MeasurementDataProviderImpl>(config, state);
   }

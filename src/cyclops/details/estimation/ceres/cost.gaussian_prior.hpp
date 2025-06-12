@@ -7,10 +7,10 @@
 
 namespace cyclops::estimation {
   class GaussianPriorCost: public ceres::CostFunction {
-    gaussian_prior_t _prior;
+    GaussianPrior _prior;
 
   public:
-    explicit GaussianPriorCost(gaussian_prior_t prior);
+    explicit GaussianPriorCost(GaussianPrior prior);
     bool Evaluate(
       double const* const* parameters, double* residuals,
       double** jacobians) const override;

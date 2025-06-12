@@ -21,7 +21,7 @@ namespace cyclops {
     return result;
   }
 
-  vector3_signal_t bezier(double T, std::vector<Vector3d> const& points) {
+  Vector3Signal bezier(double T, std::vector<Vector3d> const& points) {
     if (points.size() < 2)
       throw points;
 

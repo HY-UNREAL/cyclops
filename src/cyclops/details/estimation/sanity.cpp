@@ -9,7 +9,7 @@ namespace cyclops::estimation {
   class EstimationSanityDiscriminatorImpl:
       public EstimationSanityDiscriminator {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<telemetry::OptimizerTelemetry> _telemetry;
 
     bool _sanity = true;
@@ -21,14 +21,14 @@ namespace cyclops::estimation {
 
   public:
     EstimationSanityDiscriminatorImpl(
-      std::shared_ptr<cyclops_global_config_t const> config,
-      std::shared_ptr<telemetry::OptimizerTelemetry> sanity_telemetry);
+      std::shared_ptr<CyclopsConfig const> config,
+      std::shared_ptr<telemetry::OptimizerTelemetry> telemetry);
 
     void reset() override;
 
     void update(
-      landmark_sanity_statistics_t const& landmark_sanity,
-      optimizer_sanity_statistics_t const& optimizer_sanity) override;
+      LandmarkSanityStatistics const& landmark_sanity,
+      OptimizerSanityStatistics const& optimizer_sanity) override;
     bool sanity() const override;
   };
 
@@ -40,9 +40,9 @@ namespace cyclops::estimation {
     _telemetry->reset();
   }
 
-  static auto make_sanity_statistics_telemetry_report(
-    landmark_sanity_statistics_t const& landmark_sanity,
-    optimizer_sanity_statistics_t const& optimizer_sanity) {
+  static auto makeTelemetryReport(
+    LandmarkSanityStatistics const& landmark_sanity,
+    OptimizerSanityStatistics const& optimizer_sanity) {
     auto [cost, num_residuals, num_parameters] = optimizer_sanity;
     auto n_landmarks = landmark_sanity.landmark_observations;
 
@@ -53,10 +53,10 @@ namespace cyclops::estimation {
     double depth_failures = landmark_sanity.depth_threshold_failures;
     double mnorm_failures = landmark_sanity.mnorm_threshold_failures;
 
-    return telemetry::OptimizerTelemetry::sanity_statistics_t {
+    return telemetry::OptimizerTelemetry::SanityStatistics {
       .final_cost = cost,
       .final_cost_significant_probability =
-        1. - chi_squared_cdf(degrees_of_freedom, cost),
+        1. - chiSquaredCdf(degrees_of_freedom, cost),
 
       .landmark_observations = n_landmarks,
       .landmark_accept_rate = landmark_accepts / n_landmarks,
@@ -100,24 +100,22 @@ namespace cyclops::estimation {
   }
 
   void EstimationSanityDiscriminatorImpl::update(
-    landmark_sanity_statistics_t const& landmark_sanity,
-    optimizer_sanity_statistics_t const& optimizer_sanity) {
-    auto sanity_statistics_report = make_sanity_statistics_telemetry_report(
-      landmark_sanity, optimizer_sanity);
-    _telemetry->onSanityStatistics(sanity_statistics_report);
+    LandmarkSanityStatistics const& landmark_sanity,
+    OptimizerSanityStatistics const& optimizer_sanity) {
+    auto sanity_report = makeTelemetryReport(landmark_sanity, optimizer_sanity);
+    _telemetry->onSanityStatistics(sanity_report);
 
     auto final_cost_bad = updateFinalCostSanityBadness(
-      sanity_statistics_report.final_cost_significant_probability);
+      sanity_report.final_cost_significant_probability);
     auto landmark_bad = updateLandmarkSanityBadness(
-      sanity_statistics_report.landmark_accept_rate,
-      landmark_sanity.landmark_accepts);
+      sanity_report.landmark_accept_rate, landmark_sanity.landmark_accepts);
 
     if (landmark_bad || final_cost_bad) {
-      auto reason = telemetry::OptimizerTelemetry::bad_reason_t {
+      auto reason = telemetry::OptimizerTelemetry::BadReason {
         .bad_landmark_update = landmark_bad,
         .bad_final_cost = final_cost_bad,
       };
-      _telemetry->onSanityBad(reason, sanity_statistics_report);
+      _telemetry->onSanityBad(reason, sanity_report);
     }
 
     auto const& threshold = _config->estimation.fault_detection;
@@ -129,11 +127,11 @@ namespace cyclops::estimation {
       _final_cost_sanity_failure_count > max_final_cost_failure;
 
     if (landmark_failed || final_cost_failed) {
-      auto reason = telemetry::OptimizerTelemetry::failure_reason_t {
+      auto reason = telemetry::OptimizerTelemetry::FailureReason {
         .continued_bad_landmark_update = landmark_failed,
         .continued_bad_final_cost = final_cost_failed,
       };
-      _telemetry->onSanityFailure(reason, sanity_statistics_report);
+      _telemetry->onSanityFailure(reason, sanity_report);
       _sanity = false;
     } else {
       _sanity = true;
@@ -145,14 +143,14 @@ namespace cyclops::estimation {
   }
 
   EstimationSanityDiscriminatorImpl::EstimationSanityDiscriminatorImpl(
-    std::shared_ptr<cyclops_global_config_t const> config,
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::OptimizerTelemetry> telemetry)
       : _config(config), _telemetry(telemetry) {
   }
 
   std::unique_ptr<EstimationSanityDiscriminator>
-  EstimationSanityDiscriminator::create(
-    std::shared_ptr<cyclops_global_config_t const> config,
+  EstimationSanityDiscriminator::Create(
+    std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::OptimizerTelemetry> telemetry) {
     return std::make_unique<EstimationSanityDiscriminatorImpl>(
       config, telemetry);

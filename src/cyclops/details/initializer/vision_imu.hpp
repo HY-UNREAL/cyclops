@@ -1,13 +1,14 @@
 #pragma once
 
-#include "cyclops/details/measurement/type.hpp"
+#include "cyclops/details/initializer/vision_imu/rotation.hpp"
+#include "cyclops/details/initializer/vision_imu/translation.hpp"
 
 #include <map>
 #include <memory>
 #include <optional>
 
 namespace cyclops {
-  struct cyclops_global_config_t;
+  struct CyclopsConfig;
 }
 
 namespace cyclops::telemetry {
@@ -15,31 +16,24 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct vision_bootstrap_solution_t;
+  struct MSfMSolution;
 
-  struct imu_bootstrap_solution_t {
-    bool accept;
-    double cost;
-    double scale;
-    Eigen::Vector3d gravity;
-    Eigen::Vector3d gyr_bias;
-    Eigen::Vector3d acc_bias;
-
-    landmark_positions_t landmarks;
-    std::map<frame_id_t, imu_motion_state_t> motions;
+  struct ImuMatchSolution {
+    ImuRotationMatch rotation_match;
+    ImuTranslationMatch translation_match;
   };
 
-  class IMUBootstrapSolver {
+  class ImuMatchSolver {
   public:
-    virtual ~IMUBootstrapSolver() = default;
+    virtual ~ImuMatchSolver() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<imu_bootstrap_solution_t> solve(
-      vision_bootstrap_solution_t const& sfm_solution,
-      measurement::imu_motion_refs_t const& imu_motions) = 0;
+    virtual std::optional<ImuMatchSolution> solve(
+      MSfMSolution const& msfm,
+      measurement::ImuMotionRefs const& imu_motions) = 0;
 
-    static std::unique_ptr<IMUBootstrapSolver> create(
-      std::shared_ptr<cyclops_global_config_t const> config,
+    static std::unique_ptr<ImuMatchSolver> Create(
+      std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };
 }  // namespace cyclops::initializer

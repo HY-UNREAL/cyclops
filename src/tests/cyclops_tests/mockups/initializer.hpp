@@ -13,17 +13,18 @@ namespace cyclops::estimation {
       public OptimizerSolutionGuessPredictor {
   private:
     std::shared_ptr<std::mt19937> _rgen;
-    landmark_positions_t _landmarks;
-    std::map<frame_id_t, imu_motion_state_t> _motions;
+
+    LandmarkPositions _landmarks;
+    std::map<FrameID, ImuMotionState> _motions;
 
   public:
     OptimizerSolutionGuessPredictorMock(
-      std::shared_ptr<std::mt19937> rgen, landmark_positions_t const& landmarks,
-      pose_signal_t const& pose_signal,
-      std::map<frame_id_t, timestamp_t> frame_timestamps);
+      std::shared_ptr<std::mt19937> rgen, LandmarkPositions const& landmarks,
+      PoseSignal const& pose_signal,
+      std::map<FrameID, Timestamp> frame_timestamps);
 
     void reset() override;
 
-    std::optional<solution_t> solve() override;
+    std::optional<Solution> solve() override;
   };
 }  // namespace cyclops::estimation

@@ -6,65 +6,66 @@
 #include <variant>
 
 namespace cyclops::estimation {
-  struct node_t {
-    struct frame_t {
-      frame_id_t id;
+  struct Node {
+    struct Frame {
+      FrameID id;
 
       int dimension() const;
-      int manifold_dimension() const;
+      int localDimension() const;
     };
 
-    struct bias_t {
-      frame_id_t id;
+    struct Bias {
+      FrameID id;
 
       int dimension() const;
-      int manifold_dimension() const;
+      int localDimension() const;
     };
 
-    struct landmark_t {
-      landmark_id_t id;
+    struct Landmark {
+      LandmarkID id;
 
       int dimension() const;
-      int manifold_dimension() const;
+      int localDimension() const;
     };
 
-    std::variant<frame_t, bias_t, landmark_t> variant;
+    std::variant<Frame, Bias, Landmark> variant;
 
-    bool operator<(node_t const& other) const;
-    bool operator==(node_t const& other) const;
+    bool operator<(Node const& other) const;
+    bool operator==(Node const& other) const;
+
     int dimension() const;
-    int manifold_dimension() const;
+    int localDimension() const;
 
     template <size_t i>
-    using variant_t_at =
-      std::variant_alternative_t<i, decltype(node_t::variant)>;
+    using VariantTypeOfIndex =
+      std::variant_alternative_t<i, decltype(Node::variant)>;
   };
 
   namespace node {
-    static inline node_t frame(frame_id_t id) {
-      return {node_t::frame_t {id}};
+    static inline Node makeFrame(FrameID id) {
+      return {Node::Frame {id}};
     }
 
-    static inline node_t bias(frame_id_t id) {
-      return {node_t::bias_t {id}};
+    static inline Node makeBias(FrameID id) {
+      return {Node::Bias {id}};
     }
 
-    static inline node_t landmark(landmark_id_t id) {
-      return {node_t::landmark_t {id}};
+    static inline Node makeLandmark(LandmarkID id) {
+      return {Node::Landmark {id}};
     }
 
     template <typename type>
-    static bool is(node_t const& node) {
+    static bool is(Node const& node) {
       return std::holds_alternative<type>(node.variant);
     }
   }  // namespace node
 
-  bool operator<(node_t::frame_t const& a, node_t::frame_t const& b);
-  bool operator<(node_t::bias_t const& a, node_t::bias_t const& b);
-  bool operator<(node_t::landmark_t const& a, node_t::landmark_t const& b);
-  bool operator==(node_t::frame_t const& a, node_t::frame_t const& b);
-  bool operator==(node_t::bias_t const& a, node_t::bias_t const& b);
-  bool operator==(node_t::landmark_t const& a, node_t::landmark_t const& b);
+  bool operator<(Node::Frame const& a, Node::Frame const& b);
+  bool operator<(Node::Bias const& a, Node::Bias const& b);
+  bool operator<(Node::Landmark const& a, Node::Landmark const& b);
+  bool operator==(Node::Frame const& a, Node::Frame const& b);
+  bool operator==(Node::Bias const& a, Node::Bias const& b);
+  bool operator==(Node::Landmark const& a, Node::Landmark const& b);
 
-  std::ostream& operator<<(std::ostream&, node_t const&);
+  std::ostream& operator<<(std::ostream&, Node const&);
 }  // namespace cyclops::estimation

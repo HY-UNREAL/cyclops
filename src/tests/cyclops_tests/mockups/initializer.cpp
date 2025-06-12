@@ -7,14 +7,14 @@
 namespace cyclops::estimation {
   namespace views = ranges::views;
 
-  using estimation::landmark_parameter_blocks_t;
-  using estimation::motion_frame_parameter_blocks_t;
+  using estimation::LandmarkParameterBlocks;
+  using estimation::MotionFrameParameterBlocks;
 
-  static auto make_local_landmarks(
-    landmark_positions_t const& landmarks, pose_signal_t const& pose_signal,
-    std::map<frame_id_t, timestamp_t> frame_timestamps) {
+  static auto makeLocalLandmarks(
+    LandmarkPositions const& landmarks, PoseSignal const& pose_signal,
+    std::map<FrameID, Timestamp> frame_timestamps) {
     if (frame_timestamps.empty())
-      return landmark_positions_t {};
+      return LandmarkPositions {};
 
     auto [_, t0] = *frame_timestamps.begin();
     auto x0 = pose_signal.evaluate(t0);
@@ -27,14 +27,14 @@ namespace cyclops::estimation {
         auto f_bar = (q0.conjugate() * (f - p0)).eval();
         return std::make_pair(landmark_id, f_bar);
       }) |
-      ranges::to<landmark_positions_t>;
+      ranges::to<LandmarkPositions>;
   }
 
-  static auto make_motion_state_lookup(
-    pose_signal_t const& pose_signal,
-    std::map<frame_id_t, timestamp_t> frame_timestamps) {
+  static auto makeMotionStateLookup(
+    PoseSignal const& pose_signal,
+    std::map<FrameID, Timestamp> frame_timestamps) {
     if (frame_timestamps.empty())
-      return std::map<frame_id_t, imu_motion_state_t> {};
+      return std::map<FrameID, ImuMotionState> {};
 
     auto [_, t0] = *frame_timestamps.begin();
     auto x0 = pose_signal.evaluate(t0);
@@ -43,36 +43,36 @@ namespace cyclops::estimation {
 
     auto const& p = pose_signal.position;
     auto const& q = pose_signal.orientation;
-    auto v = numeric_derivative(p);
+    auto v = numericDerivative(p);
 
     return  //
       frame_timestamps | views::transform([&](auto pair) {
         auto const& [frame_id, t] = pair;
-        auto x = imu_motion_state_t {
+        auto x = ImuMotionState {
           .orientation = q0.conjugate() * q(t),
           .position = q0.conjugate() * (p(t) - p0),
           .velocity = q0.conjugate() * v(t),
         };
         return std::make_pair(frame_id, x);
       }) |
-      ranges::to<std::map<frame_id_t, imu_motion_state_t>>;
+      ranges::to<std::map<FrameID, ImuMotionState>>;
   }
 
   OptimizerSolutionGuessPredictorMock::OptimizerSolutionGuessPredictorMock(
-    std::shared_ptr<std::mt19937> rgen, landmark_positions_t const& landmarks,
-    pose_signal_t const& pose_signal,
-    std::map<frame_id_t, timestamp_t> frame_timestamps)
+    std::shared_ptr<std::mt19937> rgen, LandmarkPositions const& landmarks,
+    PoseSignal const& pose_signal,
+    std::map<FrameID, Timestamp> frame_timestamps)
       : _rgen(rgen),
         _landmarks(
-          make_local_landmarks(landmarks, pose_signal, frame_timestamps)),
-        _motions(make_motion_state_lookup(pose_signal, frame_timestamps)) {
+          makeLocalLandmarks(landmarks, pose_signal, frame_timestamps)),
+        _motions(makeMotionStateLookup(pose_signal, frame_timestamps)) {
   }
 
   void OptimizerSolutionGuessPredictorMock::reset() {
     // does nothing.
   }
 
-  std::optional<OptimizerSolutionGuessPredictor::solution_t>
+  std::optional<OptimizerSolutionGuessPredictor::Solution>
   OptimizerSolutionGuessPredictorMock::solve() {
     if (_motions.empty())
       return std::nullopt;
@@ -83,18 +83,18 @@ namespace cyclops::estimation {
         auto const& [id, motion] = id_motion;
         double const perturbation = id == initial_frame_id ? 0. : 0.05;
         return std::make_pair(
-          id, make_perturbated_frame_state(motion, perturbation, *_rgen));
+          id, makePerturbatedFrameState(motion, perturbation, *_rgen));
       }) |
-      ranges::to<motion_frame_parameter_blocks_t>;
+      ranges::to<MotionFrameParameterBlocks>;
 
     auto landmarks =
       _landmarks | views::transform([&](auto const& id_landmark) {
         auto const& [id, landmark] = id_landmark;
         return std::make_pair(
-          id, make_perturbated_landmark_state(landmark, 0.05, *_rgen));
+          id, makePerturbatedLandmarkState(landmark, 0.05, *_rgen));
       }) |
-      ranges::to<landmark_parameter_blocks_t>;
+      ranges::to<LandmarkParameterBlocks>;
 
-    return solution_t {motions, landmarks};
+    return Solution {motions, landmarks};
   }
 }  // namespace cyclops::estimation

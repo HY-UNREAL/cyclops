@@ -5,12 +5,11 @@ namespace cyclops::telemetry {
     // Nothing
   }
 
-  void KeyframeTelemetry::onNewMotionFrame(
-    on_new_motion_frame_argument_t const& argument) {
+  void KeyframeTelemetry::onNewMotionFrame(OnNewMotionFrame const& argument) {
     // nothing.
   }
 
-  std::unique_ptr<KeyframeTelemetry> KeyframeTelemetry::createDefault() {
+  std::unique_ptr<KeyframeTelemetry> KeyframeTelemetry::CreateDefault() {
     return std::make_unique<KeyframeTelemetry>();
   }
 }  // namespace cyclops::telemetry

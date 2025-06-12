@@ -8,7 +8,7 @@
 
 namespace cyclops {
   template <typename value_t>
-  static std::string set_to_string(std::set<value_t> const& s) {
+  static std::string setToString(std::set<value_t> const& s) {
     if (s.empty())
       return "{}";
 
@@ -24,14 +24,14 @@ namespace cyclops {
   }
 
   template <typename vectorxd_t>
-  static std::string vector_to_string(vectorxd_t const& v) {
+  static std::string vectorToString(vectorxd_t const& v) {
     std::ostringstream ss;
     ss << v.transpose();
     return ss.str();
   }
 
   template <typename matrixxd_t>
-  static std::string matrix_to_string(matrixxd_t const& M) {
+  static std::string matrixToString(matrixxd_t const& M) {
     std::ostringstream ss;
     ss << M;
     return ss.str();

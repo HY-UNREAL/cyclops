@@ -15,27 +15,26 @@ namespace cyclops::initializer {
   class TwoViewMotionHypothesisSelectorImpl:
       public TwoViewMotionHypothesisSelector {
   private:
-    std::shared_ptr<cyclops_global_config_t const> _config;
+    std::shared_ptr<CyclopsConfig const> _config;
 
     bool testMotionIMURotationPrior(
-      rotation_translation_matrix_pair_t const& motion,
-      two_view_imu_rotation_data_t const& imu_prior) const;
+      RotationPositionPair const& motion,
+      TwoViewImuRotationData const& imu_prior) const;
     bool testTriangulationSuccess(
-      two_view_triangulation_t const& triangulation, int inliers) const;
+      TwoViewTriangulation const& triangulation, int inliers) const;
 
   public:
     explicit TwoViewMotionHypothesisSelectorImpl(
-      std::shared_ptr<cyclops_global_config_t const> config);
+      std::shared_ptr<CyclopsConfig const> config);
     void reset() override;
 
-    std::vector<two_view_geometry_t> selectPossibleMotions(
-      motion_hypotheses_t const& motions,
-      two_view_feature_set_t const& image_data, inlier_set_t const& inliers,
-      two_view_imu_rotation_data_t const& prior) override;
+    std::vector<TwoViewGeometry> selectPossibleMotions(
+      MotionHypotheses const& motions, TwoViewFeatureSet const& image_data,
+      InlierSet const& inliers, TwoViewImuRotationData const& prior) override;
   };
 
   TwoViewMotionHypothesisSelectorImpl::TwoViewMotionHypothesisSelectorImpl(
-    std::shared_ptr<cyclops_global_config_t const> config)
+    std::shared_ptr<CyclopsConfig const> config)
       : _config(config) {
   }
 
@@ -43,31 +42,31 @@ namespace cyclops::initializer {
     // Does nothing
   }
 
-  static Eigen::Vector3d log_so3(Eigen::Matrix3d const& R) {
+  static Eigen::Vector3d so3Log(Eigen::Matrix3d const& R) {
     auto w = Eigen::AngleAxisd(R);
     return w.angle() * w.axis();
   }
 
   bool TwoViewMotionHypothesisSelectorImpl::testMotionIMURotationPrior(
-    rotation_translation_matrix_pair_t const& motion,
-    two_view_imu_rotation_data_t const& imu_prior) const {
+    RotationPositionPair const& motion,
+    TwoViewImuRotationData const& imu_prior) const {
     auto const& vision_config = _config->initialization.vision;
     auto const& hypothesis_config = vision_config.two_view.motion_hypothesis;
     auto min_p_value = hypothesis_config.min_imu_rotation_consistency_p_value;
 
     auto R_hat = imu_prior.value.matrix().eval();
-    auto v = log_so3(R_hat.transpose() * motion.rotation);
+    auto v = so3Log(R_hat.transpose() * motion.rotation);
 
     auto llt = Eigen::LDLT<Eigen::Matrix3d>(imu_prior.covariance);
     auto error = v.dot(llt.solve(v));
 
-    auto p_value = 1.0 - chi_squared_cdf(3, error);
+    auto p_value = 1.0 - chiSquaredCdf(3, error);
 
     return p_value > min_p_value;
   }
 
   bool TwoViewMotionHypothesisSelectorImpl::testTriangulationSuccess(
-    two_view_triangulation_t const& triangulation, int inliers) const {
+    TwoViewTriangulation const& triangulation, int inliers) const {
     auto const& config =
       _config->initialization.vision.two_view.motion_hypothesis;
 
@@ -80,10 +79,10 @@ namespace cyclops::initializer {
     return success >= min_success;
   }
 
-  std::vector<two_view_geometry_t>
+  std::vector<TwoViewGeometry>
   TwoViewMotionHypothesisSelectorImpl::selectPossibleMotions(
-    motion_hypotheses_t const& motions, two_view_feature_set_t const& features,
-    inlier_set_t const& inliers, two_view_imu_rotation_data_t const& prior) {
+    MotionHypotheses const& motions, TwoViewFeatureSet const& features,
+    InlierSet const& inliers, TwoViewImuRotationData const& prior) {
     __logger__->debug("Selecting best two-view motion hypothesis");
     __logger__->debug("Motion candidates: {}", motions.size());
 
@@ -103,7 +102,7 @@ namespace cyclops::initializer {
 
     auto motion_triangulations =
       motions_filtered | views::transform([&](auto const& motion) {
-        auto triangulation = triangulate_two_view_feature_pairs(
+        auto triangulation = triangulateTwoViewFeaturePairs(
           _config->initialization.vision, features, inliers, motion);
         return std::make_tuple(motion, triangulation);
       }) |
@@ -122,8 +121,8 @@ namespace cyclops::initializer {
       successed_motion_triangulations | views::transform([](auto const& pair) {
         auto const& [motion, triangulation] = pair;
         auto const& [R, p] = motion;
-        return two_view_geometry_t {
-          .camera_motion = se3_transform_t {p, Eigen::Quaterniond(R)},
+        return TwoViewGeometry {
+          .camera_motion = SE3Transform {p, Eigen::Quaterniond(R)},
           .landmarks = triangulation.landmarks,
         };
       }) |
@@ -131,8 +130,8 @@ namespace cyclops::initializer {
   }
 
   std::unique_ptr<TwoViewMotionHypothesisSelector>
-  TwoViewMotionHypothesisSelector::create(
-    std::shared_ptr<cyclops_global_config_t const> config) {
+  TwoViewMotionHypothesisSelector::Create(
+    std::shared_ptr<CyclopsConfig const> config) {
     return std::make_unique<TwoViewMotionHypothesisSelectorImpl>(config);
   }
 }  // namespace cyclops::initializer

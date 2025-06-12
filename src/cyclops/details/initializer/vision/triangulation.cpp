@@ -12,7 +12,7 @@ namespace cyclops::initializer {
 
   using Matrix34d = Eigen::Matrix<double, 3, 4>;
 
-  static std::tuple<Vector2d, Vector2d> correct_triangulation_point(
+  static std::tuple<Vector2d, Vector2d> correctTriangulationPoint(
     Vector2d const& u1_hat, Vector2d const& u2_hat, Matrix3d const& R,
     Vector3d const& p, int max_iterations = 4) {
     auto u1 = u1_hat;
@@ -56,7 +56,7 @@ namespace cyclops::initializer {
   // `numerator`: the numerator quadratic n[0:2] in (†).
   // `denominator`: the denominator quadratic d[0:2] in (†).
   //
-  struct triangulation_second_view_projection_error_cost_t {
+  struct TriangulationSecondViewProjectionErrorCost {
     std::array<double, 3> numerator;
     std::array<double, 3> denominator;
 
@@ -102,8 +102,8 @@ namespace cyclops::initializer {
   // Here, both the numerator and the denominator of (‡) are quadratic
   // polynomials.
   //
-  static triangulation_second_view_projection_error_cost_t
-  analyze_second_view_projection_error_cost(
+  static TriangulationSecondViewProjectionErrorCost
+  analyzeSecondViewProjectionErrorCost(
     Vector2d const& u1, Vector2d const& u2, Matrix3d const& R,
     Vector3d const& p) {
     auto A = R.leftCols<2>().eval();
@@ -130,7 +130,7 @@ namespace cyclops::initializer {
     };
   }
 
-  static auto analyze_expected_feature_distance_stddev(
+  static auto analyzeExpectedFeatureDistanceStddev(
     double sigma, Vector2d const& u1, double distance, Matrix3d const& R,
     Vector3d const& p) {
     auto z = (R.transpose() * (distance * u1.homogeneous() - p)).eval();
@@ -164,10 +164,10 @@ namespace cyclops::initializer {
   // We also evaluate lambda = ∞ and lambda = 0, then returns the optimal lambda
   // in the three optima candidates, (0, ∞, lambda^*).
   //
-  static std::optional<Vector3d> triangulate_point(
-    config::initializer::vision_solver_config_t const& config,
+  static std::optional<Vector3d> triangulatePoint(
+    config::initializer::VisionSolverConfig const& config,
     Vector2d const& u1_hat, Vector2d const& u2_hat,
-    rotation_translation_matrix_pair_t const& motion) {
+    RotationPositionPair const& motion) {
     auto const& sigma = config.feature_point_isotropic_noise;
     auto const& p_value_threshold =
       config.two_view.triangulation_acceptance.min_p_value;
@@ -176,17 +176,17 @@ namespace cyclops::initializer {
     auto p = motion.translation.normalized().eval();
     auto scale = motion.translation.norm();
 
-    auto [u1, u2] = correct_triangulation_point(u1_hat, u2_hat, R, p);
+    auto [u1, u2] = correctTriangulationPoint(u1_hat, u2_hat, R, p);
     auto du1 = (u1 - u1_hat).eval();
     auto du2 = (u2 - u2_hat).eval();
 
     auto correction_error = (du1.dot(du1) + du2.dot(du2)) / sigma / sigma;
-    auto correction_p_value = 1. - chi_squared_cdf(1, correction_error);
+    auto correction_p_value = 1. - chiSquaredCdf(1, correction_error);
 
     if (correction_p_value < p_value_threshold)
       return std::nullopt;
 
-    auto cost = analyze_second_view_projection_error_cost(u1, u2, R, p);
+    auto cost = analyzeSecondViewProjectionErrorCost(u1, u2, R, p);
 
     auto const& [n0, n1, n2] = cost.numerator;
     auto const& [d0, d1, d2] = cost.denominator;
@@ -239,7 +239,7 @@ namespace cyclops::initializer {
       }
     }();
 
-    auto depth_p_value = 1. - chi_squared_cdf(1, Q_optimal / sigma / sigma);
+    auto depth_p_value = 1. - chiSquaredCdf(1, Q_optimal / sigma / sigma);
     if (depth_p_value < p_value_threshold)
       return std::nullopt;
 
@@ -247,28 +247,28 @@ namespace cyclops::initializer {
       config.two_view.triangulation_acceptance.max_normalized_deviation;
 
     // Reject if the expected deviation of the distance is large.
-    auto distance_stddev = analyze_expected_feature_distance_stddev(
-      sigma, u1, distance_optimal, R, p);
+    auto distance_stddev =
+      analyzeExpectedFeatureDistanceStddev(sigma, u1, distance_optimal, R, p);
     if (distance_stddev > deviation_threshold * distance_optimal)
       return std::nullopt;
 
     return scale * distance_optimal * u1.homogeneous();
   }
 
-  two_view_triangulation_t triangulate_two_view_feature_pairs(
-    config::initializer::vision_solver_config_t const& config,
-    std::map<landmark_id_t, two_view_feature_pair_t> const& features,
-    std::set<landmark_id_t> const& feature_ids,
-    rotation_translation_matrix_pair_t const& motion) {
+  TwoViewTriangulation triangulateTwoViewFeaturePairs(
+    config::initializer::VisionSolverConfig const& config,
+    std::map<LandmarkID, TwoViewFeaturePair> const& features,
+    std::set<LandmarkID> const& feature_ids,
+    RotationPositionPair const& motion) {
     auto const& sigma = config.feature_point_isotropic_noise;
     auto const& p_value_threshold =
       config.two_view.triangulation_acceptance.min_p_value;
 
-    two_view_triangulation_t result = {0, 0, 0., {}};
+    TwoViewTriangulation result = {0, 0, 0., {}};
     for (auto feature_id : feature_ids) {
       auto const& [u1_hat, u2_hat] = features.at(feature_id);
 
-      auto maybe_f = triangulate_point(config, u1_hat, u2_hat, motion);
+      auto maybe_f = triangulatePoint(config, u1_hat, u2_hat, motion);
       if (!maybe_f) {
         result.n_triangulation_failure++;
         continue;
@@ -286,7 +286,7 @@ namespace cyclops::initializer {
 
       auto residual = (Vector4d() << r1, r2).finished().eval();
       auto cost = residual.dot(residual) / sigma / sigma;
-      auto cost_probability = 1. - chi_squared_cdf(1, cost);
+      auto cost_probability = 1. - chiSquaredCdf(1, cost);
 
       if (cost_probability < p_value_threshold) {
         result.n_error_probability_test_failure++;
