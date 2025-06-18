@@ -2,12 +2,16 @@ target_sources(cyclops
   PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.imu_only.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.imu_only.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/camera_motion_prior.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/camera_motion_prior.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/rotation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/rotation.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/translation.imu_only.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/translation.imu_only.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.cpp

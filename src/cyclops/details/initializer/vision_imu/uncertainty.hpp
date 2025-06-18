@@ -20,6 +20,13 @@ namespace cyclops::initializer {
     Eigen::VectorXd translation_scale_symmetric_deviation;
   };
 
+  std::optional<double> analyzeImuTranslationMatchCostProbability(
+    int residual_dimension, int parameter_dimension, double cost);
+
+  std::optional<ImuTranslationMatchUncertainty>
+  analyzeImuTranslationMatchUncertainty(
+    int frames_count, Eigen::MatrixXd const& hessian, double cost_p_value);
+
   std::optional<ImuTranslationMatchUncertainty>
   analyzeImuTranslationMatchUncertainty(
     ImuTranslationMatchAnalysis const& analysis,

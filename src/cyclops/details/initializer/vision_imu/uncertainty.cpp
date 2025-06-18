@@ -108,38 +108,23 @@ namespace cyclops::initializer {
     return true;
   }
 
-  std::optional<ImuTranslationMatchUncertainty>
-  analyzeImuTranslationMatchUncertainty(
-    ImuTranslationMatchAnalysis const& analysis,
-    ImuMatchScaleSampleSolution const& solution) {
-    __logger__->debug("Analyzing the uncertainty of imu match");
-
-    int degrees_of_freedom =
-      analysis.residual_dimension - analysis.parameter_dimension;
-    int frames = analysis.frames_count;
-
+  std::optional<double> analyzeImuTranslationMatchCostProbability(
+    int residual_dimension, int parameter_dimension, double cost) {
+    int degrees_of_freedom = residual_dimension - parameter_dimension;
     if (degrees_of_freedom <= 0)
       return std::nullopt;
 
-    auto const& [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analysis;
-    auto s = solution.scale;
-    auto const& x_I = solution.inertial_state;
-    auto const& x_V = solution.visual_state;
-
-    auto const& H = solution.hessian;
-    if (!checkHessianDimension(H, frames))
-      return std::nullopt;
-
-    auto r_I = (A_I * x_I + B_I * x_V * s + alpha + beta * s).eval();
-    auto r_V = (A_V * x_V).eval();
-    auto cost = r_I.dot(r_I) + r_V.dot(r_V);
-
-    __logger__->debug("IMU match (s = {}) solution residual:", s);
-    __logger__->debug("r_I = {}", r_I.transpose());
-    __logger__->debug("r_V = {}", r_V.transpose());
-
     __logger__->debug("Degrees of freedom: {}", degrees_of_freedom);
-    auto cost_probability = 1 - chiSquaredCdf(degrees_of_freedom, cost);
+    return 1 - chiSquaredCdf(degrees_of_freedom, cost);
+  }
+
+  std::optional<ImuTranslationMatchUncertainty>
+  analyzeImuTranslationMatchUncertainty(
+    int frames_count, Eigen::MatrixXd const& H, double cost_p_value) {
+    __logger__->debug("Analyzing the uncertainty of IMU match");
+
+    if (!checkHessianDimension(H, frames_count))
+      return std::nullopt;
 
     auto marginalize_or_die = [](auto const& matrix, auto dim, auto tag) {
       auto result = computeMarginalInformationPair(matrix, dim);
@@ -163,7 +148,7 @@ namespace cyclops::initializer {
       return std::nullopt;
     auto const& [H_b, H_vx] = *bias_marginalization;
 
-    auto v_dim = 3 * frames;
+    auto v_dim = 3 * frames_count;
     auto velocity_marginalization = marginalize_or_die(H_vx, v_dim, "velocity");
     if (!velocity_marginalization)
       return std::nullopt;
@@ -198,7 +183,7 @@ namespace cyclops::initializer {
       return std::nullopt;
 
     return ImuTranslationMatchUncertainty {
-      .final_cost_significant_probability = cost_probability,
+      .final_cost_significant_probability = cost_p_value,
       .scale_log_deviation = 1 / std::sqrt(lambda_s),
       .gravity_tangent_deviation = maybe_lambda_g->cwiseSqrt().cwiseInverse(),
       .bias_deviation = maybe_lambda_b->cwiseSqrt().cwiseInverse(),
@@ -206,5 +191,31 @@ namespace cyclops::initializer {
       .translation_scale_symmetric_deviation =
         maybe_lambda_p->cwiseSqrt().cwiseInverse(),
     };
+  }
+
+  std::optional<ImuTranslationMatchUncertainty>
+  analyzeImuTranslationMatchUncertainty(
+    ImuTranslationMatchAnalysis const& analysis,
+    ImuMatchScaleSampleSolution const& solution) {
+    auto s = solution.scale;
+    auto const& x_I = solution.inertial_state;
+    auto const& x_V = solution.visual_state;
+    auto const& [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analysis;
+
+    auto r_I = (A_I * x_I + B_I * x_V * s + alpha + beta * s).eval();
+    auto r_V = (A_V * x_V).eval();
+    auto cost = r_I.dot(r_I) + r_V.dot(r_V);
+
+    __logger__->debug("IMU match (s = {}) solution residual:", s);
+    __logger__->debug("r_I = {}", r_I.transpose());
+    __logger__->debug("r_V = {}", r_V.transpose());
+
+    auto cost_p_value = analyzeImuTranslationMatchCostProbability(
+      analysis.residual_dimension, analysis.parameter_dimension, cost);
+    if (!cost_p_value.has_value())
+      return std::nullopt;
+
+    return analyzeImuTranslationMatchUncertainty(
+      analysis.frames_count, solution.hessian, cost_p_value.value());
   }
 }  // namespace cyclops::initializer

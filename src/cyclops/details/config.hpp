@@ -111,6 +111,8 @@ namespace cyclops::config::initializer {
   };
 
   struct ImuSolverConfig {
+    bool imu_only;
+
     imu::RotationMatchConfig rotation_match;
     imu::ScaleSamplingConfig sampling;
     imu::SolutionRefinementConfig refinement;

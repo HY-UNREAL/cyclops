@@ -2,6 +2,7 @@
 #include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
 #include "cyclops/details/initializer/vision_imu/rotation.hpp"
 #include "cyclops/details/initializer/vision_imu/translation.hpp"
+#include "cyclops/details/initializer/vision_imu/translation.imu_only.hpp"
 
 #include "cyclops/details/initializer/vision/type.hpp"
 #include "cyclops/details/telemetry/initializer.hpp"
@@ -90,8 +91,12 @@ namespace cyclops::initializer {
   std::unique_ptr<ImuMatchSolver> ImuMatchSolver::Create(
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
+    auto rotation_solver = ImuRotationMatchSolver::Create(config);
+    auto translation_solver = config->initialization.imu.imu_only
+      ? ImuOnlyTranslationMatchSolver::Create(config, telemetry)
+      : ImuTranslationMatchSolver::Create(config, telemetry);
+
     return std::make_unique<ImuMatchSolverImpl>(
-      ImuRotationMatchSolver::Create(config),
-      ImuTranslationMatchSolver::Create(config, telemetry), config);
+      std::move(rotation_solver), std::move(translation_solver), config);
   }
 }  // namespace cyclops::initializer

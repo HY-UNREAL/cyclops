@@ -39,6 +39,8 @@ namespace cyclops::config::initializer {
 
   ImuSolverConfig ImuSolverConfig::CreateDefault() {
     return {
+      .imu_only = false,
+
       .rotation_match =
         {
           .vision_imu_rotation_consistency_angle_threshold = 0.05,
