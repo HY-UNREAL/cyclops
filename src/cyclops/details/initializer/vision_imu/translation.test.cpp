@@ -94,19 +94,19 @@ namespace cyclops::initializer {
   class ImuTranslationMatchAcceptDiscriminatorMock:
       public ImuTranslationMatchAcceptDiscriminator {
   public:
-    AcceptDecision determineCandidate(
-      ImuTranslationMatchSolution const& solution,
-      ImuTranslationMatchUncertainty const& uncertainty) const override {
-      return ACCEPT;
+    std::optional<ImuTranslationMatch> determineAcceptance(
+      ImuRotationMatch const& rotation_match,
+      std::vector<ImuTranslationMatchCandidate> const& candidates)
+      const override {
+      auto const& [solution, _] = candidates.front();
+
+      return ImuTranslationMatch {
+        .accept = true,
+        .solution = solution,
+      };
     }
 
     void reset() override {
-    }
-
-    AcceptDecision determineAccept(
-      ImuTranslationMatchSolution const& solution,
-      ImuTranslationMatchUncertainty const& uncertainty) const override {
-      return ACCEPT;
     }
   };
 
@@ -184,7 +184,7 @@ namespace cyclops::initializer {
     auto solver = ImuTranslationMatchSolverImpl(
       std::move(analysis_mock),
       std::make_unique<ImuTranslationMatchAcceptDiscriminatorMock>(),
-      ImuMatchScaleSampleSolver::Create(config, telemetry), config, telemetry);
+      ImuMatchScaleSampleSolver::Create(config, telemetry), config);
     auto maybe_solution = solver.solve({}, {}, {});
     REQUIRE(static_cast<bool>(maybe_solution));
     REQUIRE(maybe_solution->accept);
