@@ -39,10 +39,7 @@ namespace cyclops::initializer {
       ImuTranslationMatchAnalysisCache const& cache);
 
     std::optional<ImuMatchScaleEvaluation> evaluate(double scale) const;
-
     double evaluateDerivative(
-      ImuMatchScaleEvaluation const& evaluation, double scale) const;
-    Eigen::MatrixXd evaluateHessian(
       ImuMatchScaleEvaluation const& evaluation, double scale) const;
   };
 }  // namespace cyclops::initializer

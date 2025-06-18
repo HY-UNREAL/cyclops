@@ -14,6 +14,8 @@ target_sources(cyclops
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/translation_hessian.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/translation_hessian.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_refinement.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_refinement.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_sample.cpp
@@ -45,6 +47,7 @@ cyclops_add_unittest(
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/translation_hessian.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_refinement.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/translation_sample.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/uncertainty.cpp

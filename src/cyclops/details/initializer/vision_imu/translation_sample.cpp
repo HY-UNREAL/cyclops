@@ -4,6 +4,7 @@
 #include "cyclops/details/initializer/vision_imu/translation_cache.hpp"
 #include "cyclops/details/initializer/vision_imu/translation_refinement.hpp"
 #include "cyclops/details/initializer/vision_imu/translation_evaluation.hpp"
+#include "cyclops/details/initializer/vision_imu/translation_hessian.hpp"
 #include "cyclops/details/telemetry/initializer.hpp"
 
 #include "cyclops/details/config.hpp"
@@ -78,12 +79,15 @@ namespace cyclops::initializer {
     if (!maybe_primal)
       return std::nullopt;
 
+    auto const& x_I = maybe_primal->inertial_solution;
+    auto const& x_V = maybe_primal->visual_solution;
+
     return ImuMatchScaleSampleSolution {
       .scale = s,
       .cost = maybe_primal->cost,
       .inertial_state = maybe_primal->inertial_solution,
       .visual_state = maybe_primal->visual_solution,
-      .hessian = evaluator.evaluateHessian(*maybe_primal, s),
+      .hessian = evaluateImuTranslationMatchHessian(analysis, s, x_I, x_V),
     };
   }
 
