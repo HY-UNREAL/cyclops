@@ -73,14 +73,15 @@ namespace cyclops::initializer {
     auto [rotation_prior, translation_prior] =
       makeImuMatchCameraMotionPrior(msfm);
 
-    auto rotation_match = _rotation_solver->solve(imu_motions, rotation_prior);
+    auto rotation_match =
+      _rotation_solver->solve(solvable_imu_motions, rotation_prior);
     if (!rotation_match.has_value()) {
       __logger__->info("IMU match rotation solver failed.");
       return std::nullopt;
     }
 
     auto translation_match = _translation_solver->solve(
-      imu_motions, *rotation_match, translation_prior);
+      solvable_imu_motions, *rotation_match, translation_prior);
     if (!translation_match.has_value()) {
       __logger__->info("IMU match translation solver failed.");
       return std::nullopt;
