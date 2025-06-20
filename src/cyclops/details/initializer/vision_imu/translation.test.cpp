@@ -94,16 +94,16 @@ namespace cyclops::initializer {
   class ImuTranslationMatchAcceptDiscriminatorMock:
       public ImuTranslationMatchAcceptDiscriminator {
   public:
-    std::optional<ImuTranslationMatch> determineAcceptance(
+    std::vector<ImuTranslationMatch> determineAcceptance(
       ImuRotationMatch const& rotation_match,
       std::vector<ImuTranslationMatchCandidate> const& candidates)
       const override {
       auto const& [solution, _] = candidates.front();
 
-      return ImuTranslationMatch {
+      return {ImuTranslationMatch {
         .accept = true,
         .solution = solution,
-      };
+      }};
     }
 
     void reset() override {
@@ -186,19 +186,20 @@ namespace cyclops::initializer {
       std::make_unique<ImuTranslationMatchAcceptDiscriminatorMock>(),
       ImuMatchScaleSampleSolver::Create(config, telemetry), config);
     auto maybe_solution = solver.solve({}, {}, {});
-    REQUIRE(static_cast<bool>(maybe_solution));
-    REQUIRE(maybe_solution->accept);
+    REQUIRE(maybe_solution.has_value());
+    REQUIRE(maybe_solution->size() == 1);
 
-    auto const& solution = maybe_solution->solution;
+    auto const& solution = maybe_solution->front();
+    REQUIRE(solution.accept);
 
-    auto const& s_optimized = solution.scale;
+    auto const& s_optimized = solution.solution.scale;
     {
       CAPTURE(s_optimized);
       CHECK(std::abs(s_optimized - s) < 1e-6);
     }
     {
       auto g = x_I.head(3).eval();
-      auto const& g_optimized = solution.gravity;
+      auto const& g_optimized = solution.solution.gravity;
 
       CAPTURE(g.transpose());
       CAPTURE(g_optimized.transpose());
@@ -206,7 +207,7 @@ namespace cyclops::initializer {
     }
     {
       auto b_a = x_I.segment(3, 3).eval();
-      auto const& b_a_optimized = solution.acc_bias;
+      auto const& b_a_optimized = solution.solution.acc_bias;
 
       CAPTURE(b_a.transpose());
       CAPTURE(b_a_optimized.transpose());

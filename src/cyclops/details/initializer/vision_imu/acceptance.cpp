@@ -82,7 +82,7 @@ namespace cyclops::initializer {
     }
     void reset() override;
 
-    std::optional<ImuTranslationMatch> determineAcceptance(
+    std::vector<ImuTranslationMatch> determineAcceptance(
       ImuRotationMatch const& rotation_match,
       std::vector<ImuTranslationMatchCandidate> const& candidates)
       const override;
@@ -214,7 +214,7 @@ namespace cyclops::initializer {
     return true;
   }
 
-  std::optional<ImuTranslationMatch>
+  std::vector<ImuTranslationMatch>
   ImuTranslationMatchAcceptDiscriminatorImpl::determineAcceptance(
     ImuRotationMatch const& rotation_match,
     std::vector<ImuTranslationMatchCandidate> const& candidates) const {
@@ -241,16 +241,18 @@ namespace cyclops::initializer {
         ranges::to_vector;
 
       _telemetry->onImuMatchAmbiguity({solutions, uncertainties});
-      return std::nullopt;
     }
 
-    auto const& candidate = acceptables.front();
-    auto const& [solution, uncertainty] = candidate;
-
-    return ImuTranslationMatch {
-      .accept = determineSolutionAcceptance(rotation_match, candidate),
-      .solution = solution,
-    };
+    auto result =  //
+      acceptables | views::transform([&](auto const& candidate) {
+        auto const& [solution, uncertainty] = candidate;
+        return ImuTranslationMatch {
+          .accept = determineSolutionAcceptance(rotation_match, candidate),
+          .solution = solution,
+        };
+      }) |
+      ranges::to_vector;
+    return result;
   }
 
   std::unique_ptr<ImuTranslationMatchAcceptDiscriminator>

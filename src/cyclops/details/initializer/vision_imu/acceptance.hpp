@@ -26,7 +26,7 @@ namespace cyclops::initializer {
     virtual ~ImuTranslationMatchAcceptDiscriminator() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<ImuTranslationMatch> determineAcceptance(
+    virtual std::vector<ImuTranslationMatch> determineAcceptance(
       ImuRotationMatch const& rotation_match,
       std::vector<ImuTranslationMatchCandidate> const& candidates) const = 0;
 

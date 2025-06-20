@@ -20,7 +20,7 @@ namespace cyclops::initializer {
 
   struct ImuMatchSolution {
     ImuRotationMatch rotation_match;
-    ImuTranslationMatch translation_match;
+    std::vector<ImuTranslationMatch> translation_match;
   };
 
   class ImuMatchSolver {

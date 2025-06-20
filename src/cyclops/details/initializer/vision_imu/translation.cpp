@@ -45,7 +45,7 @@ namespace cyclops::initializer {
           analysis(analysis) {
     }
 
-    std::optional<ImuTranslationMatch> parse(
+    std::vector<ImuTranslationMatch> parse(
       ImuRotationMatch const& rotations,
       std::vector<ImuMatchScaleSampleSolution> const& candidates);
   };
@@ -107,7 +107,7 @@ namespace cyclops::initializer {
     };
   }
 
-  std::optional<ImuTranslationMatch>
+  std::vector<ImuTranslationMatch>
   ImuTranslationMatchSolutionParseContext::parse(
     ImuRotationMatch const& rotations,
     std::vector<ImuMatchScaleSampleSolution> const& solutions) {
@@ -138,7 +138,7 @@ namespace cyclops::initializer {
       std::shared_ptr<CyclopsConfig const> config);
     void reset() override;
 
-    std::optional<ImuTranslationMatch> solve(
+    std::optional<std::vector<ImuTranslationMatch>> solve(
       measurement::ImuMotionRefs const& motions,
       ImuRotationMatch const& rotations,
       ImuMatchCameraTranslationPrior const& camera_prior) override;
@@ -161,7 +161,8 @@ namespace cyclops::initializer {
     _sample_solver->reset();
   }
 
-  std::optional<ImuTranslationMatch> ImuTranslationMatchSolverImpl::solve(
+  std::optional<std::vector<ImuTranslationMatch>>
+  ImuTranslationMatchSolverImpl::solve(
     measurement::ImuMotionRefs const& motions,
     ImuRotationMatch const& rotations,
     ImuMatchCameraTranslationPrior const& camera_prior) {

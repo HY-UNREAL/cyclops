@@ -37,7 +37,7 @@ namespace cyclops::initializer {
     virtual ~ImuTranslationMatchSolver() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<ImuTranslationMatch> solve(
+    virtual std::optional<std::vector<ImuTranslationMatch>> solve(
       measurement::ImuMotionRefs const& motions,
       ImuRotationMatch const& rotations,
       ImuMatchCameraTranslationPrior const& camera_prior) = 0;

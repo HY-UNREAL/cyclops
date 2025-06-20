@@ -111,8 +111,10 @@ namespace cyclops::initializer {
 
             THEN("Solution is correct up to numerical accuracy") {
               auto const& result = *maybe_result;
+              REQUIRE(result.translation_match.size() == 1);
+
               CHECK(
-                result.translation_match.solution.scale ==
+                result.translation_match.front().solution.scale ==
                 doctest::Approx(scale_solution).epsilon(1e-3));
             }
           }

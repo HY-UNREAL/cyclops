@@ -40,7 +40,8 @@ namespace cyclops::initializer {
 
     InitializationSolverResult::SolutionCandidate parseSolutionCandidate(
       int msfm_index, MSfMSolution const& msfm_solution,
-      ImuMatchSolution const& imu_match) const;
+      ImuRotationMatch const& rotation_match,
+      ImuTranslationMatch const& translation_match) const;
 
   public:
     InitializationSolverInternalImpl(
@@ -131,11 +132,10 @@ namespace cyclops::initializer {
   InitializationSolverResult::SolutionCandidate
   InitializationSolverInternalImpl::parseSolutionCandidate(
     int msfm_index, MSfMSolution const& msfm_solution,
-    ImuMatchSolution const& imu_match) const {
-    auto const& rotation_match = imu_match.rotation_match;
-    auto const& [acceptance, translation_match] = imu_match.translation_match;
-
-    auto s = translation_match.scale;
+    ImuRotationMatch const& rotation,
+    ImuTranslationMatch const& translation_match) const {
+    auto const& solution = translation_match.solution;
+    auto s = solution.scale;
 
     auto landmarks =  //
       msfm_solution.geometry.landmarks |
@@ -147,10 +147,10 @@ namespace cyclops::initializer {
 
     auto motions =
       views::zip(
-        translation_match.imu_body_velocities | views::keys,
-        rotation_match.body_orientations | views::values,
-        translation_match.imu_body_velocities | views::values,
-        translation_match.sfm_positions | views::values) |
+        solution.imu_body_velocities | views::keys,
+        rotation.body_orientations | views::values,
+        solution.imu_body_velocities | views::values,
+        solution.sfm_positions | views::values) |
       views::transform([&](auto const& pair) {
         auto const& [frame_id, q_b, v_body, p_c] = pair;
         auto v = (q_b * v_body).eval();
@@ -164,13 +164,13 @@ namespace cyclops::initializer {
     return {
       .msfm_solution_index = msfm_index,
 
-      .acceptance = acceptance,
-      .cost = translation_match.cost,
-      .scale = translation_match.scale,
-      .gravity = translation_match.gravity,
+      .acceptance = translation_match.accept,
+      .cost = solution.cost,
+      .scale = solution.scale,
+      .gravity = solution.gravity,
 
-      .gyr_bias = rotation_match.gyro_bias,
-      .acc_bias = translation_match.acc_bias,
+      .gyr_bias = rotation.gyro_bias,
+      .acc_bias = solution.acc_bias,
 
       .landmarks = landmarks,
       .motions = motions,
@@ -188,14 +188,18 @@ namespace cyclops::initializer {
     result.msfm_solutions = _vision_solver->solve(image_data, rotation_prior);
     result.solution_candidates.reserve(result.msfm_solutions.size());
 
-    for (int i = 0; i < result.msfm_solutions.size(); i++) {
-      auto const& msfm_solution = result.msfm_solutions.at(i);
+    auto n_msfm_solutions = result.msfm_solutions.size();
+    for (int msfm_index = 0; msfm_index < n_msfm_solutions; msfm_index++) {
+      auto const& msfm_solution = result.msfm_solutions.at(msfm_index);
       auto imu_match = _imu_solver->solve(msfm_solution, imu_motions);
       if (!imu_match.has_value())
         continue;
 
-      result.solution_candidates.emplace_back(
-        parseSolutionCandidate(i, msfm_solution, imu_match.value()));
+      auto const& rotation_match = imu_match->rotation_match;
+      for (auto const& translation_match : imu_match->translation_match) {
+        result.solution_candidates.push_back(parseSolutionCandidate(
+          msfm_index, msfm_solution, rotation_match, translation_match));
+      }
     }
     return result;
   }

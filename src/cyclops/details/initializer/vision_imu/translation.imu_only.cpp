@@ -60,7 +60,7 @@ namespace cyclops::initializer {
       std::unique_ptr<ImuOnlyTranslationMatchAcceptDiscriminator> acceptor,
       std::shared_ptr<CyclopsConfig const> config);
 
-    std::optional<ImuTranslationMatch> solve(
+    std::optional<std::vector<ImuTranslationMatch>> solve(
       ImuMotionRefs const& motions, ImuRotationMatch const& rotation_match,
       ImuMatchCameraTranslationPrior const& camera_prior) override;
     void reset() override;
@@ -178,7 +178,8 @@ namespace cyclops::initializer {
       n_frames, H, cost_p_value.value());
   }
 
-  std::optional<ImuTranslationMatch> ImuOnlyTranslationMatchSolverImpl::solve(
+  std::optional<std::vector<ImuTranslationMatch>>
+  ImuOnlyTranslationMatchSolverImpl::solve(
     ImuMotionRefs const& motions, ImuRotationMatch const& rotation_match,
     ImuMatchCameraTranslationPrior const& camera_prior) {
     auto analysis = _analyzer->analyze(motions, rotation_match, camera_prior);
@@ -192,13 +193,12 @@ namespace cyclops::initializer {
     auto translation_match =
       parseSolution(camera_prior.translations, maybe_solution.value());
 
-    auto accept = _acceptor->determineAccept(
-      rotation_match, std::make_tuple(translation_match, maybe_uncertainty));
-
-    return ImuTranslationMatch {
-      .accept = accept,
+    auto result = ImuTranslationMatch {
+      .accept = _acceptor->determineAccept(
+        rotation_match, std::make_tuple(translation_match, maybe_uncertainty)),
       .solution = translation_match,
     };
+    return std::vector<ImuTranslationMatch> {result};
   }
 
   void ImuOnlyTranslationMatchSolverImpl::reset() {
