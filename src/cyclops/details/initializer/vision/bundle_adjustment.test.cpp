@@ -99,13 +99,15 @@ namespace cyclops::initializer {
       .imu_camera_time_delay = 0.,
       .imu_camera_transform = SE3Transform::Identity(),
     };
-    auto config = CyclopsConfig::CreateDefault(noise, extrinsic);
+    std::shared_ptr config = CyclopsConfig::CreateDefault(noise, extrinsic);
 
     config->initialization.vision.multiview.bundle_adjustment_max_solver_time =
       10;
 
+    auto bundle_adjustment_solver = BundleAdjustmentSolver::Create(config);
+
     auto maybe_solution =
-      solveBundleAdjustment(*config, geometry_guess, image_data, {});
+      bundle_adjustment_solver->solve(geometry_guess, image_data, {});
     REQUIRE(maybe_solution.has_value());
 
     auto const& camera_motions = maybe_solution->geometry.camera_motions;

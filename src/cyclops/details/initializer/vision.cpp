@@ -29,6 +29,7 @@ namespace cyclops::initializer {
   class VisionBootstrapSolverImpl: public VisionBootstrapSolver {
   private:
     std::unique_ptr<MultiviewVisionGeometrySolver> _multiview_solver;
+    std::unique_ptr<BundleAdjustmentSolver> _bundle_adjustment_solver;
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<InitializerTelemetry> _telemetry;
 
@@ -49,6 +50,7 @@ namespace cyclops::initializer {
   public:
     VisionBootstrapSolverImpl(
       std::unique_ptr<MultiviewVisionGeometrySolver> multiview_solver,
+      std::unique_ptr<BundleAdjustmentSolver> bundle_adjustment_solver,
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<InitializerTelemetry> telemetry);
     ~VisionBootstrapSolverImpl();
@@ -63,9 +65,11 @@ namespace cyclops::initializer {
 
   VisionBootstrapSolverImpl::VisionBootstrapSolverImpl(
     std::unique_ptr<MultiviewVisionGeometrySolver> multiview_solver,
+    std::unique_ptr<BundleAdjustmentSolver> bundle_adjustment_solver,
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<InitializerTelemetry> telemetry)
       : _multiview_solver(std::move(multiview_solver)),
+        _bundle_adjustment_solver(std::move(bundle_adjustment_solver)),
         _config(config),
         _telemetry(telemetry) {
   }
@@ -220,8 +224,8 @@ namespace cyclops::initializer {
 
     auto maybe_bundle_adjustments =
       multiview_solutions | views::transform([&](auto const& solution) {
-        return solveBundleAdjustment(
-          *_config, solution, image_data_filtered, camera_rotation_prior);
+        return _bundle_adjustment_solver->solve(
+          solution, image_data_filtered, camera_rotation_prior);
       }) |
       ranges::to_vector;
 
@@ -244,6 +248,6 @@ namespace cyclops::initializer {
     std::shared_ptr<InitializerTelemetry> telemetry) {
     return std::make_unique<VisionBootstrapSolverImpl>(
       MultiviewVisionGeometrySolver::Create(config, rgen, telemetry),  //
-      config, telemetry);
+      BundleAdjustmentSolver::Create(config), config, telemetry);
   }
 }  // namespace cyclops::initializer

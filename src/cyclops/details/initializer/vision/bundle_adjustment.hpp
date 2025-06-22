@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cyclops/details/type.hpp"
+#include <memory>
 
 namespace cyclops {
   struct CyclopsConfig;
@@ -11,8 +12,15 @@ namespace cyclops::initializer {
   struct MSfMSolution;
   struct TwoViewImuRotationConstraint;
 
-  std::optional<MSfMSolution> solveBundleAdjustment(
-    CyclopsConfig const& config, MultiViewGeometry const& guess,
-    std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& data,
-    std::map<FrameID, TwoViewImuRotationConstraint> const& imu_prior);
+  class BundleAdjustmentSolver {
+  public:
+    virtual ~BundleAdjustmentSolver() = default;
+    virtual std::optional<MSfMSolution> solve(
+      MultiViewGeometry const& guess,
+      std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& data,
+      std::map<FrameID, TwoViewImuRotationConstraint> const& imu_prior) = 0;
+
+    static std::unique_ptr<BundleAdjustmentSolver> Create(
+      std::shared_ptr<CyclopsConfig const> config);
+  };
 }  // namespace cyclops::initializer
