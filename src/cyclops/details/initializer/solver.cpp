@@ -21,8 +21,6 @@ namespace cyclops::initializer {
 
   using MultiViewFeatures =
     std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
-  using CameraRotationPriorLookup =
-    std::map<FrameID, TwoViewImuRotationConstraint>;
 
   class InitializationSolverInternalImpl: public InitializationSolverInternal {
   private:
@@ -35,7 +33,7 @@ namespace cyclops::initializer {
     MultiViewFeatures reorderMultiviewImageObservations() const;
     ImuMotionRefs filterImageObservedIMU(FrameIDs image_frames) const;
 
-    CameraRotationPriorLookup makeCameraRotationPriorLookup(
+    std::map<FrameID, GyroMotionConstraint> makeCameraRotationPriorLookup(
       ImuMotionRefs const& imu_motions) const;
 
     InitializationSolverResult::SolutionCandidate parseSolutionCandidate(
@@ -101,7 +99,7 @@ namespace cyclops::initializer {
       ranges::to_vector;
   }
 
-  CameraRotationPriorLookup
+  std::map<FrameID, GyroMotionConstraint>
   InitializationSolverInternalImpl::makeCameraRotationPriorLookup(
     ImuMotionRefs const& imu_motions) const {
     return  //
@@ -117,23 +115,19 @@ namespace cyclops::initializer {
 
         auto G_w = G.template block<3, 3>(0, 3).eval();
 
-        auto rotation_data = TwoViewImuRotationData {
-          .value = q_ext.conjugate() * q * q_ext,
-          .covariance = R_ext.transpose() * P * R_ext,
-          .gyro_bias_nominal = data.data->gyrBias(),
-          .gyro_bias_jacobian = R_ext.transpose() * G_w,
-        };
-
-        return TwoViewImuRotationConstraint {
+        return GyroMotionConstraint {
           .init_frame_id = data.from,
           .term_frame_id = data.to,
-          .rotation = rotation_data,
+          .value = q_ext.conjugate() * q * q_ext,
+          .covariance = R_ext.transpose() * P * R_ext,
+          .bias_nominal = data.data->gyrBias(),
+          .bias_jacobian = R_ext.transpose() * G_w,
         };
       }) |
       views::transform([](auto const& rotation) {
         return std::make_pair(rotation.init_frame_id, rotation);
       }) |
-      ranges::to<CameraRotationPriorLookup>;
+      ranges::to<std::map<FrameID, GyroMotionConstraint>>;
   }
 
   InitializationSolverResult::SolutionCandidate

@@ -21,10 +21,6 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  using MultiviewImageFrame = std::map<LandmarkID, FeaturePoint>;
-  using MultiViewImageData = std::map<FrameID, MultiviewImageFrame>;
-  using GyroMotionData = std::map<FrameID, TwoViewImuRotationConstraint>;
-
   struct BundleAdjustmentOptimizationContext::Impl {
     CyclopsConfig const& _config;
     BundleAdjustmentOptimizationState _state;
@@ -39,13 +35,15 @@ namespace cyclops::initializer {
 
     bool constructMotionStates();
     bool constructLandmarkFactors(MultiViewImageData const& features);
-    bool constructGyroMotionFactors(GyroMotionData const& gyro_motions);
+    bool constructGyroMotionFactors(
+      MultiViewGyroMotionData const& gyro_motions);
     bool constructScaleGaugeFactor();
 
   public:
     Impl(CyclopsConfig const& config, MultiViewGeometry const& initial_guess);
     bool construct(
-      MultiViewImageData const& features, GyroMotionData const& gyro_motions);
+      MultiViewImageData const& features,
+      MultiViewGyroMotionData const& gyro_motions);
   };
 
   bool BundleAdjustmentOptimizationContext::Impl::constructMotionStates() {
@@ -96,7 +94,7 @@ namespace cyclops::initializer {
   }
 
   bool BundleAdjustmentOptimizationContext::Impl::constructGyroMotionFactors(
-    GyroMotionData const& gyro_motions) {
+    MultiViewGyroMotionData const& gyro_motions) {
     for (auto const& motion : gyro_motions | views::values) {
       auto maybe_x_init = _frames.find(motion.init_frame_id);
       auto maybe_x_term = _frames.find(motion.term_frame_id);
@@ -109,7 +107,7 @@ namespace cyclops::initializer {
 
       auto factor = new AutoDiffCostFunction<
         BundleAdjustmentCameraRotationPriorCost, 3, 7, 7, 3>(
-        new BundleAdjustmentCameraRotationPriorCost(motion.rotation));
+        new BundleAdjustmentCameraRotationPriorCost(motion));
       _residuals.emplace_back(_problem.AddResidualBlock(
         factor, nullptr, x_init, x_term, _state.gyro_bias.data()));
 
@@ -149,7 +147,8 @@ namespace cyclops::initializer {
   }
 
   bool BundleAdjustmentOptimizationContext::Impl::construct(
-    MultiViewImageData const& features, GyroMotionData const& gyro_motions) {
+    MultiViewImageData const& features,
+    MultiViewGyroMotionData const& gyro_motions) {
     if (!constructMotionStates()) {
       __logger__->error("BA camera motion state construction failed.");
       return false;
@@ -219,7 +218,8 @@ namespace cyclops::initializer {
   }
 
   bool BundleAdjustmentOptimizationContext::construct(
-    MultiViewImageData const& features, GyroMotionData const& gyro_motions) {
+    MultiViewImageData const& features,
+    MultiViewGyroMotionData const& gyro_motions) {
     return _pimpl->construct(features, gyro_motions);
   }
 }  // namespace cyclops::initializer

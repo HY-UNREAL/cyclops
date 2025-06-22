@@ -5,13 +5,13 @@
 #include <map>
 
 namespace cyclops::initializer {
-  struct TwoViewImuRotationConstraint;
+  struct GyroMotionConstraint;
 }
 
 namespace cyclops {
   struct SE3Transform;
 
-  std::map<FrameID, initializer::TwoViewImuRotationConstraint>
+  std::map<FrameID, initializer::GyroMotionConstraint>
   makeMultiViewRotationPrior(
     PoseSignal const& pose_signal, SE3Transform const& camera_extrinsic,
     std::map<FrameID, Timestamp> const& frame_timestamps);

@@ -54,11 +54,11 @@ namespace cyclops::initializer {
   };
 
   struct BundleAdjustmentCameraRotationPriorCost {
-    TwoViewImuRotationData const& _prior;
+    GyroMotionConstraint const& _motion;
     Eigen::Matrix3d const _weight;
 
     explicit BundleAdjustmentCameraRotationPriorCost(
-      TwoViewImuRotationData const& prior);
+      GyroMotionConstraint const& motion);
 
     template <typename scalar_t>
     bool operator()(
@@ -73,11 +73,11 @@ namespace cyclops::initializer {
       auto q_next = Quaternion(x_next);
 
       Quaternion y_q = q_prev.conjugate() * q_next;
-      Quaternion y_q_hat = _prior.value.cast<scalar_t>();
+      Quaternion y_q_hat = _motion.value.cast<scalar_t>();
 
-      auto G_R = _prior.gyro_bias_jacobian.cast<scalar_t>().eval();
+      auto G_R = _motion.bias_jacobian.cast<scalar_t>().eval();
       auto delta_b_w =
-        (Vector3(b_w) - _prior.gyro_bias_nominal.cast<scalar_t>()).eval();
+        (Vector3(b_w) - _motion.bias_nominal.cast<scalar_t>()).eval();
 
       Vector3 u = so3Logmap(y_q_hat.conjugate() * y_q) - G_R * delta_b_w;
       r = _weight.cast<scalar_t>() * u;

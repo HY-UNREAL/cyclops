@@ -28,8 +28,7 @@ namespace cyclops::initializer {
     std::optional<MSfMSolution> solve(
       MultiViewGeometry const& guess,
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
-      std::map<FrameID, TwoViewImuRotationConstraint> const& gyro_motion)
-      override;
+      std::map<FrameID, GyroMotionConstraint> const& gyro_motion) override;
   };
 
   BundleAdjustmentSolverImpl::BundleAdjustmentSolverImpl(
@@ -42,7 +41,7 @@ namespace cyclops::initializer {
   std::optional<MSfMSolution> BundleAdjustmentSolverImpl::solve(
     MultiViewGeometry const& guess,
     std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
-    std::map<FrameID, TwoViewImuRotationConstraint> const& gyro_motion) {
+    std::map<FrameID, GyroMotionConstraint> const& gyro_motion) {
     auto context = BundleAdjustmentOptimizationContext(*_config, guess);
     if (!context.construct(features, gyro_motion))
       return std::nullopt;

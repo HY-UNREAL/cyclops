@@ -10,7 +10,7 @@ namespace cyclops {
 namespace cyclops::initializer {
   struct MultiViewGeometry;
   struct MSfMSolution;
-  struct TwoViewImuRotationConstraint;
+  struct GyroMotionConstraint;
 
   class BundleAdjustmentSolver {
   public:
@@ -18,7 +18,7 @@ namespace cyclops::initializer {
     virtual std::optional<MSfMSolution> solve(
       MultiViewGeometry const& guess,
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
-      std::map<FrameID, TwoViewImuRotationConstraint> const& gyro_motion) = 0;
+      std::map<FrameID, GyroMotionConstraint> const& gyro_motion) = 0;
 
     static std::unique_ptr<BundleAdjustmentSolver> Create(
       std::shared_ptr<CyclopsConfig const> config);

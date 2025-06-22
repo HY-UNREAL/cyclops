@@ -7,7 +7,7 @@
 namespace cyclops {
   namespace views = ranges::views;
 
-  std::map<FrameID, initializer::TwoViewImuRotationConstraint>
+  std::map<FrameID, initializer::GyroMotionConstraint>
   makeMultiViewRotationPrior(
     PoseSignal const& pose_signal, SE3Transform const& camera_extrinsic,
     std::map<FrameID, Timestamp> const& frame_timestamps) {
@@ -21,14 +21,13 @@ namespace cyclops {
         auto q1 = pose_signal.orientation(time1) * camera_extrinsic.rotation;
         auto q2 = pose_signal.orientation(time2) * camera_extrinsic.rotation;
 
-        auto prior = initializer::TwoViewImuRotationConstraint {
+        auto prior = initializer::GyroMotionConstraint {
           .init_frame_id = frame1,
           .term_frame_id = frame2,
-          .rotation =
-            {
-              .value = q1.conjugate() * q2,
-              .covariance = 1e-6 * Eigen::Matrix3d::Identity(),
-            },
+          .value = q1.conjugate() * q2,
+          .covariance = 1e-6 * Eigen::Matrix3d::Identity(),
+          .bias_nominal = Eigen::Vector3d::Zero(),
+          .bias_jacobian = Eigen::Matrix3d::Zero(),
         };
         return std::make_pair(frame1, prior);
       };
@@ -38,6 +37,6 @@ namespace cyclops {
 
     return multiview_frame_pair |
       views::transform(camera_relative_rotation_prior_transform) |
-      ranges::to<std::map<FrameID, initializer::TwoViewImuRotationConstraint>>;
+      ranges::to<std::map<FrameID, initializer::GyroMotionConstraint>>;
   }
 }  // namespace cyclops

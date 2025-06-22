@@ -35,8 +35,8 @@ namespace cyclops::initializer {
     void logFatal(std::string const& reason);
 
     MultiViewCorrespondences makeMultiViewCorrespondences(
-      MultiViewImageData const& multiview_data,
-      CameraRotationPriorLookup const& rotation_prior);
+      MultiViewImageData const& features,
+      MultiViewGyroMotionData const& gyro_motions);
 
     template <typename landmark_range_t>
     LandmarkPositions triangulateUnknownLandmarks(
@@ -57,8 +57,8 @@ namespace cyclops::initializer {
     void reset() override;
 
     std::vector<MultiViewGeometry> solve(
-      MultiViewImageData const& multiview_image,
-      CameraRotationPriorLookup const& camera_rotations) override;
+      MultiViewImageData const& features,
+      MultiViewGyroMotionData const& gyro_motions) override;
   };
 
   void MultiviewVisionGeometrySolverImpl::logFailure(
@@ -72,8 +72,8 @@ namespace cyclops::initializer {
   }
 
   static std::optional<TwoViewImuRotationData> makeTwoViewRotationPrior(
-    std::map<FrameID, TwoViewImuRotationConstraint> const& camera_rotations,
-    FrameID reference_view_frame, FrameID best_view_frame) {
+    MultiViewGyroMotionData const& gyro_motions, FrameID reference_view_frame,
+    FrameID best_view_frame) {
     FrameID frame_id = best_view_frame;
 
     Quaterniond q_best_to_reference = Quaterniond::Identity();
@@ -83,12 +83,13 @@ namespace cyclops::initializer {
       if (frame_id == reference_view_frame)
         break;
 
-      auto i = camera_rotations.find(frame_id);
-      if (i == camera_rotations.end())
+      auto i = gyro_motions.find(frame_id);
+      if (i == gyro_motions.end())
         return std::nullopt;
 
       auto const& [_1, rotation] = *i;
-      auto const& [q_delta, P_delta, _2, _3] = rotation.rotation;
+      auto const& q_delta = rotation.value;
+      auto const& P_delta = rotation.covariance;
 
       auto R_delta = q_delta.matrix().eval();
 
@@ -102,24 +103,22 @@ namespace cyclops::initializer {
     return TwoViewImuRotationData {
       .value = q_best_to_reference.conjugate(),
       .covariance = R_br * P_best_to_reference * R_br.transpose(),
-      .gyro_bias_nominal = Eigen::Vector3d::Zero(),
-      .gyro_bias_jacobian = Eigen::Matrix3d::Zero(),
     };
   }
 
   MultiViewCorrespondences
   MultiviewVisionGeometrySolverImpl::makeMultiViewCorrespondences(
-    MultiViewImageData const& multiview_data,
-    CameraRotationPriorLookup const& rotation_prior) {
-    auto const& [frame1_id, frame1] = *multiview_data.rbegin();
+    MultiViewImageData const& features,
+    MultiViewGyroMotionData const& gyro_motions) {
+    auto const& [frame1_id, frame1] = *features.rbegin();
 
     MultiViewCorrespondences result;
     result.reference_frame = frame1_id;
 
-    auto image_frames = multiview_data | views::drop_last(1);
+    auto image_frames = features | views::drop_last(1);
     for (auto const& [frame2_id, frame2] : image_frames) {
       auto maybe_rotation_prior =
-        makeTwoViewRotationPrior(rotation_prior, frame1_id, frame2_id);
+        makeTwoViewRotationPrior(gyro_motions, frame1_id, frame2_id);
       if (!maybe_rotation_prior) {
         logFatal("Two view rotation prior generation failed");
         return {};
@@ -218,14 +217,13 @@ namespace cyclops::initializer {
   }
 
   std::vector<MultiViewGeometry> MultiviewVisionGeometrySolverImpl::solve(
-    MultiViewImageData const& multiview_image,
-    CameraRotationPriorLookup const& rotation_prior) {
-    if (multiview_image.empty())
+    MultiViewImageData const& features,
+    MultiViewGyroMotionData const& gyro_motions) {
+    if (features.empty())
       return {};
-    auto frame_ids = multiview_image | views::keys | ranges::to<std::set>;
+    auto frame_ids = features | views::keys | ranges::to<std::set>;
 
-    auto correspondences =
-      makeMultiViewCorrespondences(multiview_image, rotation_prior);
+    auto correspondences = makeMultiViewCorrespondences(features, gyro_motions);
 
     auto maybe_best_view = selectBestTwoViewPair(correspondences);
     if (!maybe_best_view) {

@@ -20,7 +20,7 @@ namespace cyclops {
 namespace cyclops::initializer {
   struct BundleAdjustmentOptimizationState;
   struct MultiViewGeometry;
-  struct TwoViewImuRotationConstraint;
+  struct GyroMotionConstraint;
 
   class BundleAdjustmentOptimizationContext {
   private:
@@ -44,6 +44,6 @@ namespace cyclops::initializer {
 
     bool construct(
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
-      std::map<FrameID, TwoViewImuRotationConstraint> const& gyro_motions);
+      std::map<FrameID, GyroMotionConstraint> const& gyro_motions);
   };
 }  // namespace cyclops::initializer

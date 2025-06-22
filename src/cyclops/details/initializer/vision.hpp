@@ -17,21 +17,16 @@ namespace cyclops::telemetry {
 
 namespace cyclops::initializer {
   struct MSfMSolution;
-  struct TwoViewImuRotationConstraint;
+  struct GyroMotionConstraint;
 
   class VisionBootstrapSolver {
-  public:
-    using MultiViewImageData =
-      std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
-    using CameraRotations = std::map<FrameID, TwoViewImuRotationConstraint>;
-
   public:
     virtual ~VisionBootstrapSolver() = default;
     virtual void reset() = 0;
 
     virtual std::vector<MSfMSolution> solve(
-      MultiViewImageData const& image_data,
-      CameraRotations const& camera_rotation_prior) = 0;
+      std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
+      std::map<FrameID, GyroMotionConstraint> const& gyro_motions) = 0;
 
     static std::unique_ptr<VisionBootstrapSolver> Create(
       std::shared_ptr<CyclopsConfig const> config,

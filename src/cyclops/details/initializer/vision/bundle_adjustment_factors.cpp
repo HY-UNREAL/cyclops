@@ -71,8 +71,8 @@ namespace cyclops::initializer {
   }
 
   BundleAdjustmentCameraRotationPriorCost::
-    BundleAdjustmentCameraRotationPriorCost(TwoViewImuRotationData const& prior)
-      : _prior(prior),
-        _weight(computeInverseCholeskyMatrixU(prior.covariance)) {
+    BundleAdjustmentCameraRotationPriorCost(GyroMotionConstraint const& motion)
+      : _motion(motion),
+        _weight(computeInverseCholeskyMatrixU(motion.covariance)) {
   }
 }  // namespace cyclops::initializer

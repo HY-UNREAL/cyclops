@@ -17,23 +17,17 @@ namespace cyclops::telemetry {
 
 namespace cyclops::initializer {
   struct MultiViewGeometry;
-  struct TwoViewImuRotationConstraint;
+  struct GyroMotionConstraint;
 
   class MultiviewVisionGeometrySolver {
-  public:
-    using MultiViewImageData =
-      std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
-    using CameraRotationPriorLookup =
-      std::map<FrameID, TwoViewImuRotationConstraint>;
-
   public:
     virtual ~MultiviewVisionGeometrySolver() = default;
     virtual void reset() = 0;
 
     // returns a sequence of possible multiview geometries.
     virtual std::vector<MultiViewGeometry> solve(
-      MultiViewImageData const& multiview_data,
-      CameraRotationPriorLookup const& camera_rotations) = 0;
+      std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
+      std::map<FrameID, GyroMotionConstraint> const& gyro_motions) = 0;
 
     static std::unique_ptr<MultiviewVisionGeometrySolver> Create(
       std::shared_ptr<CyclopsConfig const> config,

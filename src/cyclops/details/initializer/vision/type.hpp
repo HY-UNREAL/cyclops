@@ -8,12 +8,20 @@
 namespace cyclops::initializer {
   using TwoViewFeaturePair = std::tuple<Eigen::Vector2d, Eigen::Vector2d>;
 
-  struct TwoViewImuRotationData {
+  struct GyroMotionConstraint {
+    FrameID init_frame_id;
+    FrameID term_frame_id;
+
     Eigen::Quaterniond value;
     Eigen::Matrix3d covariance;
 
-    Eigen::Vector3d gyro_bias_nominal;
-    Eigen::Matrix3d gyro_bias_jacobian;
+    Eigen::Vector3d bias_nominal;
+    Eigen::Matrix3d bias_jacobian;
+  };
+
+  struct TwoViewImuRotationData {
+    Eigen::Quaterniond value;
+    Eigen::Matrix3d covariance;
   };
 
   struct TwoViewImuRotationConstraint {
@@ -53,4 +61,8 @@ namespace cyclops::initializer {
     Eigen::MatrixXd motion_information_weight;
     Eigen::Vector3d gyro_bias;
   };
+
+  using MultiViewImageData =
+    std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+  using MultiViewGyroMotionData = std::map<FrameID, GyroMotionConstraint>;
 }  // namespace cyclops::initializer
