@@ -81,8 +81,10 @@ namespace cyclops::initializer {
 
     auto dt = data->time_delta;
 
+    auto G_a = data->bias_jacobian.block<6, 3>(3, 0).eval();
+
     A_I_bar.block(0, 0, 3, 3) = N_inv__y_R_T__R_i_bar_T * dt * dt / 2;
-    A_I_bar.block(0, 3, 6, 3) = data->bias_jacobian.block<6, 3>(3, 0);
+    A_I_bar.block(0, 3, 6, 3) = -G_a;
     A_I_bar.block(0, 6 + 3 * i, 3, 3) = -N_inv__y_R_T * dt;
 
     A_I_bar.block(3, 0, 3, 3) = N_inv__y_R_T__R_i_bar_T * dt;
