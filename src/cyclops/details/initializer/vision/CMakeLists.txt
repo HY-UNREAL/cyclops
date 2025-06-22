@@ -2,6 +2,10 @@ target_sources(cyclops
   PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_acceptance.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_acceptance.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_context.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_context.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_factors.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_factors.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_states.cpp
@@ -75,6 +79,8 @@ cyclops_add_unittest(
   initializer_bundle_adjustment
   SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment.test.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_acceptance.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_context.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_states.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/bundle_adjustment_factors.cpp
   ${cyclops_src_dir}/cyclops/details/utils/math.cpp

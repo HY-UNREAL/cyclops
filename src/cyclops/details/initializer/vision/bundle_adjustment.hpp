@@ -17,8 +17,8 @@ namespace cyclops::initializer {
     virtual ~BundleAdjustmentSolver() = default;
     virtual std::optional<MSfMSolution> solve(
       MultiViewGeometry const& guess,
-      std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& data,
-      std::map<FrameID, TwoViewImuRotationConstraint> const& imu_prior) = 0;
+      std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
+      std::map<FrameID, TwoViewImuRotationConstraint> const& gyro_motion) = 0;
 
     static std::unique_ptr<BundleAdjustmentSolver> Create(
       std::shared_ptr<CyclopsConfig const> config);
