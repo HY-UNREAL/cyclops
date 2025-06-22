@@ -87,8 +87,8 @@ namespace cyclops::initializer {
       if (i == camera_rotations.end())
         return std::nullopt;
 
-      auto const& [_, rotation] = *i;
-      auto const& [q_delta, P_delta] = rotation.rotation;
+      auto const& [_1, rotation] = *i;
+      auto const& [q_delta, P_delta, _2, _3] = rotation.rotation;
 
       auto R_delta = q_delta.matrix().eval();
 
@@ -102,6 +102,8 @@ namespace cyclops::initializer {
     return TwoViewImuRotationData {
       .value = q_best_to_reference.conjugate(),
       .covariance = R_br * P_best_to_reference * R_br.transpose(),
+      .gyro_bias_nominal = Eigen::Vector3d::Zero(),
+      .gyro_bias_jacobian = Eigen::Matrix3d::Zero(),
     };
   }
 

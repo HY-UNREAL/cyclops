@@ -146,10 +146,6 @@ namespace cyclops::initializer {
     auto config = std::make_shared<CyclopsConfig>();
     config->gravity_norm = 9.81;
     config->initialization.imu = config::initializer::ImuSolverConfig {
-      .rotation_match =
-        {
-          .vision_imu_rotation_consistency_angle_threshold = 0.05,
-        },
       .sampling =
         {
           .sampling_domain_lowerbound = 0.001,
@@ -169,12 +165,10 @@ namespace cyclops::initializer {
         },
       .acceptance_test =
         {
-          .max_rotation_deviation = 1e6,
           .max_scale_log_deviation = 1e6,
           .max_normalized_gravity_deviation = 1e6,
           .max_normalized_velocity_deviation = 1e6,
           .max_sfm_perturbation = 1e6,
-          .rotation_match_min_p_value = 0,
           .translation_match_min_p_value = 0,
         },
     };

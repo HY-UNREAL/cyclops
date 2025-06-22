@@ -64,4 +64,15 @@ namespace cyclops::initializer {
 
     return true;
   }
+
+  static Eigen::Matrix3d computeInverseCholeskyMatrixU(
+    Eigen::Matrix3d const& mat) {
+    return Eigen::LLT<Eigen::Matrix3d>(mat.inverse()).matrixU();
+  }
+
+  BundleAdjustmentCameraRotationPriorCost::
+    BundleAdjustmentCameraRotationPriorCost(TwoViewImuRotationData const& prior)
+      : _prior(prior),
+        _weight(computeInverseCholeskyMatrixU(prior.covariance)) {
+  }
 }  // namespace cyclops::initializer

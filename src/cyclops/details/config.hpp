@@ -51,14 +51,13 @@ namespace cyclops::config::initializer::vision {
   struct SolutionAcceptanceThreshold {
     double min_significant_probability;
     double min_inlier_ratio;
+
+    double gyro_motion_min_p_value;
+    double gyro_bias_min_p_value;
   };
 }  // namespace cyclops::config::initializer::vision
 
 namespace cyclops::config::initializer::imu {
-  struct RotationMatchConfig {
-    double vision_imu_rotation_consistency_angle_threshold;
-  };
-
   struct ScaleSamplingConfig {
     double sampling_domain_lowerbound;
     double sampling_domain_upperbound;
@@ -80,13 +79,11 @@ namespace cyclops::config::initializer::imu {
   };
 
   struct SolutionAcceptanceThreshold {
-    double max_rotation_deviation;
     double max_scale_log_deviation;
     double max_normalized_gravity_deviation;
     double max_normalized_velocity_deviation;
     double max_sfm_perturbation;
 
-    double rotation_match_min_p_value;
     double translation_match_min_p_value;
   };
 }  // namespace cyclops::config::initializer::imu
@@ -100,6 +97,8 @@ namespace cyclops::config::initializer {
   };
 
   struct VisionSolverConfig {
+    double gyro_bias_prior_stddev;
+
     double feature_point_isotropic_noise;
     double bundle_adjustment_robust_kernel_radius;
 
@@ -113,7 +112,6 @@ namespace cyclops::config::initializer {
   struct ImuSolverConfig {
     bool imu_only;
 
-    imu::RotationMatchConfig rotation_match;
     imu::ScaleSamplingConfig sampling;
     imu::SolutionRefinementConfig refinement;
     imu::SolutionCandidateThreshold candidate_test;

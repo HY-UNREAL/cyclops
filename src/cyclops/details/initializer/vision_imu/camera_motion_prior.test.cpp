@@ -40,22 +40,15 @@ namespace cyclops::initializer {
     msfm.motion_information_weight.block(6, 6, 3, 3) = W_R2;
     msfm.motion_information_weight.block(9, 9, 3, 3) = W_p2;
 
-    auto [rotation_prior, translation_prior] =
-      makeImuMatchCameraMotionPrior(msfm);
+    auto prior = makeImuMatchCameraMotionPrior(msfm);
 
     REQUIRE(
-      (rotation_prior.rotations | views::keys | ranges::to<set>) ==
-      set<FrameID> {0, 1});
-    REQUIRE(
-      (translation_prior.translations | views::keys | ranges::to<set>) ==
+      (prior.translations | views::keys | ranges::to<set>) ==
       set<FrameID> {0, 1});
 
-    CHECK(rotation_prior.rotations.at(0).isApprox(Quaterniond(1, 0, 0, 0), 0));
-    CHECK(rotation_prior.rotations.at(1).isApprox(Quaterniond(0, 1, 0, 0), 0));
-    CHECK(translation_prior.translations.at(0) == Vector3d(1, 0, 0));
-    CHECK(translation_prior.translations.at(1) == Vector3d(0, 1, 0));
+    CHECK(prior.translations.at(0) == Vector3d(1, 0, 0));
+    CHECK(prior.translations.at(1) == Vector3d(0, 1, 0));
 
-    CHECK(translation_prior.weight == W_p2);
-    CHECK(rotation_prior.weight == W_R2);
+    CHECK(prior.weight == W_p2);
   }
 }  // namespace cyclops::initializer

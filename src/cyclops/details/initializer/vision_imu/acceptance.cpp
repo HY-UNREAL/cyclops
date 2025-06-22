@@ -1,5 +1,4 @@
 #include "cyclops/details/initializer/vision_imu/acceptance.hpp"
-#include "cyclops/details/initializer/vision_imu/rotation.hpp"
 #include "cyclops/details/initializer/vision_imu/translation.hpp"
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"
 
@@ -170,6 +169,10 @@ namespace cyclops::initializer {
     };
 
     auto const& [solution, uncertainty] = candidate;
+
+    __logger__->debug("Evaluating IMU match solution acceptance.");
+    __logger__->debug("  scale: {}", solution.scale);
+
     if (solution.scale <= 0) {
       report(RejectReason::SCALE_LESS_THAN_ZERO);
       return false;
@@ -177,15 +180,19 @@ namespace cyclops::initializer {
 
     auto const& threshold = _config->initialization.imu.acceptance_test;
 
-    auto P = uncertainty->final_cost_significant_probability;
-    auto rho = threshold.translation_match_min_p_value;
-    if (P < rho) {
+    auto p_value = uncertainty->final_cost_significant_probability;
+    auto min_p_value = threshold.translation_match_min_p_value;
+    __logger__->debug("  p-value: {}%", p_value * 100);
+
+    if (p_value < min_p_value) {
       report(RejectReason::COST_PROBABILITY_INSIGNIFICANT);
       return false;
     }
 
     auto sigma_s = uncertainty->scale_log_deviation;
     auto epsilon_s = threshold.max_scale_log_deviation;
+    __logger__->debug("  estimated scale error: {}%", sigma_s * 100);
+
     if (checkPercentThreshold("Scale", sigma_s, epsilon_s)) {
       report(RejectReason::UNDERINFORMATIVE_PARAMETER);
       return false;
@@ -194,6 +201,9 @@ namespace cyclops::initializer {
     auto gravity = _config->gravity_norm;
     auto sigma_g = uncertainty->gravity_tangent_deviation(0) / gravity;
     auto epsilon_g = threshold.max_normalized_gravity_deviation;
+    __logger__->debug(
+      "  estimated gravity direction error: {}%", sigma_g * 100);
+
     if (checkPercentThreshold("Gravity direction", sigma_g, epsilon_g)) {
       report(RejectReason::UNDERINFORMATIVE_PARAMETER);
       return false;
@@ -202,6 +212,8 @@ namespace cyclops::initializer {
     auto sigma_v =
       uncertainty->body_velocity_deviation(1) / maxVelocity(solution);
     auto epsilon_v = threshold.max_normalized_velocity_deviation;
+    __logger__->debug("  estimated velocity error: {}%", sigma_v * 100);
+
     if (checkPercentThreshold("Velocity", sigma_v, epsilon_v)) {
       report(RejectReason::UNDERINFORMATIVE_PARAMETER);
       return false;
@@ -226,7 +238,7 @@ namespace cyclops::initializer {
         &This::determineCandidateAcceptance, this, rotation_match, _1)) |
       ranges::to_vector;
 
-    if (acceptables.size() != 1) {
+    if (acceptables.size() > 1) {
       auto solutions =  //
         acceptables | views::transform([&](auto const& _) {
           auto const& [solution, uncertainty] = _;

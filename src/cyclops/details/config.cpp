@@ -3,8 +3,9 @@
 namespace cyclops::config::initializer {
   VisionSolverConfig VisionSolverConfig::CreateDefault() {
     return {
+      .gyro_bias_prior_stddev = 0.1,
       .feature_point_isotropic_noise = 0.0075,
-      .bundle_adjustment_robust_kernel_radius = 1.0,
+      .bundle_adjustment_robust_kernel_radius = 2.0,
       .two_view =
         {
           .model_selection =
@@ -33,6 +34,8 @@ namespace cyclops::config::initializer {
         {
           .min_significant_probability = 0.05,
           .min_inlier_ratio = 0.2,
+          .gyro_motion_min_p_value = 0.05,
+          .gyro_bias_min_p_value = 0.05,
         },
     };
   }
@@ -41,10 +44,6 @@ namespace cyclops::config::initializer {
     return {
       .imu_only = false,
 
-      .rotation_match =
-        {
-          .vision_imu_rotation_consistency_angle_threshold = 0.05,
-        },
       .sampling =
         {
           .sampling_domain_lowerbound = 0.001,
@@ -65,13 +64,11 @@ namespace cyclops::config::initializer {
         },
       .acceptance_test =
         {
-          .max_rotation_deviation = 0.01,
           .max_scale_log_deviation = 0.7,
           .max_normalized_gravity_deviation = 0.05,
           .max_normalized_velocity_deviation = 0.05,
           .max_sfm_perturbation = 0.10,
-          .rotation_match_min_p_value = 0.05,
-          .translation_match_min_p_value = 0.003,
+          .translation_match_min_p_value = 0.3,
         },
     };
   }

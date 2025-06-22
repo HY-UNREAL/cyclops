@@ -1,6 +1,6 @@
 #include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
 #include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/rotation.hpp"
+#include "cyclops/details/initializer/vision_imu/translation.hpp"
 
 #include "cyclops/details/measurement/preintegration.hpp"
 #include "cyclops/details/utils/math.hpp"
@@ -49,13 +49,13 @@ namespace cyclops::initializer {
 
   static ImuMotionAnalysis analyzeImuMotion(
     ImuMatchCameraTranslationPrior const& camera_translation_prior,
-    ImuRotationMatch const& rotation_matching, int n, int i,
+    ImuRotationMatch const& rotation_match, int n, int i,
     SE3Transform const& extrinsic, ImuMotionRef const& imu_motion) {
     auto A_I_bar = MatrixXd::Zero(6, 6 + 3 * n).eval();
     auto B_I_bar = MatrixXd::Zero(3, 3 * n).eval();
 
     auto const& [from, to, data] = imu_motion.get();
-    auto const& body_orientations = rotation_matching.body_orientations;
+    auto const& body_orientations = rotation_match.body_orientations;
     auto const& [p_bc, q_bc] = extrinsic;
 
     auto const& q_i_bar = body_orientations.at(from);
@@ -82,6 +82,9 @@ namespace cyclops::initializer {
     auto dt = data->time_delta;
 
     auto G_a = data->bias_jacobian.block<6, 3>(3, 0).eval();
+    auto G_w = data->bias_jacobian.block<6, 3>(3, 3).eval();
+
+    auto delta_b_w = (rotation_match.gyro_bias - data->gyrBias()).eval();
 
     A_I_bar.block(0, 0, 3, 3) = N_inv__y_R_T__R_i_bar_T * dt * dt / 2;
     A_I_bar.block(0, 3, 6, 3) = -G_a;
@@ -100,6 +103,7 @@ namespace cyclops::initializer {
       -N_inv__y_R_T * (y_p - p_bc + R_ij_bar * p_bc),
       -N_inv__y_R_T * y_v;
     // clang-format on
+    alpha_bar -= G_w * delta_b_w;
 
     Vector3d beta_bar = N_inv__y_R_T * R_i_bar_T * (p_j_hat - p_i_hat);
 

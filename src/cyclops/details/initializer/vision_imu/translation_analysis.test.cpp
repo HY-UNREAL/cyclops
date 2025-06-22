@@ -1,6 +1,6 @@
 #include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
 #include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/rotation.hpp"
+#include "cyclops/details/initializer/vision_imu/translation.hpp"
 
 #include "cyclops/details/measurement/preintegration.hpp"
 #include "cyclops/details/config.hpp"
@@ -16,9 +16,9 @@ namespace cyclops::initializer {
   using Eigen::Vector3d;
   using Eigen::VectorXd;
 
+  using measurement::ImuMotion;
   using measurement::ImuMotionRef;
   using measurement::ImuMotions;
-  using measurement::ImuMotion;
 
   template <
     typename orientation_signal_t, typename velocity_signal_t,

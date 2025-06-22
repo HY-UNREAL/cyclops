@@ -2,16 +2,17 @@
 
 #include "cyclops/details/type.hpp"
 
-namespace cyclops::config::initializer {
-  struct VisionSolverConfig;
-}  // namespace cyclops::config::initializer
+namespace cyclops {
+  struct CyclopsConfig;
+}  // namespace cyclops
 
 namespace cyclops::initializer {
   struct MultiViewGeometry;
   struct MSfMSolution;
+  struct TwoViewImuRotationConstraint;
 
   std::optional<MSfMSolution> solveBundleAdjustment(
-    config::initializer::VisionSolverConfig const& config,
-    MultiViewGeometry const& guess,
-    std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& data);
+    CyclopsConfig const& config, MultiViewGeometry const& guess,
+    std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& data,
+    std::map<FrameID, TwoViewImuRotationConstraint> const& imu_prior);
 }  // namespace cyclops::initializer

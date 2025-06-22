@@ -87,9 +87,25 @@ namespace cyclops::initializer {
     auto geometry_guess = makeMultiViewGeometryGuess(
       rgen, motion_timestamps, pose_signal, landmarks);
 
-    auto config = config::initializer::VisionSolverConfig::CreateDefault();
+    auto noise = SensorStatistics {
+      .acc_white_noise = 0.05,
+      .gyr_white_noise = 0.001,
+      .acc_random_walk = 0.00001,
+      .gyr_random_walk = 0.00001,
+      .acc_bias_prior_stddev = 0.2,
+      .gyr_bias_prior_stddev = 0.1,
+    };
+    auto extrinsic = SensorExtrinsics {
+      .imu_camera_time_delay = 0.,
+      .imu_camera_transform = SE3Transform::Identity(),
+    };
+    auto config = CyclopsConfig::CreateDefault(noise, extrinsic);
+
+    config->initialization.vision.multiview.bundle_adjustment_max_solver_time =
+      10;
+
     auto maybe_solution =
-      solveBundleAdjustment(config, geometry_guess, image_data);
+      solveBundleAdjustment(*config, geometry_guess, image_data, {});
     REQUIRE(maybe_solution.has_value());
 
     auto const& camera_motions = maybe_solution->geometry.camera_motions;

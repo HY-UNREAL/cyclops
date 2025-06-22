@@ -1,7 +1,5 @@
 #include "cyclops/details/initializer/vision_imu.hpp"
 #include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/rotation.hpp"
-#include "cyclops/details/initializer/vision_imu/translation.hpp"
 #include "cyclops/details/initializer/vision_imu/translation.imu_only.hpp"
 
 #include "cyclops/details/initializer/vision/type.hpp"
@@ -18,14 +16,11 @@ namespace cyclops::initializer {
 
   class ImuMatchSolverImpl: public ImuMatchSolver {
   private:
-    std::unique_ptr<ImuRotationMatchSolver> _rotation_solver;
     std::unique_ptr<ImuTranslationMatchSolver> _translation_solver;
-
     std::shared_ptr<CyclopsConfig const> _config;
 
   public:
     ImuMatchSolverImpl(
-      std::unique_ptr<ImuRotationMatchSolver> rotation_solver,
       std::unique_ptr<ImuTranslationMatchSolver> translation_solver,
       std::shared_ptr<CyclopsConfig const> config);
     void reset() override;
@@ -36,16 +31,12 @@ namespace cyclops::initializer {
   };
 
   ImuMatchSolverImpl::ImuMatchSolverImpl(
-    std::unique_ptr<ImuRotationMatchSolver> rotation_solver,
     std::unique_ptr<ImuTranslationMatchSolver> translation_solver,
     std::shared_ptr<CyclopsConfig const> config)
-      : _rotation_solver(std::move(rotation_solver)),
-        _translation_solver(std::move(translation_solver)),
-        _config(config) {
+      : _translation_solver(std::move(translation_solver)), _config(config) {
   }
 
   void ImuMatchSolverImpl::reset() {
-    _rotation_solver->reset();
     _translation_solver->reset();
   }
 
@@ -70,34 +61,40 @@ namespace cyclops::initializer {
         n_sfm, n_imu);
       return std::nullopt;
     }
-    auto [rotation_prior, translation_prior] =
-      makeImuMatchCameraMotionPrior(msfm);
+    auto msfm_prior = makeImuMatchCameraMotionPrior(msfm);
 
-    auto rotation_match =
-      _rotation_solver->solve(solvable_imu_motions, rotation_prior);
-    if (!rotation_match.has_value()) {
-      __logger__->info("IMU match rotation solver failed.");
-      return std::nullopt;
-    }
+    auto const& extrinsic = _config->extrinsics.imu_camera_transform;
+    auto imu_orientations =  //
+      camera_motions | views::transform([&](auto const& element) {
+        auto const& [frame_id, motion] = element;
+        auto const& q_c = motion.rotation;
+        auto const& q_bc = extrinsic.rotation;
+        return std::make_pair(frame_id, q_c * q_bc.conjugate());
+      }) |
+      ranges::to<std::map<FrameID, Eigen::Quaterniond>>;
+
+    auto rotation_match = ImuRotationMatch {
+      .gyro_bias = msfm.gyro_bias,
+      .body_orientations = imu_orientations,
+    };
 
     auto translation_match = _translation_solver->solve(
-      solvable_imu_motions, *rotation_match, translation_prior);
+      solvable_imu_motions, rotation_match, msfm_prior);
     if (!translation_match.has_value()) {
       __logger__->info("IMU match translation solver failed.");
       return std::nullopt;
     }
-    return ImuMatchSolution {*rotation_match, *translation_match};
+    return ImuMatchSolution {rotation_match, *translation_match};
   }
 
   std::unique_ptr<ImuMatchSolver> ImuMatchSolver::Create(
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
-    auto rotation_solver = ImuRotationMatchSolver::Create(config);
     auto translation_solver = config->initialization.imu.imu_only
       ? ImuOnlyTranslationMatchSolver::Create(config, telemetry)
       : ImuTranslationMatchSolver::Create(config, telemetry);
 
     return std::make_unique<ImuMatchSolverImpl>(
-      std::move(rotation_solver), std::move(translation_solver), config);
+      std::move(translation_solver), config);
   }
 }  // namespace cyclops::initializer

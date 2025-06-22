@@ -13,6 +13,20 @@ namespace cyclops {
 namespace cyclops::initializer {
   struct MultiViewGeometry;
 
+  class BundleAdjustmentGyroBiasStateBlock {
+  private:
+    block_meta::block_cascade<block_meta::bias_gyr> _data_block;
+
+  public:
+    explicit BundleAdjustmentGyroBiasStateBlock();
+
+    Eigen::Map<Eigen::Vector3d> value();
+    Eigen::Map<Eigen::Vector3d const> value() const;
+
+    double* data();
+    double const* data() const;
+  };
+
   class BundleAdjustmentCameraMotionStateBlock {
   private:
     block_meta::block_cascade<block_meta::orientation, block_meta::position>
@@ -58,12 +72,14 @@ namespace cyclops::initializer {
   };
 
   struct BundleAdjustmentOptimizationState {
+    using BiasBlock = BundleAdjustmentGyroBiasStateBlock;
     using MotionBlock = BundleAdjustmentCameraMotionStateBlock;
     using LandmarkBlock = BundleAdjustmentLandmarkPositionStateBlock;
 
     explicit BundleAdjustmentOptimizationState(
       MultiViewGeometry const& initial_guess);
 
+    BiasBlock gyro_bias;
     std::map<FrameID, MotionBlock> camera_motions;
     std::map<LandmarkID, LandmarkBlock> landmark_positions;
 

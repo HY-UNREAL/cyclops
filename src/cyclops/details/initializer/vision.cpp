@@ -220,8 +220,8 @@ namespace cyclops::initializer {
 
     auto maybe_bundle_adjustments =
       multiview_solutions | views::transform([&](auto const& solution) {
-        auto const& config = _config->initialization.vision;
-        return solveBundleAdjustment(config, solution, image_data_filtered);
+        return solveBundleAdjustment(
+          *_config, solution, image_data_filtered, camera_rotation_prior);
       }) |
       ranges::to_vector;
 

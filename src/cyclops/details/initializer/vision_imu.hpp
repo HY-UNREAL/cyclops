@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cyclops/details/initializer/vision_imu/rotation.hpp"
 #include "cyclops/details/initializer/vision_imu/translation.hpp"
 
 #include <map>

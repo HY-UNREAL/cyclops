@@ -6,6 +6,27 @@
 namespace cyclops::initializer {
   namespace views = ranges::views;
 
+  BundleAdjustmentGyroBiasStateBlock::BundleAdjustmentGyroBiasStateBlock() {
+    value() = Eigen::Vector3d::Zero();
+  }
+
+  Eigen::Map<Eigen::Vector3d> BundleAdjustmentGyroBiasStateBlock::value() {
+    return Eigen::Map<Eigen::Vector3d>(data());
+  }
+
+  Eigen::Map<Eigen::Vector3d const> BundleAdjustmentGyroBiasStateBlock::value()
+    const {
+    return Eigen::Map<Eigen::Vector3d const>(data());
+  }
+
+  double* BundleAdjustmentGyroBiasStateBlock::data() {
+    return _data_block.data();
+  }
+
+  double const* BundleAdjustmentGyroBiasStateBlock::data() const {
+    return _data_block.data();
+  }
+
   BundleAdjustmentCameraMotionStateBlock::
     BundleAdjustmentCameraMotionStateBlock(SE3Transform const& guess) {
     orientation() = guess.rotation;

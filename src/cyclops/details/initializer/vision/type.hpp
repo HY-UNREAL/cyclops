@@ -11,6 +11,9 @@ namespace cyclops::initializer {
   struct TwoViewImuRotationData {
     Eigen::Quaterniond value;
     Eigen::Matrix3d covariance;
+
+    Eigen::Vector3d gyro_bias_nominal;
+    Eigen::Matrix3d gyro_bias_jacobian;
   };
 
   struct TwoViewImuRotationConstraint {
@@ -48,5 +51,6 @@ namespace cyclops::initializer {
 
     MultiViewGeometry geometry;
     Eigen::MatrixXd motion_information_weight;
+    Eigen::Vector3d gyro_bias;
   };
 }  // namespace cyclops::initializer

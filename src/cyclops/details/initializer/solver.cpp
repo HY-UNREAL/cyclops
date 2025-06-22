@@ -109,19 +109,26 @@ namespace cyclops::initializer {
         auto const& data = ref.get();
 
         auto const& q = data.data->rotation_delta;
+        auto const& G = data.data->bias_jacobian;
         auto const& q_ext = _config->extrinsics.imu_camera_transform.rotation;
 
         auto P = data.data->covariance.template topLeftCorner<3, 3>().eval();
         auto R_ext = q_ext.matrix().eval();
 
+        auto G_w = G.template block<3, 3>(0, 3).eval();
+
         auto rotation_data = TwoViewImuRotationData {
           .value = q_ext.conjugate() * q * q_ext,
-          .covariance = R_ext.transpose() * P * R_ext};
+          .covariance = R_ext.transpose() * P * R_ext,
+          .gyro_bias_nominal = data.data->gyrBias(),
+          .gyro_bias_jacobian = R_ext.transpose() * G_w,
+        };
 
         return TwoViewImuRotationConstraint {
           .init_frame_id = data.from,
           .term_frame_id = data.to,
-          .rotation = rotation_data};
+          .rotation = rotation_data,
+        };
       }) |
       views::transform([](auto const& rotation) {
         return std::make_pair(rotation.init_frame_id, rotation);
@@ -132,7 +139,7 @@ namespace cyclops::initializer {
   InitializationSolverResult::SolutionCandidate
   InitializationSolverInternalImpl::parseSolutionCandidate(
     int msfm_index, MSfMSolution const& msfm_solution,
-    ImuRotationMatch const& rotation,
+    ImuRotationMatch const& rotation_match,
     ImuTranslationMatch const& translation_match) const {
     auto const& solution = translation_match.solution;
     auto s = solution.scale;
@@ -148,7 +155,7 @@ namespace cyclops::initializer {
     auto motions =
       views::zip(
         solution.imu_body_velocities | views::keys,
-        rotation.body_orientations | views::values,
+        rotation_match.body_orientations | views::values,
         solution.imu_body_velocities | views::values,
         solution.sfm_positions | views::values) |
       views::transform([&](auto const& pair) {
@@ -169,7 +176,7 @@ namespace cyclops::initializer {
       .scale = solution.scale,
       .gravity = solution.gravity,
 
-      .gyr_bias = rotation.gyro_bias,
+      .gyr_bias = rotation_match.gyro_bias,
       .acc_bias = solution.acc_bias,
 
       .landmarks = landmarks,

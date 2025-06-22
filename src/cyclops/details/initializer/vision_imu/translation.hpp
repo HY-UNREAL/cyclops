@@ -27,6 +27,11 @@ namespace cyclops::initializer {
     std::map<FrameID, Eigen::Vector3d> sfm_positions;
   };
 
+  struct ImuRotationMatch {
+    Eigen::Vector3d gyro_bias;
+    std::map<FrameID, Eigen::Quaterniond> body_orientations;
+  };
+
   struct ImuTranslationMatch {
     bool accept;
     ImuTranslationMatchSolution solution;

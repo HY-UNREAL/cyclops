@@ -2,7 +2,6 @@
 #include "cyclops/details/initializer/vision_imu/acceptance.imu_only.hpp"
 
 #include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/rotation.hpp"
 #include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
 #include "cyclops/details/initializer/vision_imu/translation_hessian.hpp"
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"

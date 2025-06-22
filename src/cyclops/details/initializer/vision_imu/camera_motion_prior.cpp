@@ -9,8 +9,8 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  std::tuple<ImuMatchCameraRotationPrior, ImuMatchCameraTranslationPrior>
-  makeImuMatchCameraMotionPrior(MSfMSolution const& msfm) {
+  ImuMatchCameraTranslationPrior makeImuMatchCameraMotionPrior(
+    MSfMSolution const& msfm) {
     auto const& geometry = msfm.geometry;
 
     if (geometry.camera_motions.size() == 0)
@@ -40,19 +40,7 @@ namespace cyclops::initializer {
     MatrixXd const H_rp = H.block(3 * n, 0, 3 * n, 3 * n);
     MatrixXd const H_rr = H.block(3 * n, 3 * n, 3 * n, 3 * n);
 
-    Eigen::LDLT<MatrixXd> H_pp__inv(H_pp);
     Eigen::LDLT<MatrixXd> H_rr__inv(H_rr);
-    auto orientation_prior = ImuMatchCameraRotationPrior {
-      // clang-format off
-      .rotations = geometry.camera_motions
-        | views::transform([](auto const& id_frame) {
-          auto const& [id, frame] = id_frame;
-          return std::make_pair(id, frame.rotation);
-        })
-        | ranges::to<std::map<FrameID, Eigen::Quaterniond>>,
-      // clang-format on
-      .weight = H_rr - H_rp * H_pp__inv.solve(H_pr),
-    };
     auto translation_prior = ImuMatchCameraTranslationPrior {
       // clang-format off
       .translations = geometry.camera_motions
@@ -64,6 +52,6 @@ namespace cyclops::initializer {
       // clang-format on
       .weight = H_pp - H_pr * H_rr__inv.solve(H_rp),
     };
-    return std::make_tuple(orientation_prior, translation_prior);
+    return translation_prior;
   }
 }  // namespace cyclops::initializer
