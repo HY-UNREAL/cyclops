@@ -1,7 +1,7 @@
-#include "cyclops/details/initializer/vision_imu/translation_refinement.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_cache.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_evaluation.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_refinement.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis_cache.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_evaluation.hpp"
 #include "cyclops/details/utils/debug.hpp"
 
 #include "cyclops/details/config.hpp"

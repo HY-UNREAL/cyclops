@@ -1,7 +1,7 @@
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"
-#include "cyclops/details/initializer/vision_imu/translation.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_sample.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_sample.hpp"
+#include "cyclops/details/initializer/vision_imu/type.hpp"
 #include "cyclops/details/utils/math.hpp"
 
 #include "cyclops/details/logging.hpp"

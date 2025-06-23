@@ -1,9 +1,9 @@
-#include "cyclops/details/initializer/vision_imu/translation.imu_only.hpp"
+#include "cyclops/details/initializer/vision_imu/solver.imu_only.hpp"
 #include "cyclops/details/initializer/vision_imu/acceptance.imu_only.hpp"
-
-#include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_hessian.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis.hpp"
+#include "cyclops/details/initializer/vision_imu/hessian.hpp"
+#include "cyclops/details/initializer/vision_imu/motion_prior.hpp"
+#include "cyclops/details/initializer/vision_imu/type.hpp"
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"
 
 #include "cyclops/details/utils/qcqp1.hpp"

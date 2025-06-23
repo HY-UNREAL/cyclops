@@ -1,6 +1,6 @@
-#include "cyclops/details/initializer/vision_imu/translation_evaluation.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_cache.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_evaluation.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis_cache.hpp"
 #include "cyclops/details/utils/qcqp1.hpp"
 
 namespace cyclops::initializer {

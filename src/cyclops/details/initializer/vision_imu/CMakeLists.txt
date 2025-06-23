@@ -4,46 +4,47 @@ target_sources(cyclops
   ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.imu_only.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.imu_only.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/camera_motion_prior.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/camera_motion_prior.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation.imu_only.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation.imu_only.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_hessian.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_hessian.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_refinement.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_refinement.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_sample.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_sample.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis_cache.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis_cache.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hessian.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hessian.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/motion_prior.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/motion_prior.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_evaluation.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_evaluation.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_refinement.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_refinement.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_sample.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_sample.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver.imu_only.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver.imu_only.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/type.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/type.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/uncertainty.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/uncertainty.hpp
 )
 
 cyclops_add_unittest(
-  initializer_camera_motion_prior
+  initializer_motion_prior
   SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/camera_motion_prior.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/camera_motion_prior.test.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/motion_prior.test.cpp
 )
 
 cyclops_add_unittest(
-  initializer_translation
+  initializer_solver
   SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation.test.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver.test.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_hessian.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_refinement.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_sample.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis_cache.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hessian.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_evaluation.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_refinement.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_sample.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/uncertainty.cpp
   ${cyclops_src_dir}/cyclops/details/measurement/preintegration.cpp
   ${cyclops_src_dir}/cyclops/details/telemetry/initializer.cpp
@@ -55,18 +56,16 @@ cyclops_add_unittest(
 )
 
 cyclops_add_unittest(
-  initializer_translation_analysis
+  initializer_analysis
   SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.test.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_analysis.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis.test.cpp
   ${cyclops_src_dir}/cyclops/details/measurement/preintegration.cpp
 )
 
 cyclops_add_unittest(
   initializer_translation_primal
   SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.test.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_evaluation.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/translation_cache.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_evaluation.test.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis_cache.cpp
   ${cyclops_src_dir}/cyclops/details/utils/qcqp1.cpp
 )

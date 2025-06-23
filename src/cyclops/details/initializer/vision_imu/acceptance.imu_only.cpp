@@ -1,6 +1,5 @@
 #include "cyclops/details/initializer/vision_imu/acceptance.imu_only.hpp"
-#include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/translation.hpp"
+#include "cyclops/details/initializer/vision_imu/type.hpp"
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"
 
 #include "cyclops/details/telemetry/initializer.hpp"

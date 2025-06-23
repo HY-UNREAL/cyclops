@@ -1,5 +1,5 @@
-#include "cyclops/details/initializer/vision_imu/translation_hessian.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
+#include "cyclops/details/initializer/vision_imu/hessian.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis.hpp"
 
 namespace cyclops::initializer {
   using Eigen::Matrix3d;

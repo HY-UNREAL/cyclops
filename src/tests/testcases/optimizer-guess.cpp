@@ -10,8 +10,8 @@
 #include "cyclops/details/estimation/state/accessor_write.hpp"
 #include "cyclops/details/estimation/state/state_internal.hpp"
 
+#include "cyclops/details/initializer/candidate.hpp"
 #include "cyclops/details/initializer/initializer.hpp"
-#include "cyclops/details/initializer/solver.hpp"
 
 #include "cyclops/details/measurement/preintegration.hpp"
 

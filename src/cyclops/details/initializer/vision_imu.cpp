@@ -1,6 +1,8 @@
 #include "cyclops/details/initializer/vision_imu.hpp"
-#include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
-#include "cyclops/details/initializer/vision_imu/translation.imu_only.hpp"
+#include "cyclops/details/initializer/vision_imu/motion_prior.hpp"
+#include "cyclops/details/initializer/vision_imu/solver.hpp"
+#include "cyclops/details/initializer/vision_imu/solver.imu_only.hpp"
+#include "cyclops/details/initializer/vision_imu/type.hpp"
 
 #include "cyclops/details/initializer/vision/type.hpp"
 #include "cyclops/details/telemetry/initializer.hpp"

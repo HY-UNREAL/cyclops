@@ -1,7 +1,7 @@
-#include "cyclops/details/initializer/solver.hpp"
+#include "cyclops/details/initializer/candidate.hpp"
+
 #include "cyclops/details/initializer/vision.hpp"
 #include "cyclops/details/initializer/vision_imu.hpp"
-#include "cyclops/details/initializer/vision/type.hpp"
 
 #include "cyclops/details/measurement/data_provider.hpp"
 #include "cyclops/details/measurement/preintegration.hpp"

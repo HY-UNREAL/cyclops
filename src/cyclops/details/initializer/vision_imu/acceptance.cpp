@@ -1,5 +1,5 @@
 #include "cyclops/details/initializer/vision_imu/acceptance.hpp"
-#include "cyclops/details/initializer/vision_imu/translation.hpp"
+#include "cyclops/details/initializer/vision_imu/type.hpp"
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"
 
 #include "cyclops/details/telemetry/initializer.hpp"

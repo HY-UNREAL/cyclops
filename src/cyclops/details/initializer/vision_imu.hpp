@@ -1,6 +1,7 @@
 #pragma once
 
-#include "cyclops/details/initializer/vision_imu/translation.hpp"
+#include "cyclops/details/initializer/vision_imu/type.hpp"
+#include "cyclops/details/measurement/type.hpp"
 
 #include <map>
 #include <memory>
@@ -16,6 +17,7 @@ namespace cyclops::telemetry {
 
 namespace cyclops::initializer {
   struct MSfMSolution;
+  struct ImuMatchResult;
 
   class VisionImuInitializer {
   public:

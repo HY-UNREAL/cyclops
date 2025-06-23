@@ -1,5 +1,5 @@
-#include "cyclops/details/initializer/vision_imu/translation.cpp"
-#include "cyclops/details/initializer/vision_imu/translation_evaluation.hpp"
+#include "cyclops/details/initializer/vision_imu/solver.cpp"
+#include "cyclops/details/initializer/vision_imu/scale_evaluation.hpp"
 #include "cyclops/details/measurement/keyframe.hpp"
 
 #include "cyclops/details/config.hpp"

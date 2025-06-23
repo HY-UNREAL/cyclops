@@ -1,10 +1,10 @@
-#include "cyclops/details/initializer/vision_imu/translation_sample.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_sample.hpp"
 
-#include "cyclops/details/initializer/vision_imu/translation_analysis.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_cache.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_refinement.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_evaluation.hpp"
-#include "cyclops/details/initializer/vision_imu/translation_hessian.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis.hpp"
+#include "cyclops/details/initializer/vision_imu/analysis_cache.hpp"
+#include "cyclops/details/initializer/vision_imu/hessian.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_refinement.hpp"
+#include "cyclops/details/initializer/vision_imu/scale_evaluation.hpp"
 #include "cyclops/details/telemetry/initializer.hpp"
 
 #include "cyclops/details/config.hpp"
@@ -40,18 +40,18 @@ namespace cyclops::initializer {
 
   public:
     ImuMatchScaleSampleSolverContext(
-      ImuMatchLocalOptimizer& local_optimizer,
-      ImuMatchAnalysis const& analysis, ImuMatchAnalysisCache const& cache,
-      CyclopsConfig const& config, telemetry::InitializerTelemetry& telemetry);
+      ImuMatchLocalOptimizer& local_optimizer, ImuMatchAnalysis const& analysis,
+      ImuMatchAnalysisCache const& cache, CyclopsConfig const& config,
+      telemetry::InitializerTelemetry& telemetry);
 
     std::optional<vector<ImuMatchScaleSampleSolution>> solve(
       std::set<FrameID> const& motion_frames);
   };
 
   ImuMatchScaleSampleSolverContext::ImuMatchScaleSampleSolverContext(
-    ImuMatchLocalOptimizer& local_optimizer,
-    ImuMatchAnalysis const& analysis, ImuMatchAnalysisCache const& cache,
-    CyclopsConfig const& config, telemetry::InitializerTelemetry& telemetry)
+    ImuMatchLocalOptimizer& local_optimizer, ImuMatchAnalysis const& analysis,
+    ImuMatchAnalysisCache const& cache, CyclopsConfig const& config,
+    telemetry::InitializerTelemetry& telemetry)
       : local_optimizer(local_optimizer),
         analysis(analysis),
         evaluator(config.gravity_norm, analysis, cache),

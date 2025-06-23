@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cyclops/details/initializer/vision_imu/translation.hpp"
+#include "cyclops/details/initializer/vision_imu/solver.hpp"
 
 #include <map>
 #include <memory>

@@ -1,4 +1,4 @@
-#include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
+#include "cyclops/details/initializer/vision_imu/motion_prior.hpp"
 #include "cyclops/details/initializer/vision/type.hpp"
 
 #include <range/v3/all.hpp>

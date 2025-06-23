@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cyclops/details/type.hpp"
+#include "cyclops/details/initializer/vision/type.hpp"
 
 #include <random>
 #include <map>
@@ -16,8 +16,8 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct MSfMSolution;
   struct GyroMotionConstraint;
+  struct MSfMSolution;
 
   class VisionInitializer {
   public:
