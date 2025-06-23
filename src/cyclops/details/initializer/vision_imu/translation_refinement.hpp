@@ -15,20 +15,20 @@ namespace cyclops::initializer {
     double cost;
   };
 
-  class ImuTranslationMatchLocalOptimizer {
+  class ImuMatchLocalOptimizer {
   private:
     std::shared_ptr<CyclopsConfig const> _config;
 
   public:
-    explicit ImuTranslationMatchLocalOptimizer(
+    explicit ImuMatchLocalOptimizer(
       std::shared_ptr<CyclopsConfig const> config);
-    ~ImuTranslationMatchLocalOptimizer();
+    ~ImuMatchLocalOptimizer();
     void reset();
 
     std::optional<ImuMatchScaleRefinement> optimize(
       ImuMatchScaleEvaluationContext const& evaluator, double s0);
 
-    static std::unique_ptr<ImuTranslationMatchLocalOptimizer> Create(
+    static std::unique_ptr<ImuMatchLocalOptimizer> Create(
       std::shared_ptr<CyclopsConfig const> config);
   };
 }  // namespace cyclops::initializer

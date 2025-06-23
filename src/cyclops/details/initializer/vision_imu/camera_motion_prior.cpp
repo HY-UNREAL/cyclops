@@ -9,15 +9,10 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
-  ImuMatchCameraTranslationPrior makeImuMatchCameraMotionPrior(
+  static MatrixXd evaluateCameraPositionInformationWeight(
     MSfMSolution const& msfm) {
-    auto const& geometry = msfm.geometry;
-
-    if (geometry.camera_motions.size() == 0)
-      return {};
-
     // discount by one to handle symmetry
-    auto n = static_cast<int>(geometry.camera_motions.size() - 1);
+    auto n = static_cast<int>(msfm.geometry.camera_motions.size() - 1);
 
     Eigen::VectorXi orientation_indices(3 * n);
     Eigen::VectorXi translation_indices(3 * n);
@@ -41,17 +36,34 @@ namespace cyclops::initializer {
     MatrixXd const H_rr = H.block(3 * n, 3 * n, 3 * n, 3 * n);
 
     Eigen::LDLT<MatrixXd> H_rr__inv(H_rr);
-    auto translation_prior = ImuMatchCameraTranslationPrior {
-      // clang-format off
-      .translations = geometry.camera_motions
-        | views::transform([](auto const& id_frame) {
-          auto const& [id, frame] = id_frame;
-          return std::make_pair(id, frame.translation);
-        })
-        | ranges::to<std::map<FrameID, Eigen::Vector3d>>,
-      // clang-format on
-      .weight = H_pp - H_pr * H_rr__inv.solve(H_rp),
+    return H_pp - H_pr * H_rr__inv.solve(H_rp);
+  }
+
+  ImuMatchCameraMotionPrior makeImuMatchCameraMotionPrior(
+    MSfMSolution const& msfm, SE3Transform const& camera_extrinsic) {
+    if (msfm.geometry.camera_motions.size() == 0)
+      return {};
+
+    auto imu_orientations =  //
+      msfm.geometry.camera_motions | views::transform([&](auto const& element) {
+        auto const& [frame_id, motion] = element;
+        auto const& q_c = motion.rotation;
+        auto const& q_bc = camera_extrinsic.rotation;
+        return std::make_pair(frame_id, q_c * q_bc.conjugate());
+      }) |
+      ranges::to<std::map<FrameID, Eigen::Quaterniond>>;
+    auto camera_positions =  //
+      msfm.geometry.camera_motions | views::transform([](auto const& id_frame) {
+        auto const& [id, frame] = id_frame;
+        return std::make_pair(id, frame.translation);
+      }) |
+      ranges::to<std::map<FrameID, Eigen::Vector3d>>;
+
+    return ImuMatchCameraMotionPrior {
+      .imu_orientations = imu_orientations,
+      .camera_positions = camera_positions,
+      .gyro_bias = msfm.gyro_bias,
+      .weight = evaluateCameraPositionInformationWeight(msfm),
     };
-    return translation_prior;
   }
 }  // namespace cyclops::initializer

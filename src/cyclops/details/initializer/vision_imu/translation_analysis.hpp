@@ -10,8 +10,7 @@ namespace cyclops {
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct ImuMatchCameraTranslationPrior;
-  struct ImuRotationMatch;
+  struct ImuMatchCameraMotionPrior;
 
   /*
    * represents biquadratic translational visual-inertial matching cost,
@@ -37,7 +36,7 @@ namespace cyclops::initializer {
    *
    *  x_V starts from dp[2] to handle global translation symmetry.
    */
-  struct ImuTranslationMatchAnalysis {
+  struct ImuMatchAnalysis {
     size_t frames_count;
     size_t residual_dimension;
     size_t parameter_dimension;
@@ -50,17 +49,16 @@ namespace cyclops::initializer {
     Eigen::VectorXd translation_perturbation;
   };
 
-  class ImuTranslationMatchAnalyzer {
+  class ImuMatchAnalyzer {
   public:
-    virtual ~ImuTranslationMatchAnalyzer() = default;
+    virtual ~ImuMatchAnalyzer() = default;
     virtual void reset() = 0;
 
-    virtual ImuTranslationMatchAnalysis analyze(
+    virtual ImuMatchAnalysis analyze(
       measurement::ImuMotionRefs const& motions,
-      ImuRotationMatch const& rotations,
-      ImuMatchCameraTranslationPrior const& camera_prior) = 0;
+      ImuMatchCameraMotionPrior const& camera_prior) = 0;
 
-    static std::unique_ptr<ImuTranslationMatchAnalyzer> Create(
+    static std::unique_ptr<ImuMatchAnalyzer> Create(
       std::shared_ptr<CyclopsConfig const> config);
   };
 }  // namespace cyclops::initializer

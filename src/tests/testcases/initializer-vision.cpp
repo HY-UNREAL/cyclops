@@ -36,7 +36,7 @@ namespace cyclops::initializer {
     return Eigen::AngleAxisd(theta, Vector3d::UnitZ()) * q0;
   }
 
-  TEST_CASE("Vision bootstrap solver") {
+  TEST_CASE("Test vision initializer") {
     auto rgen = std::make_shared<std::mt19937>(2021052403);
 
     auto pose_signal = PoseSignal {
@@ -60,7 +60,7 @@ namespace cyclops::initializer {
 
     auto config = makeDefaultConfig();
     config->initialization.vision.feature_point_isotropic_noise = 0.005;
-    auto solver = VisionBootstrapSolver::Create(
+    auto solver = VisionInitializer::Create(
       config, rgen, InitializerTelemetry::CreateDefault());
     auto solutions =
       solver->solve(multiview_image_data, multiview_rotation_prior);

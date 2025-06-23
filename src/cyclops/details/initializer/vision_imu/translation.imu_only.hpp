@@ -7,11 +7,11 @@
 #include <optional>
 
 namespace cyclops::initializer {
-  class ImuOnlyTranslationMatchSolver: public ImuTranslationMatchSolver {
+  class ImuOnlyMatchSolver: public ImuMatchSolver {
   public:
-    virtual ~ImuOnlyTranslationMatchSolver() = default;
+    virtual ~ImuOnlyMatchSolver() = default;
 
-    static std::unique_ptr<ImuOnlyTranslationMatchSolver> Create(
+    static std::unique_ptr<ImuOnlyMatchSolver> Create(
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };

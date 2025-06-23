@@ -17,21 +17,16 @@ namespace cyclops::telemetry {
 namespace cyclops::initializer {
   struct MSfMSolution;
 
-  struct ImuMatchSolution {
-    ImuRotationMatch rotation_match;
-    std::vector<ImuTranslationMatch> translation_match;
-  };
-
-  class ImuMatchSolver {
+  class VisionImuInitializer {
   public:
-    virtual ~ImuMatchSolver() = default;
+    virtual ~VisionImuInitializer() = default;
     virtual void reset() = 0;
 
-    virtual std::optional<ImuMatchSolution> solve(
+    virtual std::optional<std::vector<ImuMatchResult>> solve(
       MSfMSolution const& msfm,
       measurement::ImuMotionRefs const& imu_motions) = 0;
 
-    static std::unique_ptr<ImuMatchSolver> Create(
+    static std::unique_ptr<VisionImuInitializer> Create(
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };

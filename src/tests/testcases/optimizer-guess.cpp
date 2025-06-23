@@ -82,15 +82,15 @@ namespace cyclops::initializer {
     std::shared_ptr telemetry =
       telemetry::InitializerTelemetry::CreateDefault();
 
-    auto bootstrap_internal =
-      InitializationSolverInternal::Create(rgen, config, mprovider, telemetry);
-    auto bootstrap_solver = InitializerMain::Create(
-      std::move(bootstrap_internal), keyframe_manager, telemetry);
+    auto candidate_solver =
+      InitializerCandidateSolver::Create(rgen, config, mprovider, telemetry);
+    auto initializer = InitializerMain::Create(
+      std::move(candidate_solver), keyframe_manager, telemetry);
 
-    auto initializer = estimation::OptimizerSolutionGuessPredictor::Create(
-      std::move(bootstrap_solver), config, state_reader, mprovider);
+    auto predictor = estimation::OptimizerSolutionGuessPredictor::Create(
+      std::move(initializer), config, state_reader, mprovider);
 
-    return std::make_tuple(state_reader, state_writer, std::move(initializer));
+    return std::make_tuple(state_reader, state_writer, std::move(predictor));
   }
 
   static auto CHECK_MOTION_STATE_VALID(

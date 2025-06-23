@@ -5,17 +5,16 @@
 #include <memory>
 
 namespace cyclops::initializer {
-  struct ImuTranslationMatchAnalysis;
+  struct ImuMatchAnalysis;
 
-  class ImuTranslationMatchAnalysisCache {
+  class ImuMatchAnalysisCache {
   private:
     struct Impl;
     std::unique_ptr<Impl> _pimpl;
 
   public:
-    explicit ImuTranslationMatchAnalysisCache(
-      ImuTranslationMatchAnalysis const& analysis);
-    ~ImuTranslationMatchAnalysisCache();
+    explicit ImuMatchAnalysisCache(ImuMatchAnalysis const& analysis);
+    ~ImuMatchAnalysisCache();
 
     /*
      * Represents the following Schur-decomposed system of linear equations,

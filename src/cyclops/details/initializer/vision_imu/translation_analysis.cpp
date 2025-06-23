@@ -19,24 +19,22 @@ namespace cyclops::initializer {
 
   using measurement::ImuMotionRef;
 
-  class ImuTranslationMatchAnalyzerImpl: public ImuTranslationMatchAnalyzer {
+  class ImuMatchAnalyzerImpl: public ImuMatchAnalyzer {
   private:
     std::shared_ptr<CyclopsConfig const> _config;
 
   public:
-    explicit ImuTranslationMatchAnalyzerImpl(
-      std::shared_ptr<CyclopsConfig const> config)
+    explicit ImuMatchAnalyzerImpl(std::shared_ptr<CyclopsConfig const> config)
         : _config(config) {
     }
     void reset() override;
 
-    ImuTranslationMatchAnalysis analyze(
+    ImuMatchAnalysis analyze(
       std::vector<ImuMotionRef> const& imu_motions,
-      ImuRotationMatch const& rotations,
-      ImuMatchCameraTranslationPrior const& camera_prior) override;
+      ImuMatchCameraMotionPrior const& camera_prior) override;
   };
 
-  void ImuTranslationMatchAnalyzerImpl::reset() {
+  void ImuMatchAnalyzerImpl::reset() {
     // does nothing.
   }
 
@@ -48,22 +46,20 @@ namespace cyclops::initializer {
   };
 
   static ImuMotionAnalysis analyzeImuMotion(
-    ImuMatchCameraTranslationPrior const& camera_translation_prior,
-    ImuRotationMatch const& rotation_match, int n, int i,
+    ImuMatchCameraMotionPrior const& camera_prior, int n, int i,
     SE3Transform const& extrinsic, ImuMotionRef const& imu_motion) {
     auto A_I_bar = MatrixXd::Zero(6, 6 + 3 * n).eval();
     auto B_I_bar = MatrixXd::Zero(3, 3 * n).eval();
 
     auto const& [from, to, data] = imu_motion.get();
-    auto const& body_orientations = rotation_match.body_orientations;
     auto const& [p_bc, q_bc] = extrinsic;
 
-    auto const& q_i_bar = body_orientations.at(from);
-    auto const& q_j_bar = body_orientations.at(to);
+    auto const& q_i_bar = camera_prior.imu_orientations.at(from);
+    auto const& q_j_bar = camera_prior.imu_orientations.at(to);
     auto q_ij_bar = q_i_bar.conjugate() * q_j_bar;
 
-    auto const& p_i_hat = camera_translation_prior.translations.at(from);
-    auto const& p_j_hat = camera_translation_prior.translations.at(to);
+    auto const& p_i_hat = camera_prior.camera_positions.at(from);
+    auto const& p_j_hat = camera_prior.camera_positions.at(to);
 
     auto y_R_T = data->rotation_delta.conjugate().matrix().eval();
     auto const& y_v = data->velocity_delta;
@@ -84,7 +80,7 @@ namespace cyclops::initializer {
     auto G_a = data->bias_jacobian.block<6, 3>(3, 0).eval();
     auto G_w = data->bias_jacobian.block<6, 3>(3, 3).eval();
 
-    auto delta_b_w = (rotation_match.gyro_bias - data->gyrBias()).eval();
+    auto delta_b_w = (camera_prior.gyro_bias - data->gyrBias()).eval();
 
     A_I_bar.block(0, 0, 3, 3) = N_inv__y_R_T__R_i_bar_T * dt * dt / 2;
     A_I_bar.block(0, 3, 6, 3) = -G_a;
@@ -118,10 +114,9 @@ namespace cyclops::initializer {
     };
   }
 
-  ImuTranslationMatchAnalysis ImuTranslationMatchAnalyzerImpl::analyze(
+  ImuMatchAnalysis ImuMatchAnalyzerImpl::analyze(
     std::vector<ImuMotionRef> const& imu_motions,
-    ImuRotationMatch const& rotations,
-    ImuMatchCameraTranslationPrior const& camera_prior) {
+    ImuMatchCameraMotionPrior const& camera_prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
     auto acc_bias_prior_weight = 1 / _config->noise.acc_bias_prior_stddev;
 
@@ -139,8 +134,7 @@ namespace cyclops::initializer {
     A_I.block(0, 3, 3, 3) = acc_bias_prior_weight * Matrix3d::Identity();
 
     for (auto const& [i, motion] : ranges::views::enumerate(imu_motions)) {
-      auto analysis =
-        analyzeImuMotion(camera_prior, rotations, n, i, extrinsic, motion);
+      auto analysis = analyzeImuMotion(camera_prior, n, i, extrinsic, motion);
       A_I.middleRows(6 * i + 3, 6) = analysis.A_I;
       B_I.middleRows(6 * i + 3, 6) = analysis.B_I;
       alpha.segment(6 * i + 3, 6) = analysis.alpha;
@@ -160,9 +154,8 @@ namespace cyclops::initializer {
     };
   }
 
-  std::unique_ptr<ImuTranslationMatchAnalyzer>
-  ImuTranslationMatchAnalyzer::Create(
+  std::unique_ptr<ImuMatchAnalyzer> ImuMatchAnalyzer::Create(
     std::shared_ptr<CyclopsConfig const> config) {
-    return std::make_unique<ImuTranslationMatchAnalyzerImpl>(config);
+    return std::make_unique<ImuMatchAnalyzerImpl>(config);
   }
 }  // namespace cyclops::initializer

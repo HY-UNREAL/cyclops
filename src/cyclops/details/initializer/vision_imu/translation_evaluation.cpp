@@ -10,8 +10,8 @@ namespace cyclops::initializer {
   using Eigen::VectorXd;
 
   ImuMatchScaleEvaluationContext::ImuMatchScaleEvaluationContext(
-    double gravity_norm, ImuTranslationMatchAnalysis const& analysis,
-    ImuTranslationMatchAnalysisCache const& cache)
+    double gravity_norm, ImuMatchAnalysis const& analysis,
+    ImuMatchAnalysisCache const& cache)
       : gravity_norm(gravity_norm), analysis(analysis), cache(cache) {
   }
 

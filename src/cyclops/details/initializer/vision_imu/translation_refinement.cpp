@@ -62,7 +62,7 @@ namespace cyclops::initializer {
     double trust_region_step_accept_quality_threshold;
   };
 
-  class ImuTranslationMatchLocalOptimizationSolver {
+  class ImuMatchLocalOptimizationSolver {
   private:
     BfgsTrustRegionConfig _config;
 
@@ -240,7 +240,7 @@ namespace cyclops::initializer {
     }
 
   public:
-    explicit ImuTranslationMatchLocalOptimizationSolver(
+    explicit ImuMatchLocalOptimizationSolver(
       BfgsTrustRegionConfig const& config)
         : _config(config) {
     }
@@ -283,20 +283,18 @@ namespace cyclops::initializer {
     }
   };
 
-  ImuTranslationMatchLocalOptimizer::ImuTranslationMatchLocalOptimizer(
+  ImuMatchLocalOptimizer::ImuMatchLocalOptimizer(
     std::shared_ptr<CyclopsConfig const> config)
       : _config(config) {
   }
 
-  ImuTranslationMatchLocalOptimizer::~ImuTranslationMatchLocalOptimizer() =
-    default;
+  ImuMatchLocalOptimizer::~ImuMatchLocalOptimizer() = default;
 
-  void ImuTranslationMatchLocalOptimizer::reset() {
+  void ImuMatchLocalOptimizer::reset() {
     // does nothing.
   }
 
-  std::optional<ImuMatchScaleRefinement>
-  ImuTranslationMatchLocalOptimizer::optimize(
+  std::optional<ImuMatchScaleRefinement> ImuMatchLocalOptimizer::optimize(
     ImuMatchScaleEvaluationContext const& evaluator, double s0) {
     __logger__->debug(
       "Finding IMU match local optima around the initial guess...");
@@ -306,7 +304,7 @@ namespace cyclops::initializer {
     auto const& local_opt_config = _config->initialization.imu.refinement;
     auto gravity = _config->gravity_norm;
 
-    auto solver = ImuTranslationMatchLocalOptimizationSolver({
+    auto solver = ImuMatchLocalOptimizationSolver({
       .max_iterations = local_opt_config.max_iteration,
       .initial_hessian_approximation = 1,
       .initial_trust_region_radius = 0.1,
@@ -327,9 +325,8 @@ namespace cyclops::initializer {
     return result;
   }
 
-  std::unique_ptr<ImuTranslationMatchLocalOptimizer>
-  ImuTranslationMatchLocalOptimizer::Create(
+  std::unique_ptr<ImuMatchLocalOptimizer> ImuMatchLocalOptimizer::Create(
     std::shared_ptr<CyclopsConfig const> config) {
-    return std::make_unique<ImuTranslationMatchLocalOptimizer>(config);
+    return std::make_unique<ImuMatchLocalOptimizer>(config);
   }
 }  // namespace cyclops::initializer

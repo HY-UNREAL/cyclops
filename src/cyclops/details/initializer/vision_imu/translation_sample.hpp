@@ -16,8 +16,8 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct ImuTranslationMatchAnalysis;
-  struct ImuTranslationMatchAnalysisCache;
+  struct ImuMatchAnalysis;
+  struct ImuMatchAnalysisCache;
 
   struct ImuMatchScaleSampleSolution {
     double scale;
@@ -35,9 +35,8 @@ namespace cyclops::initializer {
     virtual void reset() = 0;
 
     virtual std::optional<std::vector<ImuMatchScaleSampleSolution>> solve(
-      std::set<FrameID> const& motion_frames,
-      ImuTranslationMatchAnalysis const& analysis,
-      ImuTranslationMatchAnalysisCache const& cache) const = 0;
+      std::set<FrameID> const& motion_frames, ImuMatchAnalysis const& analysis,
+      ImuMatchAnalysisCache const& cache) const = 0;
 
     static std::unique_ptr<ImuMatchScaleSampleSolver> Create(
       std::shared_ptr<CyclopsConfig const> config,

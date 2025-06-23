@@ -13,24 +13,22 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct ImuRotationMatch;
-  struct ImuTranslationMatch;
-  struct ImuTranslationMatchSolution;
-  struct ImuTranslationMatchUncertainty;
+  struct ImuMatchResult;
+  struct ImuMatchSolution;
+  struct ImuMatchUncertainty;
 
-  using ImuTranslationMatchCandidate = std::tuple<
-    ImuTranslationMatchSolution, std::optional<ImuTranslationMatchUncertainty>>;
+  using ImuMatchCandidate =
+    std::tuple<ImuMatchSolution, std::optional<ImuMatchUncertainty>>;
 
-  class ImuTranslationMatchAcceptDiscriminator {
+  class ImuMatchAcceptDiscriminator {
   public:
-    virtual ~ImuTranslationMatchAcceptDiscriminator() = default;
+    virtual ~ImuMatchAcceptDiscriminator() = default;
     virtual void reset() = 0;
 
-    virtual std::vector<ImuTranslationMatch> determineAcceptance(
-      ImuRotationMatch const& rotation_match,
-      std::vector<ImuTranslationMatchCandidate> const& candidates) const = 0;
+    virtual std::vector<ImuMatchResult> determineAcceptance(
+      std::vector<ImuMatchCandidate> const& match_candidates) const = 0;
 
-    static std::unique_ptr<ImuTranslationMatchAcceptDiscriminator> Create(
+    static std::unique_ptr<ImuMatchAcceptDiscriminator> Create(
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };

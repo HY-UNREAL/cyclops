@@ -1,4 +1,5 @@
 #include "cyclops/details/initializer/vision_imu/acceptance.imu_only.hpp"
+#include "cyclops/details/initializer/vision_imu/camera_motion_prior.hpp"
 #include "cyclops/details/initializer/vision_imu/translation.hpp"
 #include "cyclops/details/initializer/vision_imu/uncertainty.hpp"
 
@@ -14,18 +15,17 @@ namespace cyclops::initializer {
   using RejectReason = InitializerTelemetry::ImuMatchCandidateRejectReason;
 
   static InitializerTelemetry::ImuMatchSolutionPoint makeTelemetrySolutionPoint(
-    ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchSolution const& translation_match) {
+    ImuMatchSolution const& match) {
     return {
-      .scale = translation_match.scale,
-      .cost = translation_match.cost,
+      .scale = match.scale,
+      .cost = match.cost,
 
-      .gravity = translation_match.gravity,
-      .acc_bias = translation_match.acc_bias,
-      .gyr_bias = rotation_match.gyro_bias,
-      .imu_orientations = rotation_match.body_orientations,
-      .imu_body_velocities = translation_match.imu_body_velocities,
-      .sfm_positions = translation_match.sfm_positions,
+      .gravity = match.gravity,
+      .acc_bias = match.acc_bias,
+      .gyr_bias = match.gyr_bias,
+      .imu_orientations = match.body_orientations,
+      .imu_body_velocities = match.body_velocities,
+      .sfm_positions = match.sfm_positions,
     };
   }
 
@@ -40,29 +40,28 @@ namespace cyclops::initializer {
     return false;
   }
 
-  static auto maxVelocity(ImuTranslationMatchSolution const& solution) {
+  static auto maxVelocity(ImuMatchSolution const& solution) {
     double result = 1e-6;
-    for (auto const& [_, v] : solution.imu_body_velocities)
+    for (auto const& [_, v] : solution.body_velocities)
       result = std::max<double>(v.norm(), result);
     return result;
   }
 
-  class ImuOnlyTranslationMatchAcceptDiscriminatorImpl:
-      public ImuOnlyTranslationMatchAcceptDiscriminator {
+  class ImuOnlyMatchAcceptDiscriminatorImpl:
+      public ImuOnlyMatchAcceptDiscriminator {
   private:
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<InitializerTelemetry> _telemetry;
 
     std::optional<InitializerTelemetry::ImuMatchUncertainty>
     makeSolutionUncertaintyReport(
-      ImuTranslationMatchCandidate const& candidate) const;
+      ImuMatchCandidate const& match_candidate) const;
 
     InitializerTelemetry::ImuMatchReject makeRejectReport(
-      RejectReason reason, ImuRotationMatch const& rotation_match,
-      ImuTranslationMatchCandidate const& candidate) const;
+      RejectReason reason, ImuMatchCandidate const& match_candidate) const;
 
   public:
-    ImuOnlyTranslationMatchAcceptDiscriminatorImpl(
+    ImuOnlyMatchAcceptDiscriminatorImpl(
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<InitializerTelemetry> telemetry)
         : _config(config), _telemetry(telemetry) {
@@ -70,14 +69,13 @@ namespace cyclops::initializer {
     void reset() override;
 
     bool determineAccept(
-      ImuRotationMatch const& rotation_match,
-      ImuTranslationMatchCandidate const& candidate) const override;
+      ImuMatchCandidate const& match_candidate) const override;
   };
 
   std::optional<InitializerTelemetry::ImuMatchUncertainty>
-  ImuOnlyTranslationMatchAcceptDiscriminatorImpl::makeSolutionUncertaintyReport(
-    ImuTranslationMatchCandidate const& candidate) const {
-    auto const& [solution, maybe_uncertainty] = candidate;
+  ImuOnlyMatchAcceptDiscriminatorImpl::makeSolutionUncertaintyReport(
+    ImuMatchCandidate const& match_candidate) const {
+    auto const& [solution, maybe_uncertainty] = match_candidate;
     if (!maybe_uncertainty.has_value())
       return std::nullopt;
 
@@ -100,31 +98,28 @@ namespace cyclops::initializer {
     };
   }
 
-  void ImuOnlyTranslationMatchAcceptDiscriminatorImpl::reset() {
+  void ImuOnlyMatchAcceptDiscriminatorImpl::reset() {
     _telemetry->reset();
   }
 
   InitializerTelemetry::ImuMatchReject
-  ImuOnlyTranslationMatchAcceptDiscriminatorImpl::makeRejectReport(
-    RejectReason reason, ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchCandidate const& candidate) const {
-    auto const& [solution, _] = candidate;
+  ImuOnlyMatchAcceptDiscriminatorImpl::makeRejectReport(
+    RejectReason reason, ImuMatchCandidate const& match_candidate) const {
+    auto const& [solution, _] = match_candidate;
 
     return InitializerTelemetry::ImuMatchReject {
       .reason = reason,
-      .solution = makeTelemetrySolutionPoint(rotation_match, solution),
-      .uncertainty = makeSolutionUncertaintyReport(candidate),
+      .solution = makeTelemetrySolutionPoint(solution),
+      .uncertainty = makeSolutionUncertaintyReport(match_candidate),
     };
   }
 
-  bool ImuOnlyTranslationMatchAcceptDiscriminatorImpl::determineAccept(
-    ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchCandidate const& candidate) const {
+  bool ImuOnlyMatchAcceptDiscriminatorImpl::determineAccept(
+    ImuMatchCandidate const& match_candidate) const {
     auto report = [&](auto reason) {
-      _telemetry->onImuMatchReject(
-        makeRejectReport(reason, rotation_match, candidate));
+      _telemetry->onImuMatchReject(makeRejectReport(reason, match_candidate));
     };
-    auto const& [solution, uncertainty] = candidate;
+    auto const& [solution, uncertainty] = match_candidate;
 
     if (!uncertainty.has_value()) {
       report(RejectReason::UNCERTAINTY_EVALUATION_FAILED);
@@ -162,17 +157,17 @@ namespace cyclops::initializer {
     }
 
     _telemetry->onImuMatchAccept({
-      .solution = makeTelemetrySolutionPoint(rotation_match, solution),
-      .uncertainty = makeSolutionUncertaintyReport(candidate).value(),
+      .solution = makeTelemetrySolutionPoint(solution),
+      .uncertainty = makeSolutionUncertaintyReport(match_candidate).value(),
     });
     return true;
   }
 
-  std::unique_ptr<ImuOnlyTranslationMatchAcceptDiscriminator>
-  ImuOnlyTranslationMatchAcceptDiscriminator::Create(
+  std::unique_ptr<ImuOnlyMatchAcceptDiscriminator>
+  ImuOnlyMatchAcceptDiscriminator::Create(
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<InitializerTelemetry> telemetry) {
-    return std::make_unique<ImuOnlyTranslationMatchAcceptDiscriminatorImpl>(
+    return std::make_unique<ImuOnlyMatchAcceptDiscriminatorImpl>(
       config, telemetry);
   }
 }  // namespace cyclops::initializer

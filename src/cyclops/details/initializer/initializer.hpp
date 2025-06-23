@@ -14,7 +14,7 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  class InitializationSolverInternal;
+  class InitializerCandidateSolver;
 
   struct InitializationSolution {
     Eigen::Vector3d acc_bias;
@@ -31,7 +31,7 @@ namespace cyclops::initializer {
     virtual std::optional<InitializationSolution> solve() = 0;
 
     static std::unique_ptr<InitializerMain> Create(
-      std::unique_ptr<InitializationSolverInternal> solver_internal,
+      std::unique_ptr<InitializerCandidateSolver> candidate_solver,
       std::shared_ptr<measurement::KeyframeManager const> keyframe_manager,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
   };

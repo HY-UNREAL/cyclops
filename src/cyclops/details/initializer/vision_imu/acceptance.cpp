@@ -19,18 +19,17 @@ namespace cyclops::initializer {
   using namespace std::placeholders;
 
   static InitializerTelemetry::ImuMatchSolutionPoint makeTelemetrySolutionPoint(
-    ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchSolution const& translation_match) {
+    ImuMatchSolution const& match) {
     return {
-      .scale = translation_match.scale,
-      .cost = translation_match.cost,
+      .scale = match.scale,
+      .cost = match.cost,
 
-      .gravity = translation_match.gravity,
-      .acc_bias = translation_match.acc_bias,
-      .gyr_bias = rotation_match.gyro_bias,
-      .imu_orientations = rotation_match.body_orientations,
-      .imu_body_velocities = translation_match.imu_body_velocities,
-      .sfm_positions = translation_match.sfm_positions,
+      .gravity = match.gravity,
+      .acc_bias = match.acc_bias,
+      .gyr_bias = match.gyr_bias,
+      .imu_orientations = match.body_orientations,
+      .imu_body_velocities = match.body_velocities,
+      .sfm_positions = match.sfm_positions,
     };
   }
 
@@ -45,52 +44,46 @@ namespace cyclops::initializer {
     return false;
   }
 
-  static auto maxVelocity(ImuTranslationMatchSolution const& solution) {
+  static auto maxVelocity(ImuMatchSolution const& solution) {
     double result = 1e-6;
-    for (auto const& [_, v] : solution.imu_body_velocities)
+    for (auto const& [_, v] : solution.body_velocities)
       result = std::max<double>(v.norm(), result);
     return result;
   }
 
-  class ImuTranslationMatchAcceptDiscriminatorImpl:
-      public ImuTranslationMatchAcceptDiscriminator {
+  class ImuMatchAcceptDiscriminatorImpl: public ImuMatchAcceptDiscriminator {
   private:
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<telemetry::InitializerTelemetry> _telemetry;
 
     std::optional<InitializerTelemetry::ImuMatchUncertainty>
     makeSolutionUncertaintyReport(
-      ImuTranslationMatchCandidate const& candidate) const;
+      ImuMatchCandidate const& match_candidate) const;
 
     InitializerTelemetry::ImuMatchReject makeRejectReport(
-      RejectReason reason, ImuRotationMatch const& rotation_match,
-      ImuTranslationMatchCandidate const& candidate) const;
+      RejectReason reason, ImuMatchCandidate const& match_candidate) const;
 
     bool determineCandidateAcceptance(
-      ImuRotationMatch const& rotation_match,
-      ImuTranslationMatchCandidate const& candidate) const;
+      ImuMatchCandidate const& match_candidate) const;
     bool determineSolutionAcceptance(
-      ImuRotationMatch const& rotation_match,
-      ImuTranslationMatchCandidate const& candidate) const;
+      ImuMatchCandidate const& match_candidate) const;
 
   public:
-    explicit ImuTranslationMatchAcceptDiscriminatorImpl(
+    explicit ImuMatchAcceptDiscriminatorImpl(
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry)
         : _config(config), _telemetry(telemetry) {
     }
     void reset() override;
 
-    std::vector<ImuTranslationMatch> determineAcceptance(
-      ImuRotationMatch const& rotation_match,
-      std::vector<ImuTranslationMatchCandidate> const& candidates)
-      const override;
+    std::vector<ImuMatchResult> determineAcceptance(
+      std::vector<ImuMatchCandidate> const& match_candidates) const override;
   };
 
   std::optional<InitializerTelemetry::ImuMatchUncertainty>
-  ImuTranslationMatchAcceptDiscriminatorImpl::makeSolutionUncertaintyReport(
-    ImuTranslationMatchCandidate const& candidate) const {
-    auto const& [solution, maybe_uncertainty] = candidate;
+  ImuMatchAcceptDiscriminatorImpl::makeSolutionUncertaintyReport(
+    ImuMatchCandidate const& match_candidate) const {
+    auto const& [solution, maybe_uncertainty] = match_candidate;
     if (!maybe_uncertainty.has_value())
       return std::nullopt;
 
@@ -113,32 +106,30 @@ namespace cyclops::initializer {
     };
   }
 
-  void ImuTranslationMatchAcceptDiscriminatorImpl::reset() {
+  void ImuMatchAcceptDiscriminatorImpl::reset() {
     _telemetry->reset();
   }
 
   InitializerTelemetry::ImuMatchReject
-  ImuTranslationMatchAcceptDiscriminatorImpl::makeRejectReport(
-    RejectReason reason, ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchCandidate const& candidate) const {
-    auto const& [solution, _] = candidate;
+  ImuMatchAcceptDiscriminatorImpl::makeRejectReport(
+    RejectReason reason, ImuMatchCandidate const& match_candidate) const {
+    auto const& [solution, _] = match_candidate;
 
     return InitializerTelemetry::ImuMatchReject {
       .reason = reason,
-      .solution = makeTelemetrySolutionPoint(rotation_match, solution),
-      .uncertainty = makeSolutionUncertaintyReport(candidate),
+      .solution = makeTelemetrySolutionPoint(solution),
+      .uncertainty = makeSolutionUncertaintyReport(match_candidate),
     };
   }
 
-  bool ImuTranslationMatchAcceptDiscriminatorImpl::determineCandidateAcceptance(
-    ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchCandidate const& candidate) const {
+  bool ImuMatchAcceptDiscriminatorImpl::determineCandidateAcceptance(
+    ImuMatchCandidate const& match_candidate) const {
     auto report = [&](auto reason) {
       _telemetry->onImuMatchCandidateReject(
-        makeRejectReport(reason, rotation_match, candidate));
+        makeRejectReport(reason, match_candidate));
     };
 
-    auto const& [solution, uncertainty] = candidate;
+    auto const& [solution, uncertainty] = match_candidate;
 
     if (!uncertainty.has_value()) {
       report(RejectReason::UNCERTAINTY_EVALUATION_FAILED);
@@ -160,15 +151,13 @@ namespace cyclops::initializer {
     return true;
   }
 
-  bool ImuTranslationMatchAcceptDiscriminatorImpl::determineSolutionAcceptance(
-    ImuRotationMatch const& rotation_match,
-    ImuTranslationMatchCandidate const& candidate) const {
+  bool ImuMatchAcceptDiscriminatorImpl::determineSolutionAcceptance(
+    ImuMatchCandidate const& match_candidate) const {
     auto report = [&](auto reason) {
-      _telemetry->onImuMatchReject(
-        makeRejectReport(reason, rotation_match, candidate));
+      _telemetry->onImuMatchReject(makeRejectReport(reason, match_candidate));
     };
 
-    auto const& [solution, uncertainty] = candidate;
+    auto const& [solution, uncertainty] = match_candidate;
 
     __logger__->debug("Evaluating IMU match solution acceptance.");
     __logger__->debug("  scale: {}", solution.scale);
@@ -220,29 +209,27 @@ namespace cyclops::initializer {
     }
 
     _telemetry->onImuMatchAccept({
-      .solution = makeTelemetrySolutionPoint(rotation_match, solution),
-      .uncertainty = makeSolutionUncertaintyReport(candidate).value(),
+      .solution = makeTelemetrySolutionPoint(solution),
+      .uncertainty = makeSolutionUncertaintyReport(match_candidate).value(),
     });
     return true;
   }
 
-  std::vector<ImuTranslationMatch>
-  ImuTranslationMatchAcceptDiscriminatorImpl::determineAcceptance(
-    ImuRotationMatch const& rotation_match,
-    std::vector<ImuTranslationMatchCandidate> const& candidates) const {
-    using This = ImuTranslationMatchAcceptDiscriminatorImpl;
+  std::vector<ImuMatchResult>
+  ImuMatchAcceptDiscriminatorImpl::determineAcceptance(
+    std::vector<ImuMatchCandidate> const& match_candidates) const {
+    using This = ImuMatchAcceptDiscriminatorImpl;
 
     auto acceptables =  //
-      candidates |
-      views::filter(std::bind(
-        &This::determineCandidateAcceptance, this, rotation_match, _1)) |
+      match_candidates |
+      views::filter(std::bind(&This::determineCandidateAcceptance, this, _1)) |
       ranges::to_vector;
 
     if (acceptables.size() > 1) {
       auto solutions =  //
         acceptables | views::transform([&](auto const& _) {
           auto const& [solution, uncertainty] = _;
-          return makeTelemetrySolutionPoint(rotation_match, solution);
+          return makeTelemetrySolutionPoint(solution);
         }) |
         ranges::to_vector;
       auto uncertainties =  //
@@ -256,10 +243,10 @@ namespace cyclops::initializer {
     }
 
     auto result =  //
-      acceptables | views::transform([&](auto const& candidate) {
-        auto const& [solution, uncertainty] = candidate;
-        return ImuTranslationMatch {
-          .accept = determineSolutionAcceptance(rotation_match, candidate),
+      acceptables | views::transform([&](auto const& match_candidate) {
+        auto const& [solution, uncertainty] = match_candidate;
+        return ImuMatchResult {
+          .accept = determineSolutionAcceptance(match_candidate),
           .solution = solution,
         };
       }) |
@@ -267,11 +254,10 @@ namespace cyclops::initializer {
     return result;
   }
 
-  std::unique_ptr<ImuTranslationMatchAcceptDiscriminator>
-  ImuTranslationMatchAcceptDiscriminator::Create(
+  std::unique_ptr<ImuMatchAcceptDiscriminator>
+  ImuMatchAcceptDiscriminator::Create(
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
-    return std::make_unique<ImuTranslationMatchAcceptDiscriminatorImpl>(
-      config, telemetry);
+    return std::make_unique<ImuMatchAcceptDiscriminatorImpl>(config, telemetry);
   }
 }  // namespace cyclops::initializer

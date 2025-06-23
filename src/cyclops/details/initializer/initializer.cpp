@@ -24,21 +24,21 @@ namespace cyclops::initializer {
   using ImuTelemetryDigest =
     telemetry::InitializerTelemetry::ImuSolutionCandidateDigest;
 
-  using SolutionCandidate = InitializationSolverResult::SolutionCandidate;
+  using MatchCandidate = InitializerCandidatePairs::ImuMatchCandidate;
 
   class InitializerMainImpl: public InitializerMain {
   private:
-    std::unique_ptr<InitializationSolverInternal> _solver_internal;
+    std::unique_ptr<InitializerCandidateSolver> _candidate_solver;
 
     std::shared_ptr<measurement::KeyframeManager const> _keyframe_manager;
     std::shared_ptr<telemetry::InitializerTelemetry> _telemetry;
 
-    void reportFailureTelemetry(InitializationSolverResult const& solution);
-    std::optional<SolutionCandidate> solveAndReportTelemetry();
+    void reportFailureTelemetry(InitializerCandidatePairs const& solution);
+    std::optional<MatchCandidate> solveAndReportTelemetry();
 
   public:
     InitializerMainImpl(
-      std::unique_ptr<InitializationSolverInternal> solver_internal,
+      std::unique_ptr<InitializerCandidateSolver> candidate_solver,
       std::shared_ptr<measurement::KeyframeManager const> keyframe_manager,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
     ~InitializerMainImpl();
@@ -48,10 +48,10 @@ namespace cyclops::initializer {
   };
 
   InitializerMainImpl::InitializerMainImpl(
-    std::unique_ptr<InitializationSolverInternal> solver_internal,
+    std::unique_ptr<InitializerCandidateSolver> candidate_solver,
     std::shared_ptr<measurement::KeyframeManager const> keyframe_manager,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry)
-      : _solver_internal(std::move(solver_internal)),
+      : _candidate_solver(std::move(candidate_solver)),
         _keyframe_manager(keyframe_manager),
         _telemetry(telemetry) {
   }
@@ -59,12 +59,12 @@ namespace cyclops::initializer {
   InitializerMainImpl::~InitializerMainImpl() = default;
 
   void InitializerMainImpl::reset() {
-    _solver_internal->reset();
+    _candidate_solver->reset();
     _telemetry->reset();
   }
 
   void InitializerMainImpl::reportFailureTelemetry(
-    InitializationSolverResult const& solution) {
+    InitializerCandidatePairs const& solution) {
     auto vision_solutions =  //
       solution.msfm_solutions | views::transform([](auto const& sol) {
         return VisionTelemetryDigest {
@@ -76,7 +76,7 @@ namespace cyclops::initializer {
       ranges::to_vector;
 
     auto imu_solutions =
-      solution.solution_candidates | views::transform([](auto const& solution) {
+      solution.imu_match_solutions | views::transform([](auto const& solution) {
         return ImuTelemetryDigest {
           .vision_solution_index = solution.msfm_solution_index,
           .acceptable = solution.acceptance,
@@ -94,21 +94,20 @@ namespace cyclops::initializer {
     __logger__->debug("Reported failure.");
   }
 
-  std::optional<SolutionCandidate>
-  InitializerMainImpl::solveAndReportTelemetry() {
-    auto solution = _solver_internal->solve();
+  std::optional<MatchCandidate> InitializerMainImpl::solveAndReportTelemetry() {
+    auto solution = _candidate_solver->solve();
     __logger__->debug("Initialization solution obtained.");
 
-    if (solution.solution_candidates.empty()) {
+    if (solution.imu_match_solutions.empty()) {
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
-    if (solution.solution_candidates.size() > 1) {
+    if (solution.imu_match_solutions.size() > 1) {
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
 
-    auto const& candidate = solution.solution_candidates.front();
+    auto const& candidate = solution.imu_match_solutions.front();
     auto const& vision_solution =
       solution.msfm_solutions.at(candidate.msfm_solution_index);
 
@@ -168,7 +167,7 @@ namespace cyclops::initializer {
   };
 
   static InitializationGravityRotation rotateGravity(
-    SolutionCandidate const& imu_matching) {
+    MatchCandidate const& imu_matching) {
     auto const& g = imu_matching.gravity;
 
     auto R_vb0 = [&]() -> Matrix3d {
@@ -213,10 +212,10 @@ namespace cyclops::initializer {
   }
 
   std::unique_ptr<InitializerMain> InitializerMain::Create(
-    std::unique_ptr<InitializationSolverInternal> solver_internal,
+    std::unique_ptr<InitializerCandidateSolver> candidate_solver,
     std::shared_ptr<measurement::KeyframeManager const> keyframe_manager,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
     return std::make_unique<InitializerMainImpl>(
-      std::move(solver_internal), keyframe_manager, telemetry);
+      std::move(candidate_solver), keyframe_manager, telemetry);
   }
 }  // namespace cyclops::initializer

@@ -22,10 +22,10 @@ namespace cyclops::initializer {
   using MultiViewFeatures =
     std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
 
-  class InitializationSolverInternalImpl: public InitializationSolverInternal {
+  class InitializerCandidateSolverImpl: public InitializerCandidateSolver {
   private:
-    std::unique_ptr<VisionBootstrapSolver> _vision_solver;
-    std::unique_ptr<ImuMatchSolver> _imu_solver;
+    std::unique_ptr<VisionInitializer> _vision_solver;
+    std::unique_ptr<VisionImuInitializer> _imu_solver;
 
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<MeasurementDataProvider const> _data_provider;
@@ -36,26 +36,25 @@ namespace cyclops::initializer {
     std::map<FrameID, GyroMotionConstraint> makeCameraRotationPriorLookup(
       ImuMotionRefs const& imu_motions) const;
 
-    InitializationSolverResult::SolutionCandidate parseSolutionCandidate(
+    InitializerCandidatePairs::ImuMatchCandidate parseSolutionCandidate(
       int msfm_index, MSfMSolution const& msfm_solution,
-      ImuRotationMatch const& rotation_match,
-      ImuTranslationMatch const& translation_match) const;
+      ImuMatchResult const& imu_match) const;
 
   public:
-    InitializationSolverInternalImpl(
-      std::unique_ptr<initializer::VisionBootstrapSolver> vision_solver,
-      std::unique_ptr<ImuMatchSolver> imu_solver,
+    InitializerCandidateSolverImpl(
+      std::unique_ptr<initializer::VisionInitializer> vision_solver,
+      std::unique_ptr<VisionImuInitializer> imu_solver,
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<MeasurementDataProvider const> data_provider);
-    ~InitializationSolverInternalImpl();
+    ~InitializerCandidateSolverImpl();
     void reset() override;
 
-    InitializationSolverResult solve() override;
+    InitializerCandidatePairs solve() override;
   };
 
-  InitializationSolverInternalImpl::InitializationSolverInternalImpl(
-    std::unique_ptr<initializer::VisionBootstrapSolver> vision_solver,
-    std::unique_ptr<ImuMatchSolver> imu_solver,
+  InitializerCandidateSolverImpl::InitializerCandidateSolverImpl(
+    std::unique_ptr<initializer::VisionInitializer> vision_solver,
+    std::unique_ptr<VisionImuInitializer> imu_solver,
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataProvider const> data_provider)
       : _vision_solver(std::move(vision_solver)),
@@ -64,16 +63,15 @@ namespace cyclops::initializer {
         _data_provider(data_provider) {
   }
 
-  InitializationSolverInternalImpl::~InitializationSolverInternalImpl() =
-    default;
+  InitializerCandidateSolverImpl::~InitializerCandidateSolverImpl() = default;
 
-  void InitializationSolverInternalImpl::reset() {
+  void InitializerCandidateSolverImpl::reset() {
     _vision_solver->reset();
     _imu_solver->reset();
   }
 
   MultiViewFeatures
-  InitializationSolverInternalImpl::reorderMultiviewImageObservations() const {
+  InitializerCandidateSolverImpl::reorderMultiviewImageObservations() const {
     MultiViewFeatures result;
 
     for (auto const& [landmark_id, track] : _data_provider->tracks()) {
@@ -83,7 +81,7 @@ namespace cyclops::initializer {
     return result;
   }
 
-  ImuMotionRefs InitializationSolverInternalImpl::filterImageObservedIMU(
+  ImuMotionRefs InitializerCandidateSolverImpl::filterImageObservedIMU(
     FrameIDs image_frames) const {
     return  //
       _data_provider->imu() | views::filter([&](auto const& motion) {
@@ -100,7 +98,7 @@ namespace cyclops::initializer {
   }
 
   std::map<FrameID, GyroMotionConstraint>
-  InitializationSolverInternalImpl::makeCameraRotationPriorLookup(
+  InitializerCandidateSolverImpl::makeCameraRotationPriorLookup(
     ImuMotionRefs const& imu_motions) const {
     return  //
       imu_motions | views::transform([&](auto const& ref) {
@@ -130,12 +128,11 @@ namespace cyclops::initializer {
       ranges::to<std::map<FrameID, GyroMotionConstraint>>;
   }
 
-  InitializationSolverResult::SolutionCandidate
-  InitializationSolverInternalImpl::parseSolutionCandidate(
+  InitializerCandidatePairs::ImuMatchCandidate
+  InitializerCandidateSolverImpl::parseSolutionCandidate(
     int msfm_index, MSfMSolution const& msfm_solution,
-    ImuRotationMatch const& rotation_match,
-    ImuTranslationMatch const& translation_match) const {
-    auto const& solution = translation_match.solution;
+    ImuMatchResult const& imu_match) const {
+    auto const& solution = imu_match.solution;
     auto s = solution.scale;
 
     auto landmarks =  //
@@ -148,9 +145,9 @@ namespace cyclops::initializer {
 
     auto motions =
       views::zip(
-        solution.imu_body_velocities | views::keys,
-        rotation_match.body_orientations | views::values,
-        solution.imu_body_velocities | views::values,
+        solution.body_velocities | views::keys,
+        solution.body_orientations | views::values,
+        solution.body_velocities | views::values,
         solution.sfm_positions | views::values) |
       views::transform([&](auto const& pair) {
         auto const& [frame_id, q_b, v_body, p_c] = pair;
@@ -165,12 +162,12 @@ namespace cyclops::initializer {
     return {
       .msfm_solution_index = msfm_index,
 
-      .acceptance = translation_match.accept,
+      .acceptance = imu_match.accept,
       .cost = solution.cost,
       .scale = solution.scale,
       .gravity = solution.gravity,
 
-      .gyr_bias = rotation_match.gyro_bias,
+      .gyr_bias = solution.gyr_bias,
       .acc_bias = solution.acc_bias,
 
       .landmarks = landmarks,
@@ -178,41 +175,40 @@ namespace cyclops::initializer {
     };
   }
 
-  InitializationSolverResult InitializationSolverInternalImpl::solve() {
+  InitializerCandidatePairs InitializerCandidateSolverImpl::solve() {
     auto image_data = reorderMultiviewImageObservations();
     auto image_motion_frames = image_data | views::keys | ranges::to<std::set>;
     auto imu_motions = filterImageObservedIMU(image_motion_frames);
 
     auto rotation_prior = makeCameraRotationPriorLookup(imu_motions);
 
-    InitializationSolverResult result;
+    InitializerCandidatePairs result;
     result.msfm_solutions = _vision_solver->solve(image_data, rotation_prior);
-    result.solution_candidates.reserve(result.msfm_solutions.size());
+    result.imu_match_solutions.reserve(result.msfm_solutions.size());
 
     auto n_msfm_solutions = result.msfm_solutions.size();
     for (int msfm_index = 0; msfm_index < n_msfm_solutions; msfm_index++) {
       auto const& msfm_solution = result.msfm_solutions.at(msfm_index);
-      auto imu_match = _imu_solver->solve(msfm_solution, imu_motions);
-      if (!imu_match.has_value())
+      auto matches = _imu_solver->solve(msfm_solution, imu_motions);
+      if (!matches.has_value())
         continue;
 
-      auto const& rotation_match = imu_match->rotation_match;
-      for (auto const& translation_match : imu_match->translation_match) {
-        result.solution_candidates.push_back(parseSolutionCandidate(
-          msfm_index, msfm_solution, rotation_match, translation_match));
+      for (auto const& match : *matches) {
+        result.imu_match_solutions.push_back(
+          parseSolutionCandidate(msfm_index, msfm_solution, match));
       }
     }
     return result;
   }
 
-  std::unique_ptr<InitializationSolverInternal>
-  InitializationSolverInternal::Create(
+  std::unique_ptr<InitializerCandidateSolver>
+  InitializerCandidateSolver::Create(
     std::shared_ptr<std::mt19937> rgen,
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<MeasurementDataProvider const> data_provider,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
-    return std::make_unique<InitializationSolverInternalImpl>(
-      initializer::VisionBootstrapSolver::Create(config, rgen, telemetry),
-      ImuMatchSolver::Create(config, telemetry), config, data_provider);
+    return std::make_unique<InitializerCandidateSolverImpl>(
+      initializer::VisionInitializer::Create(config, rgen, telemetry),
+      VisionImuInitializer::Create(config, telemetry), config, data_provider);
   }
 }  // namespace cyclops::initializer

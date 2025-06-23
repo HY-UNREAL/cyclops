@@ -8,11 +8,13 @@
 namespace cyclops::initializer {
   struct MSfMSolution;
 
-  struct ImuMatchCameraTranslationPrior {
-    std::map<FrameID, Eigen::Vector3d> translations;
+  struct ImuMatchCameraMotionPrior {
+    std::map<FrameID, Eigen::Quaterniond> imu_orientations;
+    std::map<FrameID, Eigen::Vector3d> camera_positions;
+    Eigen::Vector3d gyro_bias;
     Eigen::MatrixXd weight;
   };
 
-  ImuMatchCameraTranslationPrior makeImuMatchCameraMotionPrior(
-    MSfMSolution const& msfm);
+  ImuMatchCameraMotionPrior makeImuMatchCameraMotionPrior(
+    MSfMSolution const& msfm, SE3Transform const& camera_extrinsic);
 }  // namespace cyclops::initializer

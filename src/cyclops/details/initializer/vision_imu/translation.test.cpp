@@ -22,6 +22,8 @@ namespace cyclops::initializer {
 
   using doctest::Approx;
 
+  using measurement::ImuMotionRefs;
+
   static double randnum(std::mt19937& rgen) {
     return std::normal_distribution<double>(0, 1)(rgen);
   }
@@ -73,34 +75,29 @@ namespace cyclops::initializer {
     return _.matrixU();
   }
 
-  struct ImuTranslationMatchAnalyzerMock: public ImuTranslationMatchAnalyzer {
-    ImuTranslationMatchAnalysis analysis;
+  struct ImuMatchAnalyzerMock: public ImuMatchAnalyzer {
+    ImuMatchAnalysis analysis;
 
-    explicit ImuTranslationMatchAnalyzerMock(
-      ImuTranslationMatchAnalysis analysis)
+    explicit ImuMatchAnalyzerMock(ImuMatchAnalysis analysis)
         : analysis(analysis) {
     }
 
     void reset() override {
     }
 
-    ImuTranslationMatchAnalysis analyze(
-      measurement::ImuMotionRefs const& _1, ImuRotationMatch const& _2,
-      ImuMatchCameraTranslationPrior const& _3) override {
+    ImuMatchAnalysis analyze(
+      ImuMotionRefs const& _1, ImuMatchCameraMotionPrior const& _2) override {
       return analysis;
     }
   };
 
-  class ImuTranslationMatchAcceptDiscriminatorMock:
-      public ImuTranslationMatchAcceptDiscriminator {
+  class ImuMatchAcceptDiscriminatorMock: public ImuMatchAcceptDiscriminator {
   public:
-    std::vector<ImuTranslationMatch> determineAcceptance(
-      ImuRotationMatch const& rotation_match,
-      std::vector<ImuTranslationMatchCandidate> const& candidates)
-      const override {
-      auto const& [solution, _] = candidates.front();
+    std::vector<ImuMatchResult> determineAcceptance(
+      std::vector<ImuMatchCandidate> const& matches) const override {
+      auto const& [solution, _] = matches.front();
 
-      return {ImuTranslationMatch {
+      return {ImuMatchResult {
         .accept = true,
         .solution = solution,
       }};
@@ -110,7 +107,7 @@ namespace cyclops::initializer {
     }
   };
 
-  TEST_CASE("test visual-inertial translation matching") {
+  TEST_CASE("Test IMU match") {
     std::mt19937 rgen(20220803);
     auto A_I = randmatWellConditioned(rgen, 54, 36, 1e4);
     auto B_I = randmatWellConditioned(rgen, 54, 27, 1e4);
@@ -132,10 +129,10 @@ namespace cyclops::initializer {
     auto alpha = randvec(rgen, 54);
     auto beta = (-(A_I * x_I + B_I * x_V * s + alpha) / s).eval();
 
-    auto analysis_mock = std::make_unique<ImuTranslationMatchAnalyzerMock>(
-      ImuTranslationMatchAnalysis {10, 81, 63, A_I, B_I, A_V, alpha, beta});
+    auto analysis_mock = std::make_unique<ImuMatchAnalyzerMock>(
+      ImuMatchAnalysis {10, 81, 63, A_I, B_I, A_V, alpha, beta});
     {
-      auto cache = ImuTranslationMatchAnalysisCache(analysis_mock->analysis);
+      auto cache = ImuMatchAnalysisCache(analysis_mock->analysis);
       auto evaluator =
         ImuMatchScaleEvaluationContext(9.81, analysis_mock->analysis, cache);
       auto maybe_p_primal = evaluator.evaluate(s);
@@ -175,11 +172,11 @@ namespace cyclops::initializer {
 
     std::shared_ptr telemetry =
       telemetry::InitializerTelemetry::CreateDefault();
-    auto solver = ImuTranslationMatchSolverImpl(
+    auto solver = ImuMatchSolverImpl(
       std::move(analysis_mock),
-      std::make_unique<ImuTranslationMatchAcceptDiscriminatorMock>(),
+      std::make_unique<ImuMatchAcceptDiscriminatorMock>(),
       ImuMatchScaleSampleSolver::Create(config, telemetry), config);
-    auto maybe_solution = solver.solve({}, {}, {});
+    auto maybe_solution = solver.solve({}, {});
     REQUIRE(maybe_solution.has_value());
     REQUIRE(maybe_solution->size() == 1);
 

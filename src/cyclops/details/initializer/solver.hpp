@@ -24,10 +24,10 @@ namespace cyclops::telemetry {
 namespace cyclops::initializer {
   struct MSfMSolution;
 
-  struct InitializationSolverResult {
+  struct InitializerCandidatePairs {
     std::vector<MSfMSolution> msfm_solutions;
 
-    struct SolutionCandidate {
+    struct ImuMatchCandidate {
       int msfm_solution_index;
 
       bool acceptance;
@@ -40,17 +40,17 @@ namespace cyclops::initializer {
       LandmarkPositions landmarks;
       std::map<FrameID, ImuMotionState> motions;
     };
-    std::vector<SolutionCandidate> solution_candidates;
+    std::vector<ImuMatchCandidate> imu_match_solutions;
   };
 
-  class InitializationSolverInternal {
+  class InitializerCandidateSolver {
   public:
-    virtual ~InitializationSolverInternal() = default;
+    virtual ~InitializerCandidateSolver() = default;
     virtual void reset() = 0;
 
-    virtual InitializationSolverResult solve() = 0;
+    virtual InitializerCandidatePairs solve() = 0;
 
-    static std::unique_ptr<InitializationSolverInternal> Create(
+    static std::unique_ptr<InitializerCandidateSolver> Create(
       std::shared_ptr<std::mt19937> rgen,
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<measurement::MeasurementDataProvider const> data_provider,

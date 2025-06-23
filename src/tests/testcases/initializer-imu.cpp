@@ -105,16 +105,17 @@ namespace cyclops::initializer {
 
           WHEN("Solved IMU matching") {
             auto telemetry = telemetry::InitializerTelemetry::CreateDefault();
-            auto solver = ImuMatchSolver::Create(config, std::move(telemetry));
+            auto solver =
+              VisionImuInitializer::Create(config, std::move(telemetry));
             auto maybe_result = solver->solve(msfm, imu_motion_refs);
             REQUIRE(static_cast<bool>(maybe_result));
 
             THEN("Solution is correct up to numerical accuracy") {
               auto const& result = *maybe_result;
-              REQUIRE(result.translation_match.size() == 1);
+              REQUIRE(result.size() == 1);
 
               CHECK(
-                result.translation_match.front().solution.scale ==
+                result.front().solution.scale ==
                 doctest::Approx(scale_solution).epsilon(1e-3));
             }
           }

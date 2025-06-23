@@ -108,7 +108,7 @@ namespace cyclops::initializer {
     return true;
   }
 
-  std::optional<double> analyzeImuTranslationMatchCostProbability(
+  std::optional<double> analyzeImuMatchCostProbability(
     int residual_dimension, int parameter_dimension, double cost) {
     int degrees_of_freedom = residual_dimension - parameter_dimension;
     if (degrees_of_freedom <= 0)
@@ -118,8 +118,7 @@ namespace cyclops::initializer {
     return 1 - chiSquaredCdf(degrees_of_freedom, cost);
   }
 
-  std::optional<ImuTranslationMatchUncertainty>
-  analyzeImuTranslationMatchUncertainty(
+  std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
     int frames_count, Eigen::MatrixXd const& H, double cost_p_value) {
     __logger__->debug("Analyzing the uncertainty of IMU match");
 
@@ -182,7 +181,7 @@ namespace cyclops::initializer {
     if (!maybe_lambda_p)
       return std::nullopt;
 
-    return ImuTranslationMatchUncertainty {
+    return ImuMatchUncertainty {
       .final_cost_significant_probability = cost_p_value,
       .scale_log_deviation = 1 / std::sqrt(lambda_s),
       .gravity_tangent_deviation = maybe_lambda_g->cwiseSqrt().cwiseInverse(),
@@ -193,9 +192,8 @@ namespace cyclops::initializer {
     };
   }
 
-  std::optional<ImuTranslationMatchUncertainty>
-  analyzeImuTranslationMatchUncertainty(
-    ImuTranslationMatchAnalysis const& analysis,
+  std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
+    ImuMatchAnalysis const& analysis,
     ImuMatchScaleSampleSolution const& solution) {
     auto s = solution.scale;
     auto const& x_I = solution.inertial_state;
@@ -210,12 +208,12 @@ namespace cyclops::initializer {
     __logger__->debug("r_I = {}", r_I.transpose());
     __logger__->debug("r_V = {}", r_V.transpose());
 
-    auto cost_p_value = analyzeImuTranslationMatchCostProbability(
+    auto cost_p_value = analyzeImuMatchCostProbability(
       analysis.residual_dimension, analysis.parameter_dimension, cost);
     if (!cost_p_value.has_value())
       return std::nullopt;
 
-    return analyzeImuTranslationMatchUncertainty(
+    return analyzeImuMatchUncertainty(
       analysis.frames_count, solution.hessian, cost_p_value.value());
   }
 }  // namespace cyclops::initializer

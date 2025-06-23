@@ -47,7 +47,7 @@ namespace cyclops::initializer {
     return _.matrixU();
   }
 
-  TEST_CASE("test scale-fixed visual-inertial translation matching") {
+  TEST_CASE("Test scale-fixed IMU match") {
     std::mt19937 rgen(20220518);
     auto g = (9.81 * randvec<3>(rgen).normalized()).eval();
     auto b = (0.1 * randvec<3>(rgen)).eval();
@@ -66,7 +66,7 @@ namespace cyclops::initializer {
     auto alpha = randvec<24>(rgen);
     auto beta = (-(A_I * x_I + alpha) / s).eval();
 
-    auto analysis = ImuTranslationMatchAnalysis {
+    auto analysis = ImuMatchAnalysis {
       .frames_count = 5,
       .residual_dimension = 36,
       .parameter_dimension = 33,
@@ -76,7 +76,7 @@ namespace cyclops::initializer {
       .inertial_perturbation = alpha,
       .translation_perturbation = beta,
     };
-    auto cache = ImuTranslationMatchAnalysisCache(analysis);
+    auto cache = ImuMatchAnalysisCache(analysis);
 
     auto evaluator = ImuMatchScaleEvaluationContext(9.81, analysis, cache);
     auto maybe_solution = evaluator.evaluate(s);
@@ -90,8 +90,7 @@ namespace cyclops::initializer {
     CHECK((solution.visual_solution - x_V).norm() < 1e-6);
   }
 
-  TEST_CASE(
-    "test scale-fixed visual-inertial translation matching cost derivative") {
+  TEST_CASE("Test scale-fixed IMU match cost derivative") {
     std::mt19937 rgen(20220518);
     auto g = (9.81 * randvec<3>(rgen).normalized()).eval();
     auto b = (0.1 * randvec<3>(rgen)).eval();
@@ -110,7 +109,7 @@ namespace cyclops::initializer {
     auto alpha = randvec<24>(rgen);
     auto beta = (-(A_I * x_I + alpha) / s0).eval();
 
-    auto analysis = ImuTranslationMatchAnalysis {
+    auto analysis = ImuMatchAnalysis {
       .frames_count = 5,
       .residual_dimension = 36,
       .parameter_dimension = 33,
@@ -120,7 +119,7 @@ namespace cyclops::initializer {
       .inertial_perturbation = alpha,
       .translation_perturbation = beta,
     };
-    auto cache = ImuTranslationMatchAnalysisCache(analysis);
+    auto cache = ImuMatchAnalysisCache(analysis);
     auto evaluator = ImuMatchScaleEvaluationContext(9.81, analysis, cache);
 
     auto constexpr ds = 1e-6;

@@ -60,7 +60,7 @@ namespace cyclops::initializer {
     return SE3Transform {p, q};
   }
 
-  TEST_CASE("Initializer main") {
+  TEST_CASE("Test initializer main logic") {
     auto rgen = std::make_shared<std::mt19937>(20220803);
 
     auto config = makeDefaultConfig();
@@ -82,11 +82,11 @@ namespace cyclops::initializer {
           makeDataProviderMockup(*rgen, extrinsic, pose_signal, landmarks);
 
         std::shared_ptr telemetry = InitializerTelemetry::CreateDefault();
-        auto solver_internal = InitializationSolverInternal::Create(
+        auto candidate_solver = InitializerCandidateSolver::Create(
           rgen, config, data_provider, telemetry);
 
         WHEN("Invoked the initialization solver core") {
-          auto solution = solver_internal->solve();
+          auto solution = candidate_solver->solve();
 
           THEN(
             "Despite the unprovided guarantee, the acceptable vision solution "
@@ -94,10 +94,10 @@ namespace cyclops::initializer {
             CHECK(solution.msfm_solutions.size() == 1);
 
             AND_THEN("Therefore, the IMU match solution is also only one") {
-              CHECK(solution.solution_candidates.size() == 1);
+              CHECK(solution.imu_match_solutions.size() == 1);
 
-              auto candidate = solution.solution_candidates.front();
-              CHECK(candidate.msfm_solution_index == 0);
+              auto imu_match = solution.imu_match_solutions.front();
+              CHECK(imu_match.msfm_solution_index == 0);
             }
           }
         }
@@ -107,7 +107,7 @@ namespace cyclops::initializer {
           keyframe_manager->_keyframes = motion_timestamps;
 
           auto initializer = InitializerMain::Create(
-            std::move(solver_internal), keyframe_manager, telemetry);
+            std::move(candidate_solver), keyframe_manager, telemetry);
 
           auto maybe_solution = initializer->solve();
           THEN("The solution comes out") {

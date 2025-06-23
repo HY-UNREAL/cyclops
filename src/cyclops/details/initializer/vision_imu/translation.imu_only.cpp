@@ -32,41 +32,39 @@ namespace cyclops::initializer {
   using Cost = double;
   using ImuOnlyMatchSolution = std::tuple<VectorXd, Scale, Cost>;
 
-  class ImuOnlyTranslationMatchSolverImpl:
-      public ImuOnlyTranslationMatchSolver {
+  class ImuOnlyMatchSolverImpl: public ImuOnlyMatchSolver {
   private:
-    std::unique_ptr<ImuTranslationMatchAnalyzer> _analyzer;
-    std::unique_ptr<ImuOnlyTranslationMatchAcceptDiscriminator> _acceptor;
+    std::unique_ptr<ImuMatchAnalyzer> _analyzer;
+    std::unique_ptr<ImuOnlyMatchAcceptDiscriminator> _acceptor;
 
     std::shared_ptr<CyclopsConfig const> _config;
 
-    std::optional<ImuOnlyMatchSolution> solve(
-      ImuTranslationMatchAnalysis const& analysis);
+    std::optional<ImuOnlyMatchSolution> solve(ImuMatchAnalysis const& analysis);
 
     ImuOnlyMatchSolution parseSolution(
-      ImuTranslationMatchAnalysis const& analysis, VectorXd const& x) const;
-    ImuTranslationMatchSolution parseSolution(
-      MsfmPositions const& msfm_positions,
+      ImuMatchAnalysis const& analysis, VectorXd const& x) const;
+    ImuMatchSolution parseSolution(
+      ImuMatchCameraMotionPrior const& camera_prior,
       ImuOnlyMatchSolution const& match_solution) const;
 
-    std::optional<ImuTranslationMatchUncertainty> analyzeUncertainty(
-      ImuTranslationMatchAnalysis const& analysis,
+    std::optional<ImuMatchUncertainty> analyzeUncertainty(
+      ImuMatchAnalysis const& analysis,
       ImuOnlyMatchSolution const& match_solution) const;
 
   public:
-    ImuOnlyTranslationMatchSolverImpl(
-      std::unique_ptr<ImuTranslationMatchAnalyzer> analyzer,
-      std::unique_ptr<ImuOnlyTranslationMatchAcceptDiscriminator> acceptor,
+    ImuOnlyMatchSolverImpl(
+      std::unique_ptr<ImuMatchAnalyzer> analyzer,
+      std::unique_ptr<ImuOnlyMatchAcceptDiscriminator> acceptor,
       std::shared_ptr<CyclopsConfig const> config);
 
-    std::optional<std::vector<ImuTranslationMatch>> solve(
-      ImuMotionRefs const& motions, ImuRotationMatch const& rotation_match,
-      ImuMatchCameraTranslationPrior const& camera_prior) override;
+    std::optional<std::vector<ImuMatchResult>> solve(
+      ImuMotionRefs const& motions,
+      ImuMatchCameraMotionPrior const& camera_prior) override;
     void reset() override;
   };
 
-  std::optional<ImuOnlyMatchSolution> ImuOnlyTranslationMatchSolverImpl::solve(
-    ImuTranslationMatchAnalysis const& analysis) {
+  std::optional<ImuOnlyMatchSolution> ImuOnlyMatchSolverImpl::solve(
+    ImuMatchAnalysis const& analysis) {
     auto const& [_1, _2, _3, A_I, _4, _5, alpha, beta] = analysis;
     auto gravity_norm = _config->gravity_norm;
 
@@ -113,8 +111,8 @@ namespace cyclops::initializer {
     return parseSolution(analysis, result);
   }
 
-  ImuOnlyMatchSolution ImuOnlyTranslationMatchSolverImpl::parseSolution(
-    ImuTranslationMatchAnalysis const& analysis, VectorXd const& x) const {
+  ImuOnlyMatchSolution ImuOnlyMatchSolverImpl::parseSolution(
+    ImuMatchAnalysis const& analysis, VectorXd const& x) const {
     auto const& [n_frames, _2, _3, A_I, _4, _5, alpha, beta] = analysis;
 
     auto x_I = x.head(6 + 3 * n_frames).eval();
@@ -124,13 +122,13 @@ namespace cyclops::initializer {
     return std::make_tuple(x_I, s, r.dot(r));
   }
 
-  ImuTranslationMatchSolution ImuOnlyTranslationMatchSolverImpl::parseSolution(
-    MsfmPositions const& msfm_positions,
+  ImuMatchSolution ImuOnlyMatchSolverImpl::parseSolution(
+    ImuMatchCameraMotionPrior const& camera_prior,
     ImuOnlyMatchSolution const& match_solution) const {
     auto const& [x_I, s, cost] = match_solution;
 
     auto velocities =  //
-      views::enumerate(msfm_positions | views::keys) |
+      views::enumerate(camera_prior.camera_positions | views::keys) |
       views::transform([x_I = x_I](auto const& element) {
         auto [n, frame_id] = element;
         auto v_n = x_I.segment(6 + 3 * n, 3).eval();
@@ -139,19 +137,20 @@ namespace cyclops::initializer {
       }) |
       ranges::to<std::map<FrameID, Vector3d>>;
 
-    return ImuTranslationMatchSolution {
+    return ImuMatchSolution {
       .scale = s,
       .cost = cost,
       .gravity = x_I.head(3),
       .acc_bias = x_I.segment(3, 3),
-      .imu_body_velocities = velocities,
-      .sfm_positions = msfm_positions,
+      .gyr_bias = camera_prior.gyro_bias,
+      .body_velocities = velocities,
+      .body_orientations = camera_prior.imu_orientations,
+      .sfm_positions = camera_prior.camera_positions,
     };
   }
 
-  std::optional<ImuTranslationMatchUncertainty>
-  ImuOnlyTranslationMatchSolverImpl::analyzeUncertainty(
-    ImuTranslationMatchAnalysis const& analysis,
+  std::optional<ImuMatchUncertainty> ImuOnlyMatchSolverImpl::analyzeUncertainty(
+    ImuMatchAnalysis const& analysis,
     ImuOnlyMatchSolution const& match_solution) const {
     auto const& [n_frames, _1, _2, _3, _4, A_V, alpha, beta] = analysis;
     auto const& [x_I, s, cost] = match_solution;
@@ -162,65 +161,59 @@ namespace cyclops::initializer {
     // Since we are applying virtual constraint x_V = 0 during the IMU-only
     // match, assign high information intensity to the x_V part of the Hessian
     // matrix that will be used for the parameter observability test.
-    auto H = evaluateImuTranslationMatchHessian(analysis, s, x_I, x_V);
+    auto H = evaluateImuMatchHessian(analysis, s, x_I, x_V);
     H.bottomRightCorner(n_V, n_V) = 1e12 * MatrixXd::Identity(n_V, n_V);
 
     int residual_dimension = 3 + 6 * (n_frames - 1);
     int parameter_dimension = 6 + 3 * n_frames;
 
-    auto cost_p_value = analyzeImuTranslationMatchCostProbability(
+    auto cost_p_value = analyzeImuMatchCostProbability(
       residual_dimension, parameter_dimension, cost);
     if (!cost_p_value.has_value())
       return std::nullopt;
 
-    return analyzeImuTranslationMatchUncertainty(
-      n_frames, H, cost_p_value.value());
+    return analyzeImuMatchUncertainty(n_frames, H, cost_p_value.value());
   }
 
-  std::optional<std::vector<ImuTranslationMatch>>
-  ImuOnlyTranslationMatchSolverImpl::solve(
-    ImuMotionRefs const& motions, ImuRotationMatch const& rotation_match,
-    ImuMatchCameraTranslationPrior const& camera_prior) {
-    auto analysis = _analyzer->analyze(motions, rotation_match, camera_prior);
+  std::optional<std::vector<ImuMatchResult>> ImuOnlyMatchSolverImpl::solve(
+    ImuMotionRefs const& motions,
+    ImuMatchCameraMotionPrior const& camera_prior) {
+    auto analysis = _analyzer->analyze(motions, camera_prior);
 
     auto maybe_solution = solve(analysis);
     if (!maybe_solution.has_value())
       return std::nullopt;
 
-    auto maybe_uncertainty =
-      analyzeUncertainty(analysis, maybe_solution.value());
-    auto translation_match =
-      parseSolution(camera_prior.translations, maybe_solution.value());
+    auto uncertainty = analyzeUncertainty(analysis, maybe_solution.value());
+    auto solution = parseSolution(camera_prior, maybe_solution.value());
+    auto candidate = std::make_tuple(solution, uncertainty);
 
-    auto result = ImuTranslationMatch {
-      .accept = _acceptor->determineAccept(
-        rotation_match, std::make_tuple(translation_match, maybe_uncertainty)),
-      .solution = translation_match,
+    auto result = ImuMatchResult {
+      .accept = _acceptor->determineAccept(candidate),
+      .solution = solution,
     };
-    return std::vector<ImuTranslationMatch> {result};
+    return std::vector<ImuMatchResult> {result};
   }
 
-  void ImuOnlyTranslationMatchSolverImpl::reset() {
+  void ImuOnlyMatchSolverImpl::reset() {
     _analyzer->reset();
     _acceptor->reset();
   }
 
-  ImuOnlyTranslationMatchSolverImpl::ImuOnlyTranslationMatchSolverImpl(
-    std::unique_ptr<ImuTranslationMatchAnalyzer> analyzer,
-    std::unique_ptr<ImuOnlyTranslationMatchAcceptDiscriminator> acceptor,
+  ImuOnlyMatchSolverImpl::ImuOnlyMatchSolverImpl(
+    std::unique_ptr<ImuMatchAnalyzer> analyzer,
+    std::unique_ptr<ImuOnlyMatchAcceptDiscriminator> acceptor,
     std::shared_ptr<CyclopsConfig const> config)
       : _analyzer(std::move(analyzer)),
         _acceptor(std::move(acceptor)),
         _config(config) {
   }
 
-  std::unique_ptr<ImuOnlyTranslationMatchSolver>
-  ImuOnlyTranslationMatchSolver::Create(
+  std::unique_ptr<ImuOnlyMatchSolver> ImuOnlyMatchSolver::Create(
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
-    return std::make_unique<ImuOnlyTranslationMatchSolverImpl>(
-      ImuTranslationMatchAnalyzer::Create(config),
-      ImuOnlyTranslationMatchAcceptDiscriminator::Create(config, telemetry),
-      config);
+    return std::make_unique<ImuOnlyMatchSolverImpl>(
+      ImuMatchAnalyzer::Create(config),
+      ImuOnlyMatchAcceptDiscriminator::Create(config, telemetry), config);
   }
 }  // namespace cyclops::initializer

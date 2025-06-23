@@ -21,8 +21,8 @@ namespace cyclops::initializer {
 
   class ImuMatchScaleSampleSolverContext {
   private:
-    ImuTranslationMatchLocalOptimizer& local_optimizer;
-    ImuTranslationMatchAnalysis const& analysis;
+    ImuMatchLocalOptimizer& local_optimizer;
+    ImuMatchAnalysis const& analysis;
 
     ImuMatchScaleEvaluationContext evaluator;
 
@@ -40,9 +40,8 @@ namespace cyclops::initializer {
 
   public:
     ImuMatchScaleSampleSolverContext(
-      ImuTranslationMatchLocalOptimizer& local_optimizer,
-      ImuTranslationMatchAnalysis const& analysis,
-      ImuTranslationMatchAnalysisCache const& cache,
+      ImuMatchLocalOptimizer& local_optimizer,
+      ImuMatchAnalysis const& analysis, ImuMatchAnalysisCache const& cache,
       CyclopsConfig const& config, telemetry::InitializerTelemetry& telemetry);
 
     std::optional<vector<ImuMatchScaleSampleSolution>> solve(
@@ -50,10 +49,9 @@ namespace cyclops::initializer {
   };
 
   ImuMatchScaleSampleSolverContext::ImuMatchScaleSampleSolverContext(
-    ImuTranslationMatchLocalOptimizer& local_optimizer,
-    ImuTranslationMatchAnalysis const& analysis,
-    ImuTranslationMatchAnalysisCache const& cache, CyclopsConfig const& config,
-    telemetry::InitializerTelemetry& telemetry)
+    ImuMatchLocalOptimizer& local_optimizer,
+    ImuMatchAnalysis const& analysis, ImuMatchAnalysisCache const& cache,
+    CyclopsConfig const& config, telemetry::InitializerTelemetry& telemetry)
       : local_optimizer(local_optimizer),
         analysis(analysis),
         evaluator(config.gravity_norm, analysis, cache),
@@ -87,7 +85,7 @@ namespace cyclops::initializer {
       .cost = maybe_primal->cost,
       .inertial_state = maybe_primal->inertial_solution,
       .visual_state = maybe_primal->visual_solution,
-      .hessian = evaluateImuTranslationMatchHessian(analysis, s, x_I, x_V),
+      .hessian = evaluateImuMatchHessian(analysis, s, x_I, x_V),
     };
   }
 
@@ -232,26 +230,25 @@ namespace cyclops::initializer {
 
   class ImuMatchScaleSampleSolverImpl: public ImuMatchScaleSampleSolver {
   private:
-    std::unique_ptr<ImuTranslationMatchLocalOptimizer> _local_optimizer;
+    std::unique_ptr<ImuMatchLocalOptimizer> _local_optimizer;
 
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<telemetry::InitializerTelemetry> _telemetry;
 
   public:
     ImuMatchScaleSampleSolverImpl(
-      std::unique_ptr<ImuTranslationMatchLocalOptimizer> local_optimizer,
+      std::unique_ptr<ImuMatchLocalOptimizer> local_optimizer,
       std::shared_ptr<CyclopsConfig const> config,
       std::shared_ptr<telemetry::InitializerTelemetry> telemetry);
     void reset() override;
 
     std::optional<vector<ImuMatchScaleSampleSolution>> solve(
-      std::set<FrameID> const& motion_frames,
-      ImuTranslationMatchAnalysis const& analysis,
-      ImuTranslationMatchAnalysisCache const& cache) const override;
+      std::set<FrameID> const& motion_frames, ImuMatchAnalysis const& analysis,
+      ImuMatchAnalysisCache const& cache) const override;
   };
 
   ImuMatchScaleSampleSolverImpl::ImuMatchScaleSampleSolverImpl(
-    std::unique_ptr<ImuTranslationMatchLocalOptimizer> local_optimizer,
+    std::unique_ptr<ImuMatchLocalOptimizer> local_optimizer,
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry)
       : _local_optimizer(std::move(local_optimizer)),
@@ -266,9 +263,8 @@ namespace cyclops::initializer {
 
   std::optional<vector<ImuMatchScaleSampleSolution>>
   ImuMatchScaleSampleSolverImpl::solve(
-    std::set<FrameID> const& motion_frames,
-    ImuTranslationMatchAnalysis const& analysis,
-    ImuTranslationMatchAnalysisCache const& cache) const {
+    std::set<FrameID> const& motion_frames, ImuMatchAnalysis const& analysis,
+    ImuMatchAnalysisCache const& cache) const {
     auto context = ImuMatchScaleSampleSolverContext(
       *_local_optimizer, analysis, cache, *_config, *_telemetry);
     return context.solve(motion_frames);
@@ -278,6 +274,6 @@ namespace cyclops::initializer {
     std::shared_ptr<CyclopsConfig const> config,
     std::shared_ptr<telemetry::InitializerTelemetry> telemetry) {
     return std::make_unique<ImuMatchScaleSampleSolverImpl>(
-      ImuTranslationMatchLocalOptimizer::Create(config), config, telemetry);
+      ImuMatchLocalOptimizer::Create(config), config, telemetry);
   }
 }  // namespace cyclops::initializer

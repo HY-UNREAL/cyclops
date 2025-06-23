@@ -86,7 +86,7 @@ namespace cyclops::initializer {
     return result;
   }
 
-  TEST_CASE("test visual-inertial translation matching analysis") {
+  TEST_CASE("Test IMU match analysis logic") {
     std::mt19937 rgen(20220511);
     auto rand = [&rgen]() {
       return std::uniform_real_distribution<double>(-1, 1)(rgen);
@@ -145,23 +145,21 @@ namespace cyclops::initializer {
       auto const& dp = position_perturbations.at(i - 1);
       return (p_c / scale - q_c * dp);
     };
-    auto position_prior = ImuMatchCameraTranslationPrior {
-      .translations =
-        {
-          {0, make_camera_position_prior(0)},
-          {1, make_camera_position_prior(1)},
-          {2, make_camera_position_prior(2)},
-        },
-      .weight = 1e4 * MatrixXd::Identity(6, 6),
-    };
-    auto orientations = ImuRotationMatch {
-      .gyro_bias = Vector3d::Zero(),
-      .body_orientations =
+    auto camera_prior = ImuMatchCameraMotionPrior {
+      .imu_orientations =
         {
           {0, orientation_signal(0.0)},
           {1, orientation_signal(0.1)},
           {2, orientation_signal(0.2)},
         },
+      .camera_positions =
+        {
+          {0, make_camera_position_prior(0)},
+          {1, make_camera_position_prior(1)},
+          {2, make_camera_position_prior(2)},
+        },
+      .gyro_bias = Vector3d::Zero(),
+      .weight = 1e4 * MatrixXd::Identity(6, 6),
     };
     auto times = std::vector {0.0, 0.1, 0.2};
 
@@ -174,12 +172,12 @@ namespace cyclops::initializer {
     config->extrinsics.imu_camera_transform = extrinsic;
     config->noise.acc_bias_prior_stddev = 1.;
 
-    auto analyzer = ImuTranslationMatchAnalyzer::Create(config);
+    auto analyzer = ImuMatchAnalyzer::Create(config);
     auto [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analyzer->analyze(
       imu_motions |
         views::transform([](auto const& _) -> ImuMotionRef { return _; }) |
         ranges::to_vector,
-      orientations, position_prior);
+      camera_prior);
 
     auto x_I = concatenate(
       gravity, Vector3d::Zero().eval(),

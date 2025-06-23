@@ -47,8 +47,8 @@ namespace cyclops::initializer {
     return T_g;
   }
 
-  MatrixXd evaluateImuTranslationMatchHessian(
-    ImuTranslationMatchAnalysis const& analysis, double s, VectorXd const& x_I,
+  MatrixXd evaluateImuMatchHessian(
+    ImuMatchAnalysis const& analysis, double s, VectorXd const& x_I,
     VectorXd const& x_V) {
     auto const& [_1, _2, _3, A_I, B_I, A_V, alpha, beta] = analysis;
 

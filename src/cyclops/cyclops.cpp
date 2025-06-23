@@ -302,14 +302,14 @@ namespace cyclops {
       args.config, data_provider, frame_manager, state_reader);
 
     auto rgen = std::make_shared<std::mt19937>(args.seed.value());
-    auto bootstrap_internal = initializer::InitializationSolverInternal::Create(
+    auto candidate_solver = initializer::InitializerCandidateSolver::Create(
       rgen, args.config, data_provider, args.initializer_telemetry);
-    auto bootstrap_solver = initializer::InitializerMain::Create(
-      std::move(bootstrap_internal), frame_manager, args.initializer_telemetry);
+    auto initializer = initializer::InitializerMain::Create(
+      std::move(candidate_solver), frame_manager, args.initializer_telemetry);
 
     auto optimizer = LikelihoodOptimizer::Create(
       estimation::OptimizerSolutionGuessPredictor::Create(
-        std::move(bootstrap_solver), args.config, state_reader, data_provider),
+        std::move(initializer), args.config, state_reader, data_provider),
       args.config, state_writer, data_provider);
     auto estimation_core = EstimationFrameworkMain::Create(
       std::move(optimizer),

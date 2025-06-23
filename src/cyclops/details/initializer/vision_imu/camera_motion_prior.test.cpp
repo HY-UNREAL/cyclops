@@ -25,13 +25,18 @@ namespace cyclops::initializer {
     return S.transpose() * S;
   }
 
-  TEST_CASE("test camera motion prior generation") {
+  TEST_CASE("Test camera motion prior generation") {
     MSfMSolution msfm;
     msfm.geometry.camera_motions = {
       {0, SE3Transform {Vector3d::UnitX(), Quaterniond(1, 0, 0, 0)}},
       {1, SE3Transform {Vector3d::UnitY(), Quaterniond(0, 1, 0, 0)}},
     };
     msfm.motion_information_weight = MatrixXd::Zero(12, 12);
+
+    auto extrinsic = SE3Transform {
+      .translation = Vector3d::Zero(),
+      .rotation = Quaterniond::Identity(),
+    };
 
     std::mt19937 rgen(20220510);
     auto W_R2 = makeRandomPositiveDefiniteMatrix(rgen);
@@ -40,14 +45,14 @@ namespace cyclops::initializer {
     msfm.motion_information_weight.block(6, 6, 3, 3) = W_R2;
     msfm.motion_information_weight.block(9, 9, 3, 3) = W_p2;
 
-    auto prior = makeImuMatchCameraMotionPrior(msfm);
+    auto prior = makeImuMatchCameraMotionPrior(msfm, extrinsic);
 
     REQUIRE(
-      (prior.translations | views::keys | ranges::to<set>) ==
+      (prior.camera_positions | views::keys | ranges::to<set>) ==
       set<FrameID> {0, 1});
 
-    CHECK(prior.translations.at(0) == Vector3d(1, 0, 0));
-    CHECK(prior.translations.at(1) == Vector3d(0, 1, 0));
+    CHECK(prior.camera_positions.at(0) == Vector3d(1, 0, 0));
+    CHECK(prior.camera_positions.at(1) == Vector3d(0, 1, 0));
 
     CHECK(prior.weight == W_p2);
   }

@@ -8,10 +8,10 @@ namespace cyclops {
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct ImuTranslationMatchAnalysis;
+  struct ImuMatchAnalysis;
   struct ImuMatchScaleSampleSolution;
 
-  struct ImuTranslationMatchUncertainty {
+  struct ImuMatchUncertainty {
     double final_cost_significant_probability;
     double scale_log_deviation;
     Eigen::Vector2d gravity_tangent_deviation;
@@ -20,15 +20,12 @@ namespace cyclops::initializer {
     Eigen::VectorXd translation_scale_symmetric_deviation;
   };
 
-  std::optional<double> analyzeImuTranslationMatchCostProbability(
+  std::optional<double> analyzeImuMatchCostProbability(
     int residual_dimension, int parameter_dimension, double cost);
-
-  std::optional<ImuTranslationMatchUncertainty>
-  analyzeImuTranslationMatchUncertainty(
+  std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
     int frames_count, Eigen::MatrixXd const& hessian, double cost_p_value);
 
-  std::optional<ImuTranslationMatchUncertainty>
-  analyzeImuTranslationMatchUncertainty(
-    ImuTranslationMatchAnalysis const& analysis,
+  std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
+    ImuMatchAnalysis const& analysis,
     ImuMatchScaleSampleSolution const& solution);
 }  // namespace cyclops::initializer

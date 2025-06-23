@@ -8,8 +8,8 @@ namespace cyclops {
 }
 
 namespace cyclops::initializer {
-  struct ImuTranslationMatchAnalysis;
-  struct ImuTranslationMatchAnalysisCache;
+  struct ImuMatchAnalysis;
+  struct ImuMatchAnalysisCache;
 
   struct ImuMatchScaleEvaluation {
     double multiplier;
@@ -30,13 +30,13 @@ namespace cyclops::initializer {
   class ImuMatchScaleEvaluationContext {
   private:
     double const gravity_norm;
-    ImuTranslationMatchAnalysis const& analysis;
-    ImuTranslationMatchAnalysisCache const& cache;
+    ImuMatchAnalysis const& analysis;
+    ImuMatchAnalysisCache const& cache;
 
   public:
     ImuMatchScaleEvaluationContext(
-      double gravity_norm, ImuTranslationMatchAnalysis const& analysis,
-      ImuTranslationMatchAnalysisCache const& cache);
+      double gravity_norm, ImuMatchAnalysis const& analysis,
+      ImuMatchAnalysisCache const& cache);
 
     std::optional<ImuMatchScaleEvaluation> evaluate(double scale) const;
     double evaluateDerivative(
