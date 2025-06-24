@@ -17,7 +17,7 @@ namespace cyclops::initializer {
     Eigen::Matrix3d bias_jacobian;
   };
 
-  struct MSfMSolution {
+  struct BundleAdjustmentSolution {
     bool acceptable;
 
     double solution_significant_probability;

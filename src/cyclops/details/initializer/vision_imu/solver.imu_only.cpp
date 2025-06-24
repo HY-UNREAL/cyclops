@@ -44,7 +44,7 @@ namespace cyclops::initializer {
     ImuOnlyMatchSolution parseSolution(
       ImuMatchAnalysis const& analysis, VectorXd const& x) const;
     ImuMatchSolution parseSolution(
-      ImuMatchCameraMotionPrior const& camera_prior,
+      ImuMatchMotionPrior const& camera_prior,
       ImuOnlyMatchSolution const& match_solution) const;
 
     std::optional<ImuMatchUncertainty> analyzeUncertainty(
@@ -59,7 +59,7 @@ namespace cyclops::initializer {
 
     std::optional<std::vector<ImuMatchResult>> solve(
       ImuMotionRefs const& motions,
-      ImuMatchCameraMotionPrior const& camera_prior) override;
+      ImuMatchMotionPrior const& camera_prior) override;
     void reset() override;
   };
 
@@ -123,7 +123,7 @@ namespace cyclops::initializer {
   }
 
   ImuMatchSolution ImuOnlyMatchSolverImpl::parseSolution(
-    ImuMatchCameraMotionPrior const& camera_prior,
+    ImuMatchMotionPrior const& camera_prior,
     ImuOnlyMatchSolution const& match_solution) const {
     auto const& [x_I, s, cost] = match_solution;
 
@@ -176,8 +176,7 @@ namespace cyclops::initializer {
   }
 
   std::optional<std::vector<ImuMatchResult>> ImuOnlyMatchSolverImpl::solve(
-    ImuMotionRefs const& motions,
-    ImuMatchCameraMotionPrior const& camera_prior) {
+    ImuMotionRefs const& motions, ImuMatchMotionPrior const& camera_prior) {
     auto analysis = _analyzer->analyze(motions, camera_prior);
 
     auto maybe_solution = solve(analysis);

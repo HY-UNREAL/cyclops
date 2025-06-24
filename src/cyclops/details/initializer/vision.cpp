@@ -49,7 +49,7 @@ namespace cyclops::initializer {
 
     void reportBundleAdjustmentTelemetry(
       std::set<FrameID> const& input_frames,
-      std::vector<MSfMSolution> const& solutions);
+      std::vector<BundleAdjustmentSolution> const& solutions);
 
   public:
     VisionInitializerImpl(
@@ -60,7 +60,7 @@ namespace cyclops::initializer {
     ~VisionInitializerImpl();
     void reset() override;
 
-    std::vector<MSfMSolution> solve(
+    std::vector<BundleAdjustmentSolution> solve(
       MultiViewImageData const& features,
       MultiViewGyroMotionData const& gyro_motions) override;
   };
@@ -155,7 +155,7 @@ namespace cyclops::initializer {
 
   void VisionInitializerImpl::reportBundleAdjustmentTelemetry(
     std::set<FrameID> const& input_frames,
-    std::vector<MSfMSolution> const& solutions) {
+    std::vector<BundleAdjustmentSolution> const& solutions) {
     if (solutions.empty()) {
       _telemetry->onVisionFailure({
         .frames = input_frames,
@@ -188,7 +188,7 @@ namespace cyclops::initializer {
     });
   }
 
-  std::vector<MSfMSolution> VisionInitializerImpl::solve(
+  std::vector<BundleAdjustmentSolution> VisionInitializerImpl::solve(
     MultiViewImageData const& features,
     MultiViewGyroMotionData const& gyro_motions) {
     auto tic = ::cyclops::tic();

@@ -10,7 +10,7 @@ namespace cyclops {
 }  // namespace cyclops
 
 namespace cyclops::initializer {
-  struct ImuMatchCameraMotionPrior;
+  struct ImuMatchMotionPrior;
 
   /*
    * represents biquadratic translational visual-inertial matching cost,
@@ -56,7 +56,7 @@ namespace cyclops::initializer {
 
     virtual ImuMatchAnalysis analyze(
       measurement::ImuMotionRefs const& motions,
-      ImuMatchCameraMotionPrior const& camera_prior) = 0;
+      ImuMatchMotionPrior const& motion_prior) = 0;
 
     static std::unique_ptr<ImuMatchAnalyzer> Create(
       std::shared_ptr<CyclopsConfig const> config);

@@ -16,7 +16,7 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct MSfMSolution;
+  struct BundleAdjustmentSolution;
   struct ImuMatchResult;
 
   class VisionImuInitializer {
@@ -25,7 +25,7 @@ namespace cyclops::initializer {
     virtual void reset() = 0;
 
     virtual std::optional<std::vector<ImuMatchResult>> solve(
-      MSfMSolution const& msfm,
+      BundleAdjustmentSolution const& msfm,
       measurement::ImuMotionRefs const& imu_motions) = 0;
 
     static std::unique_ptr<VisionImuInitializer> Create(

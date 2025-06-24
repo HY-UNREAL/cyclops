@@ -9,13 +9,13 @@ namespace cyclops {
 
 namespace cyclops::initializer {
   struct MultiViewGeometry;
-  struct MSfMSolution;
+  struct BundleAdjustmentSolution;
   struct GyroMotionConstraint;
 
   class BundleAdjustmentSolver {
   public:
     virtual ~BundleAdjustmentSolver() = default;
-    virtual std::optional<MSfMSolution> solve(
+    virtual std::optional<BundleAdjustmentSolution> solve(
       MultiViewGeometry const& guess,
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
       std::map<FrameID, GyroMotionConstraint> const& gyro_motion) = 0;

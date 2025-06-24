@@ -145,7 +145,7 @@ namespace cyclops::initializer {
       auto const& dp = position_perturbations.at(i - 1);
       return (p_c / scale - q_c * dp);
     };
-    auto camera_prior = ImuMatchCameraMotionPrior {
+    auto camera_prior = ImuMatchMotionPrior {
       .imu_orientations =
         {
           {0, orientation_signal(0.0)},

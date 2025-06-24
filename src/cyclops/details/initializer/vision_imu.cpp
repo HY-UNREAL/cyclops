@@ -28,7 +28,8 @@ namespace cyclops::initializer {
     void reset() override;
 
     std::optional<std::vector<ImuMatchResult>> solve(
-      MSfMSolution const& msfm, ImuMotionRefs const& imu_motions) override;
+      BundleAdjustmentSolution const& msfm,
+      ImuMotionRefs const& imu_motions) override;
   };
 
   VisionImuInitializerImpl::VisionImuInitializerImpl(
@@ -42,7 +43,7 @@ namespace cyclops::initializer {
   }
 
   std::optional<std::vector<ImuMatchResult>> VisionImuInitializerImpl::solve(
-    MSfMSolution const& msfm, ImuMotionRefs const& imu_motions) {
+    BundleAdjustmentSolution const& msfm, ImuMotionRefs const& imu_motions) {
     auto const& camera_motions = msfm.camera_motions;
     auto solvable_imu_motions =
       imu_motions | ranges::views::filter([&](auto const& motion_ref) {
@@ -64,7 +65,7 @@ namespace cyclops::initializer {
     }
 
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
-    auto camera_prior = makeImuMatchCameraMotionPrior(msfm, extrinsic);
+    auto camera_prior = makeImuMatchMotionPrior(msfm, extrinsic);
     return _matcher->solve(solvable_imu_motions, camera_prior);
   }
 

@@ -15,7 +15,7 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct ImuMatchCameraMotionPrior;
+  struct ImuMatchMotionPrior;
   struct ImuMatchResult;
 
   class ImuMatchSolver {
@@ -25,7 +25,7 @@ namespace cyclops::initializer {
 
     virtual std::optional<std::vector<ImuMatchResult>> solve(
       measurement::ImuMotionRefs const& motions,
-      ImuMatchCameraMotionPrior const& camera_prior) = 0;
+      ImuMatchMotionPrior const& camera_prior) = 0;
 
     static std::unique_ptr<ImuMatchSolver> Create(
       std::shared_ptr<CyclopsConfig const> config,

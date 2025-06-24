@@ -26,7 +26,7 @@ namespace cyclops::initializer {
   }
 
   TEST_CASE("Test camera motion prior generation") {
-    MSfMSolution msfm;
+    BundleAdjustmentSolution msfm;
     msfm.camera_motions = {
       {0, SE3Transform {Vector3d::UnitX(), Quaterniond(1, 0, 0, 0)}},
       {1, SE3Transform {Vector3d::UnitY(), Quaterniond(0, 1, 0, 0)}},
@@ -45,7 +45,7 @@ namespace cyclops::initializer {
     msfm.motion_information_weight.block(6, 6, 3, 3) = W_R2;
     msfm.motion_information_weight.block(9, 9, 3, 3) = W_p2;
 
-    auto prior = makeImuMatchCameraMotionPrior(msfm, extrinsic);
+    auto prior = makeImuMatchMotionPrior(msfm, extrinsic);
 
     REQUIRE(
       (prior.camera_positions | views::keys | ranges::to<set>) ==

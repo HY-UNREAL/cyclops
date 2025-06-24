@@ -25,7 +25,7 @@ namespace cyclops::initializer {
       std::unique_ptr<BundleAdjustmentAcceptDiscriminator> accept_discriminator,
       std::shared_ptr<CyclopsConfig const> config);
 
-    std::optional<MSfMSolution> solve(
+    std::optional<BundleAdjustmentSolution> solve(
       MultiViewGeometry const& guess,
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
       std::map<FrameID, GyroMotionConstraint> const& gyro_motion) override;
@@ -38,7 +38,7 @@ namespace cyclops::initializer {
         _config(config) {
   }
 
-  std::optional<MSfMSolution> BundleAdjustmentSolverImpl::solve(
+  std::optional<BundleAdjustmentSolution> BundleAdjustmentSolverImpl::solve(
     MultiViewGeometry const& guess,
     std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
     std::map<FrameID, GyroMotionConstraint> const& gyro_motion) {
@@ -63,7 +63,7 @@ namespace cyclops::initializer {
     auto acceptance = _accept_discriminator->evaluate(summary, context);
     auto const& uncertainty = acceptance.uncertainty;
 
-    return MSfMSolution {
+    return BundleAdjustmentSolution {
       .acceptable = acceptance.accept,
       .solution_significant_probability = uncertainty.p_value,
       .measurement_inlier_ratio = uncertainty.inlier_ratio,

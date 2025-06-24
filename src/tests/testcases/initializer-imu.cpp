@@ -91,7 +91,7 @@ namespace cyclops::initializer {
           makeBodyCameraMotionData(pose_signal, extrinsic, scale_solution);
 
         GIVEN("The vision SfM and the IMU sensing without noise") {
-          auto msfm = MSfMSolution {
+          auto msfm = BundleAdjustmentSolution {
             .acceptable = true,
             .solution_significant_probability = 1.0,
             .measurement_inlier_ratio = 1.0,

@@ -86,7 +86,7 @@ namespace cyclops::initializer {
     }
 
     ImuMatchAnalysis analyze(
-      ImuMotionRefs const& _1, ImuMatchCameraMotionPrior const& _2) override {
+      ImuMotionRefs const& _1, ImuMatchMotionPrior const& _2) override {
       return analysis;
     }
   };

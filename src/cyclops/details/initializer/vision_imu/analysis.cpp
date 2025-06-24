@@ -31,7 +31,7 @@ namespace cyclops::initializer {
 
     ImuMatchAnalysis analyze(
       std::vector<ImuMotionRef> const& imu_motions,
-      ImuMatchCameraMotionPrior const& camera_prior) override;
+      ImuMatchMotionPrior const& camera_prior) override;
   };
 
   void ImuMatchAnalyzerImpl::reset() {
@@ -46,7 +46,7 @@ namespace cyclops::initializer {
   };
 
   static ImuMotionAnalysis analyzeImuMotion(
-    ImuMatchCameraMotionPrior const& camera_prior, int n, int i,
+    ImuMatchMotionPrior const& camera_prior, int n, int i,
     SE3Transform const& extrinsic, ImuMotionRef const& imu_motion) {
     auto A_I_bar = MatrixXd::Zero(6, 6 + 3 * n).eval();
     auto B_I_bar = MatrixXd::Zero(3, 3 * n).eval();
@@ -116,7 +116,7 @@ namespace cyclops::initializer {
 
   ImuMatchAnalysis ImuMatchAnalyzerImpl::analyze(
     std::vector<ImuMotionRef> const& imu_motions,
-    ImuMatchCameraMotionPrior const& camera_prior) {
+    ImuMatchMotionPrior const& camera_prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
     auto acc_bias_prior_weight = 1 / _config->noise.acc_bias_prior_stddev;
 

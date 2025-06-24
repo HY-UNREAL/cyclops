@@ -22,10 +22,10 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct MSfMSolution;
+  struct BundleAdjustmentSolution;
 
   struct InitializerCandidatePairs {
-    std::vector<MSfMSolution> msfm_solutions;
+    std::vector<BundleAdjustmentSolution> msfm_solutions;
 
     struct ImuMatchCandidate {
       int msfm_solution_index;

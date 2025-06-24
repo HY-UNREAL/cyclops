@@ -27,7 +27,7 @@ namespace cyclops::initializer {
     CyclopsConfig const& config;
     ImuMatchAcceptDiscriminator const& acceptor;
 
-    ImuMatchCameraMotionPrior const& camera_prior;
+    ImuMatchMotionPrior const& camera_prior;
     ImuMatchAnalysis const& analysis;
 
     ImuMatchSolution parseSolution(ImuMatchScaleSampleSolution const& solution);
@@ -35,8 +35,7 @@ namespace cyclops::initializer {
   public:
     ImuMatchSolutionParseContext(
       CyclopsConfig const& config, ImuMatchAcceptDiscriminator const& acceptor,
-      ImuMatchCameraMotionPrior const& camera_prior,
-      ImuMatchAnalysis const& analysis)
+      ImuMatchMotionPrior const& camera_prior, ImuMatchAnalysis const& analysis)
         : config(config),
           acceptor(acceptor),
           camera_prior(camera_prior),
@@ -133,7 +132,7 @@ namespace cyclops::initializer {
 
     std::optional<std::vector<ImuMatchResult>> solve(
       measurement::ImuMotionRefs const& motions,
-      ImuMatchCameraMotionPrior const& camera_prior) override;
+      ImuMatchMotionPrior const& camera_prior) override;
   };
 
   ImuMatchSolverImpl::ImuMatchSolverImpl(
@@ -155,7 +154,7 @@ namespace cyclops::initializer {
 
   std::optional<std::vector<ImuMatchResult>> ImuMatchSolverImpl::solve(
     measurement::ImuMotionRefs const& motions,
-    ImuMatchCameraMotionPrior const& camera_prior) {
+    ImuMatchMotionPrior const& camera_prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
 
     auto analysis = _analyzer->analyze(motions, camera_prior);

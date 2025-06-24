@@ -10,7 +10,7 @@ namespace cyclops::initializer {
   namespace views = ranges::views;
 
   static MatrixXd evaluateCameraPositionInformationWeight(
-    MSfMSolution const& msfm) {
+    BundleAdjustmentSolution const& msfm) {
     // discount by one to handle symmetry
     auto n = static_cast<int>(msfm.camera_motions.size() - 1);
 
@@ -39,8 +39,8 @@ namespace cyclops::initializer {
     return H_pp - H_pr * H_rr__inv.solve(H_rp);
   }
 
-  ImuMatchCameraMotionPrior makeImuMatchCameraMotionPrior(
-    MSfMSolution const& msfm, SE3Transform const& camera_extrinsic) {
+  ImuMatchMotionPrior makeImuMatchMotionPrior(
+    BundleAdjustmentSolution const& msfm, SE3Transform const& extrinsic) {
     if (msfm.camera_motions.size() == 0)
       return {};
 
@@ -48,7 +48,7 @@ namespace cyclops::initializer {
       msfm.camera_motions | views::transform([&](auto const& element) {
         auto const& [frame_id, motion] = element;
         auto const& q_c = motion.rotation;
-        auto const& q_bc = camera_extrinsic.rotation;
+        auto const& q_bc = extrinsic.rotation;
         return std::make_pair(frame_id, q_c * q_bc.conjugate());
       }) |
       ranges::to<std::map<FrameID, Eigen::Quaterniond>>;
@@ -59,7 +59,7 @@ namespace cyclops::initializer {
       }) |
       ranges::to<std::map<FrameID, Eigen::Vector3d>>;
 
-    return ImuMatchCameraMotionPrior {
+    return ImuMatchMotionPrior {
       .imu_orientations = imu_orientations,
       .camera_positions = camera_positions,
       .gyro_bias = msfm.gyro_bias,

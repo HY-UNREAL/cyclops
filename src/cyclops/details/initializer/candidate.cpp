@@ -37,7 +37,7 @@ namespace cyclops::initializer {
       ImuMotionRefs const& imu_motions) const;
 
     InitializerCandidatePairs::ImuMatchCandidate parseSolutionCandidate(
-      int msfm_index, MSfMSolution const& msfm_solution,
+      int msfm_index, BundleAdjustmentSolution const& msfm_solution,
       ImuMatchResult const& imu_match) const;
 
   public:
@@ -130,7 +130,7 @@ namespace cyclops::initializer {
 
   InitializerCandidatePairs::ImuMatchCandidate
   InitializerCandidateSolverImpl::parseSolutionCandidate(
-    int msfm_index, MSfMSolution const& msfm_solution,
+    int msfm_index, BundleAdjustmentSolution const& msfm_solution,
     ImuMatchResult const& imu_match) const {
     auto const& solution = imu_match.solution;
     auto s = solution.scale;

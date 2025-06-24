@@ -17,14 +17,14 @@ namespace cyclops::telemetry {
 
 namespace cyclops::initializer {
   struct GyroMotionConstraint;
-  struct MSfMSolution;
+  struct BundleAdjustmentSolution;
 
   class VisionInitializer {
   public:
     virtual ~VisionInitializer() = default;
     virtual void reset() = 0;
 
-    virtual std::vector<MSfMSolution> solve(
+    virtual std::vector<BundleAdjustmentSolution> solve(
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
       std::map<FrameID, GyroMotionConstraint> const& gyro_motions) = 0;
 
