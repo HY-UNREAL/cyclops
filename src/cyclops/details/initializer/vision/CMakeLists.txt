@@ -30,6 +30,7 @@ target_sources(cyclops
   ${CMAKE_CURRENT_SOURCE_DIR}/twoview.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/twoview_selection.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/twoview_selection.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/type.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/type.hpp
 )
 

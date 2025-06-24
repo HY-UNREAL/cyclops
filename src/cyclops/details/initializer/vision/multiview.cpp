@@ -24,6 +24,10 @@ namespace cyclops::initializer {
   using Eigen::Matrix3d;
   using Eigen::Quaterniond;
 
+  using MultiViewImageData =
+    std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+  using MultiViewGyroMotionData = std::map<FrameID, GyroMotionConstraint>;
+
   class MultiviewVisionGeometrySolverImpl:
       public MultiviewVisionGeometrySolver {
   private:
@@ -134,7 +138,7 @@ namespace cyclops::initializer {
         auto const& u1 = i->second;
 
         view_frame.features.emplace(
-          landmark_id, std::make_tuple(u1.point, u2.point));
+          landmark_id, TwoViewFeaturePair {u1.point, u2.point});
       }
     }
     return result;

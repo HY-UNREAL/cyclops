@@ -88,6 +88,7 @@ namespace cyclops::initializer {
 
     std::optional<MotionBlockRefPair> normalize();
 
-    MultiViewGeometry asMultiViewGeometry() const;
+    std::map<LandmarkID, Eigen::Vector3d> landmarkPositions() const;
+    std::map<FrameID, SE3Transform> cameraMotions() const;
   };
 }  // namespace cyclops::initializer

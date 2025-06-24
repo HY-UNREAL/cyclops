@@ -15,6 +15,8 @@ namespace cyclops::config::initializer {
 }
 
 namespace cyclops::initializer {
+  struct TwoViewFeaturePair;
+
   struct TwoViewTriangulation {
     /* failure statistics. */
     int n_triangulation_failure;

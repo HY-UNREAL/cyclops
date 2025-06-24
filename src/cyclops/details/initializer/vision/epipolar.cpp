@@ -1,5 +1,7 @@
 #include "cyclops/details/initializer/vision/epipolar.hpp"
 #include "cyclops/details/initializer/vision/epipolar_refine.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
+
 #include "cyclops/details/utils/math.hpp"
 #include "cyclops/details/utils/vision.hpp"
 #include "cyclops/details/logging.hpp"

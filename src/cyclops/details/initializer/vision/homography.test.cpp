@@ -33,7 +33,7 @@ namespace cyclops::initializer {
           auto const f_1 = Vector2d(dist(rgen), dist(rgen));
           auto const f_2 = project(H * f_1.homogeneous());
 
-          feature_frame.emplace(feature_id, std::make_tuple(f_1, f_2));
+          feature_frame.emplace(feature_id, TwoViewFeaturePair {f_1, f_2});
         }
 
         WHEN("Solved homography by the random consensus") {

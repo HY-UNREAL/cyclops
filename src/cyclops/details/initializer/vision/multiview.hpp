@@ -16,8 +16,12 @@ namespace cyclops::telemetry {
 }
 
 namespace cyclops::initializer {
-  struct MultiViewGeometry;
   struct GyroMotionConstraint;
+
+  struct MultiViewGeometry {
+    std::map<FrameID, SE3Transform> camera_motions;
+    LandmarkPositions landmarks;
+  };
 
   class MultiviewVisionGeometrySolver {
   public:

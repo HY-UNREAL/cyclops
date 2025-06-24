@@ -1,5 +1,5 @@
 #include "cyclops/details/initializer/vision/bundle_adjustment_states.hpp"
-#include "cyclops/details/initializer/vision/type.hpp"
+#include "cyclops/details/initializer/vision/multiview.hpp"
 
 #include <range/v3/all.hpp>
 
@@ -199,15 +199,17 @@ namespace cyclops::initializer {
     return std::make_tuple(x_0, x_n);
   }
 
-  MultiViewGeometry BundleAdjustmentOptimizationState::asMultiViewGeometry()
-    const {
-    return {
-      .camera_motions = camera_motions |
-        valueTransform([](auto const& _) { return _.asSE3Transform(); }) |
-        ranges::to<std::map<FrameID, SE3Transform>>,
-      .landmarks = landmark_positions |
-        valueTransform([](auto const& _) { return _.asVector3(); }) |
-        ranges::to<LandmarkPositions>,
-    };
+  std::map<FrameID, SE3Transform>
+  BundleAdjustmentOptimizationState::cameraMotions() const {
+    return camera_motions |
+      valueTransform([](auto const& _) { return _.asSE3Transform(); }) |
+      ranges::to<std::map<FrameID, SE3Transform>>;
+  }
+
+  std::map<LandmarkID, Eigen::Vector3d>
+  BundleAdjustmentOptimizationState::landmarkPositions() const {
+    return landmark_positions |
+      valueTransform([](auto const& _) { return _.asVector3(); }) |
+      ranges::to<LandmarkPositions>;
   }
 }  // namespace cyclops::initializer

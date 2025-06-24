@@ -1,4 +1,5 @@
 #include "cyclops/details/initializer/vision/twoview_selection.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
 #include "cyclops/details/initializer/vision/type.hpp"
 #include "cyclops/details/logging.hpp"
 

@@ -1,5 +1,6 @@
 #include "cyclops/details/initializer/vision/homography.hpp"
 #include "cyclops/details/initializer/vision/homography_refinement.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
 #include "cyclops/details/utils/math.hpp"
 #include "cyclops/details/utils/vision.hpp"
 

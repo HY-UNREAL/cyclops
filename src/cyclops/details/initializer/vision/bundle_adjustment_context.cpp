@@ -21,6 +21,10 @@ namespace cyclops::initializer {
 
   namespace views = ranges::views;
 
+  using MultiViewImageData =
+    std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+  using MultiViewGyroMotionData = std::map<FrameID, GyroMotionConstraint>;
+
   struct BundleAdjustmentOptimizationContext::Impl {
     CyclopsConfig const& _config;
     BundleAdjustmentOptimizationState _state;

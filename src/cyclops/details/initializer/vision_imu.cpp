@@ -43,8 +43,8 @@ namespace cyclops::initializer {
 
   std::optional<std::vector<ImuMatchResult>> VisionImuInitializerImpl::solve(
     MSfMSolution const& msfm, ImuMotionRefs const& imu_motions) {
-    auto const& camera_motions = msfm.geometry.camera_motions;
-    auto solvable_imu_motions =  //
+    auto const& camera_motions = msfm.camera_motions;
+    auto solvable_imu_motions =
       imu_motions | ranges::views::filter([&](auto const& motion_ref) {
         auto const& motion = motion_ref.get();
         return  //

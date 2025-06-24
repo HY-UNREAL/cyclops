@@ -27,7 +27,7 @@ namespace cyclops::initializer {
 
   TEST_CASE("Test camera motion prior generation") {
     MSfMSolution msfm;
-    msfm.geometry.camera_motions = {
+    msfm.camera_motions = {
       {0, SE3Transform {Vector3d::UnitX(), Quaterniond(1, 0, 0, 0)}},
       {1, SE3Transform {Vector3d::UnitY(), Quaterniond(0, 1, 0, 0)}},
     };

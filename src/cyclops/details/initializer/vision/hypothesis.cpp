@@ -1,5 +1,7 @@
 #include "cyclops/details/initializer/vision/hypothesis.hpp"
 #include "cyclops/details/initializer/vision/triangulation.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
+
 #include "cyclops/details/utils/math.hpp"
 #include "cyclops/details/utils/vision.hpp"
 

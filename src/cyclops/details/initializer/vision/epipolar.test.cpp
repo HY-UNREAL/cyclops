@@ -28,9 +28,9 @@ namespace cyclops::initializer {
       GIVEN("Perfectly correct feature observations") {
         std::map<LandmarkID, TwoViewFeaturePair> feature_frame;
         for (auto const& [feature_id, landmark] : landmarks) {
-          auto const f_1 = project(landmark);
-          auto const f_2 = project(R.transpose() * (landmark - p));
-          feature_frame.emplace(feature_id, std::make_tuple(f_1, f_2));
+          auto f_1 = project(landmark);
+          auto f_2 = project(R.transpose() * (landmark - p));
+          feature_frame.emplace(feature_id, TwoViewFeaturePair {f_1, f_2});
         }
 
         std::vector<std::set<LandmarkID>> batch = {

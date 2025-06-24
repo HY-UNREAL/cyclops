@@ -1,4 +1,5 @@
 #include "cyclops/details/initializer/vision/bundle_adjustment.cpp"
+#include "cyclops/details/initializer/vision/multiview.hpp"
 #include "cyclops/details/initializer/vision/type.hpp"
 #include "cyclops/details/utils/math.hpp"
 
@@ -110,7 +111,7 @@ namespace cyclops::initializer {
       bundle_adjustment_solver->solve(geometry_guess, image_data, {});
     REQUIRE(maybe_solution.has_value());
 
-    auto const& camera_motions = maybe_solution->geometry.camera_motions;
+    auto const& camera_motions = maybe_solution->camera_motions;
     REQUIRE(camera_motions.size() == n_frames);
     REQUIRE(
       (camera_motions | views::keys | ranges::to<std::set>) ==

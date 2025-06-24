@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cyclops/details/type.hpp"
+
 #include <random>
 #include <vector>
 #include <memory>
@@ -9,8 +11,25 @@ namespace cyclops {
 }
 
 namespace cyclops::initializer {
-  struct TwoViewGeometry;
-  struct TwoViewCorrespondenceData;
+  struct TwoViewFeaturePair {
+    Eigen::Vector2d feature_1;
+    Eigen::Vector2d feature_2;
+  };
+
+  struct TwoViewImuRotationData {
+    Eigen::Quaterniond value;
+    Eigen::Matrix3d covariance;
+  };
+
+  struct TwoViewCorrespondenceData {
+    TwoViewImuRotationData rotation_prior;
+    std::map<LandmarkID, TwoViewFeaturePair> features;
+  };
+
+  struct TwoViewGeometry {
+    SE3Transform camera_motion;
+    LandmarkPositions landmarks;
+  };
 
   class TwoViewVisionGeometrySolver {
   public:

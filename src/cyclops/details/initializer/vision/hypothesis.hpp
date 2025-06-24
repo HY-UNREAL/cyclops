@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cyclops/details/initializer/vision/type.hpp"
+#include "cyclops/details/type.hpp"
 
 #include <set>
 #include <map>
@@ -13,6 +13,7 @@ namespace cyclops {
 }  // namespace cyclops
 
 namespace cyclops::initializer {
+  struct TwoViewFeaturePair;
   struct TwoViewGeometry;
   struct TwoViewImuRotationData;
 
@@ -23,14 +24,12 @@ namespace cyclops::initializer {
     using TwoViewFeatureSet = std::map<LandmarkID, TwoViewFeaturePair>;
     using InlierSet = std::set<LandmarkID>;
 
-  public:
     virtual ~TwoViewMotionHypothesisSelector() = default;
     virtual void reset() = 0;
 
     virtual std::vector<TwoViewGeometry> selectPossibleMotions(
       MotionHypotheses const& motions, TwoViewFeatureSet const& image_data,
-      InlierSet const& inliers,
-      TwoViewImuRotationData const& rotation_prior) = 0;
+      InlierSet const& inliers, TwoViewImuRotationData const& gyro_prior) = 0;
 
     static std::unique_ptr<TwoViewMotionHypothesisSelector> Create(
       std::shared_ptr<CyclopsConfig const> config);

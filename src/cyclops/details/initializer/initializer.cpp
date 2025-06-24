@@ -68,8 +68,7 @@ namespace cyclops::initializer {
       solution.msfm_solutions | views::transform([](auto const& sol) {
         return VisionTelemetryDigest {
           .acceptable = sol.acceptable,
-          .keyframes =
-            sol.geometry.camera_motions | views::keys | ranges::to<std::set>,
+          .keyframes = sol.camera_motions | views::keys | ranges::to<std::set>,
         };
       }) |
       ranges::to_vector;
@@ -129,7 +128,7 @@ namespace cyclops::initializer {
     _telemetry->onSuccess({
       .initial_motion_frame_id = initial_motion_frame_id,
       .initial_motion_frame_timestamp = initial_motion_frame_timestamp,
-      .sfm_camera_pose = vision_solution.geometry.camera_motions,
+      .sfm_camera_pose = vision_solution.camera_motions,
       .cost = candidate.cost,
       .scale = candidate.scale,
       .gravity = candidate.gravity,

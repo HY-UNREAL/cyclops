@@ -45,22 +45,22 @@ namespace cyclops::initializer {
   }
 
   static auto makeTwoViewFeaturePairs(
-    std::map<LandmarkID, Vector3d> const& landmarks,
-    Quaterniond const& rotation, Vector3d const& translation,
-    std::mt19937& rgen, double noise) {
-    auto perturbation = [&](auto const& u) -> Vector2d {
+    std::map<LandmarkID, Vector3d> const& landmarks, Quaterniond const& q,
+    Vector3d const& p, std::mt19937& rgen, double noise) {
+    auto perturbate = [&](auto const& u) -> Vector2d {
       auto d = std::normal_distribution<double>(0, 1);
       return u + Vector2d(noise * d(rgen), noise * d(rgen));
     };
 
-    auto fst_view_features = landmarks | views::values |
-      views::transform(project) | views::transform(perturbation);
-    auto snd_view_features =
+    auto two_view_features =  //
       landmarks | views::values | views::transform([&](auto const& f) {
-        return project(rotation.conjugate() * (f - translation));
-      }) |
-      views::transform(perturbation);
-    auto two_view_features = views::zip(fst_view_features, snd_view_features);
+        auto u1 = perturbate(project(f));
+        auto u2 = perturbate(project(q.conjugate() * (f - p)));
+        return TwoViewFeaturePair {
+          .feature_1 = u1,
+          .feature_2 = u2,
+        };
+      });
 
     return makeZipdict(landmarks | views::keys, two_view_features) |
       ranges::to<std::map<LandmarkID, TwoViewFeaturePair>>;

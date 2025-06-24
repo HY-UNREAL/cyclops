@@ -60,7 +60,7 @@ namespace cyclops::initializer {
             views::transform([&](auto landmark_id) {
               auto const& u0 = view0.at(landmark_id).point;
               auto const& u1 = view1.at(landmark_id).point;
-              auto feature_pair = std::make_tuple(u0, u1);
+              auto feature_pair = TwoViewFeaturePair {u0, u1};
 
               return std::make_pair(landmark_id, feature_pair);
             }) |

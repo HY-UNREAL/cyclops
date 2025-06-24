@@ -1,4 +1,6 @@
 #include "cyclops/details/initializer/vision/triangulation.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
+#include "cyclops/details/initializer/vision/type.hpp"
 #include "cyclops/details/utils/vision.hpp"
 #include "cyclops/details/utils/math.hpp"
 

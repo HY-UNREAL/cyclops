@@ -68,9 +68,10 @@ namespace cyclops::initializer {
       .solution_significant_probability = uncertainty.p_value,
       .measurement_inlier_ratio = uncertainty.inlier_ratio,
 
-      .geometry = context.state().asMultiViewGeometry(),
+      .camera_motions = context.state().cameraMotions(),
       .motion_information_weight = uncertainty.motion_information,
       .gyro_bias = context.state().gyro_bias.value(),
+      .landmarks = context.state().landmarkPositions(),
     };
   }
 

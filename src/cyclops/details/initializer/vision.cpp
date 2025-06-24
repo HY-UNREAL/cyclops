@@ -21,6 +21,10 @@ namespace cyclops::initializer {
   using KeyframeMotionStatisticsLookup =
     std::map<FrameID, KeyframeMotionStatistics>;
 
+  using MultiViewImageData =
+    std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
+  using MultiViewGyroMotionData = std::map<FrameID, GyroMotionConstraint>;
+
   template <typename key_t, typename value_t>
   static std::set<key_t> projectKeys(std::map<key_t, value_t> const& map) {
     return map | views::keys | ranges::to<std::set<key_t>>;
@@ -162,8 +166,8 @@ namespace cyclops::initializer {
 
     for (auto const& solution : solutions) {
       _telemetry->onBundleAdjustmentSuccess({
-        .camera_motions = solution.geometry.camera_motions,
-        .landmarks = solution.geometry.landmarks,
+        .camera_motions = solution.camera_motions,
+        .landmarks = solution.landmarks,
       });
     }
 

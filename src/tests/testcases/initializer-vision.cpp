@@ -68,22 +68,21 @@ namespace cyclops::initializer {
 
     auto const& best_solution = *std::max_element(
       solutions.begin(), solutions.end(), [](auto const& a, auto const& b) {
-        return a.geometry.landmarks.size() < b.geometry.landmarks.size();
+        return a.landmarks.size() < b.landmarks.size();
       });
-    auto const& result = best_solution.geometry;
+    auto const& camera_motions = best_solution.camera_motions;
 
-    REQUIRE(result.camera_motions.size() != 0);
+    REQUIRE(camera_motions.size() != 0);
     REQUIRE(
-      (result.camera_motions | views::keys | ranges::to_vector) ==
-      motion_frames);
+      (camera_motions | views::keys | ranges::to_vector) == motion_frames);
 
     auto init_frame = motion_frames.front();
     auto last_frame = motion_frames.back();
 
     auto distance = [](auto const& a, auto const& b) { return (a - b).norm(); };
     auto result_travel = distance(
-      result.camera_motions.at(last_frame).translation,
-      result.camera_motions.at(init_frame).translation);
+      camera_motions.at(last_frame).translation,
+      camera_motions.at(init_frame).translation);
 
     auto init_time = timestamp_lookup.at(init_frame);
     auto last_time = timestamp_lookup.at(last_frame);
@@ -95,18 +94,18 @@ namespace cyclops::initializer {
 
     auto scale = truth_travel / result_travel;
     for (auto const& [frame_id, time] : timestamp_lookup) {
-      auto const& result_motion = result.camera_motions.at(frame_id);
+      auto const& obtained_motion = camera_motions.at(frame_id);
       auto truth_motion = compose(
         inverse(pose_signal.evaluate(init_time)), pose_signal.evaluate(time));
 
       auto const& q_truth = truth_motion.rotation;
-      auto const& q_result = result_motion.rotation;
+      auto const& q_result = obtained_motion.rotation;
       CAPTURE(q_truth.coeffs().transpose());
       CAPTURE(q_result.coeffs().transpose());
       CHECK(q_truth.isApprox(q_result, 0.01));
 
       auto const& p_truth = truth_motion.translation;
-      auto const& p_result = result_motion.translation;
+      auto const& p_result = obtained_motion.translation;
       CAPTURE(p_truth.transpose());
       CAPTURE(p_result.transpose());
       CHECK(p_truth.isApprox(p_result * scale, 0.05));

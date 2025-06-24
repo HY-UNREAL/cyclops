@@ -95,9 +95,11 @@ namespace cyclops::initializer {
             .acceptable = true,
             .solution_significant_probability = 1.0,
             .measurement_inlier_ratio = 1.0,
-            .geometry = {camera_motions, {}},
+            .camera_motions = camera_motions,
             .motion_information_weight =
               1e4 * Eigen::MatrixXd::Identity(n_frames * 6, n_frames * 6),
+            .gyro_bias = Vector3d::Zero(),
+            .landmarks = {},
           };
           auto imu_motions = makeImuMotions(pose_signal, motion_timestamps);
           auto imu_motion_refs = imu_motions |

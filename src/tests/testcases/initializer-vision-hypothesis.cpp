@@ -1,6 +1,7 @@
 #include "cyclops/details/initializer/vision/hypothesis.hpp"
 #include "cyclops/details/initializer/vision/epipolar.hpp"
 #include "cyclops/details/initializer/vision/homography.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
 #include "cyclops/details/utils/vision.hpp"
 #include "cyclops/details/config.hpp"
 
@@ -39,7 +40,8 @@ namespace cyclops::initializer {
           x2.z() > 1e-3 && contained(u2.x(), -1, 1) && contained(u2.y(), -1, 1);
 
         return ranges::yield_if(
-          u1_in_fov && u2_in_fov, std::make_pair(id, std::make_tuple(u1, u2)));
+          u1_in_fov && u2_in_fov,
+          std::make_pair(id, TwoViewFeaturePair {u1, u2}));
       });
     return feature_pairs | ranges::to<std::map<LandmarkID, TwoViewFeaturePair>>;
   }

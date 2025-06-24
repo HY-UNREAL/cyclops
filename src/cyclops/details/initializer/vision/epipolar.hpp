@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cyclops/details/initializer/vision/type.hpp"
+#include "cyclops/details/type.hpp"
 
 #include <set>
 #include <map>
@@ -11,6 +11,8 @@ namespace cyclops {
 }  // namespace cyclops
 
 namespace cyclops::initializer {
+  struct TwoViewFeaturePair;
+
   struct EpipolarAnalysis {
     double expected_inliers;
 

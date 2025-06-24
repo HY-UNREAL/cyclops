@@ -9,7 +9,11 @@
 
 namespace cyclops::initializer {
   struct TwoViewCorrespondenceData;
-  struct MultiViewCorrespondences;
+
+  struct MultiViewCorrespondences {
+    FrameID reference_frame;
+    std::map<FrameID, TwoViewCorrespondenceData> view_frames;
+  };
 
   std::optional<std::reference_wrapper<
     std::pair<FrameID const, TwoViewCorrespondenceData> const>>

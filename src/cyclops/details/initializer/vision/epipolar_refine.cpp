@@ -1,4 +1,5 @@
 #include "cyclops/details/initializer/vision/epipolar_refine.hpp"
+#include "cyclops/details/initializer/vision/twoview.hpp"
 #include <range/v3/all.hpp>
 
 namespace cyclops::initializer {

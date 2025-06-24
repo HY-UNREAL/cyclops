@@ -136,8 +136,7 @@ namespace cyclops::initializer {
     auto s = solution.scale;
 
     auto landmarks =  //
-      msfm_solution.geometry.landmarks |
-      views::transform([&](auto const& id_landmark) {
+      msfm_solution.landmarks | views::transform([&](auto const& id_landmark) {
         auto [landmark_id, f] = id_landmark;
         return std::make_pair(landmark_id, (s * f).eval());
       }) |
