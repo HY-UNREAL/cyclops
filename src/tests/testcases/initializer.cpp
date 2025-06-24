@@ -60,7 +60,7 @@ namespace cyclops::initializer {
     return SE3Transform {p, q};
   }
 
-  TEST_CASE("Test initializer main logic") {
+  TEST_CASE("Test the initializer main logic") {
     auto rgen = std::make_shared<std::mt19937>(20220803);
 
     auto config = makeDefaultConfig();

@@ -15,17 +15,6 @@ namespace cyclops::initializer {
       : gravity_norm(gravity_norm), analysis(analysis), cache(cache) {
   }
 
-  /*
-   * represents the following Schur-decomposed system of linear equations,
-   * 1. (H_g_bar + mu * I3) * g + b_g_bar = 0,
-   * 2. x_q = -(F_q * g + z_q).
-   *
-   * that is originated from the following system of linear equations,
-   *              (H_I_bar + mu * C_I) * x_I + b_I_bar = 0
-   *                               <=>
-   *       [H_g + mu * I3,   F_g] * [  g  ] + [ b_g ]  = [ 0 ]
-   *       [F_g.T,           H_q]   [ x_q ]   [ b_q ]    [ 0 ].
-   */
   struct GravityTermReduction {
     Matrix3d H_g_bar;
     Vector3d b_g_bar;

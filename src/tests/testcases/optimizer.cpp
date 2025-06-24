@@ -29,7 +29,7 @@ namespace cyclops::estimation {
   using Eigen::Matrix3d;
   using Eigen::Vector3d;
 
-  TEST_CASE("Measurement probability optimization with mockup data") {
+  TEST_CASE("Test factor-graph optimization") {
     auto rgen = std::make_shared<std::mt19937>(20240516001);
     auto config = makeDefaultConfig();
 

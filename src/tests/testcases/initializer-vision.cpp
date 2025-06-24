@@ -36,7 +36,7 @@ namespace cyclops::initializer {
     return Eigen::AngleAxisd(theta, Vector3d::UnitZ()) * q0;
   }
 
-  TEST_CASE("Test vision initializer") {
+  TEST_CASE("Test vision initialization") {
     auto rgen = std::make_shared<std::mt19937>(2021052403);
 
     auto pose_signal = PoseSignal {

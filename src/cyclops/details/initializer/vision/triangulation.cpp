@@ -98,7 +98,7 @@ namespace cyclops::initializer {
   //    || u1^(h) * lambda - p ||_B^2
   //
   // where
-  //   W := (A - b * u2^2) * (A^2 - u2 * b^T),
+  //   W := (A - b * u2^T) * (A^T - u2 * b^T),
   //   B := b * b^T.
   //
   // Here, both the numerator and the denominator of (‡) are quadratic
@@ -196,8 +196,8 @@ namespace cyclops::initializer {
     auto a1 = d0 * n2 - d2 * n0;
     auto a2 = d1 * n2 - d2 * n1;
 
-    auto distance_min = 1e-4;  // a very small distance - 0.1mm close.
-    auto distance_max = 1e+4;  // a very large distance - 10km far.
+    auto distance_min = 1e-4;  // A very small distance - 0.1mm close.
+    auto distance_max = 1e+4;  // A very large distance - 10km far.
     auto safeguard = [&](auto x) {
       return std::min(distance_max, std::max(distance_min, x));
     };

@@ -131,7 +131,7 @@ namespace cyclops {
     }
   };
 
-  TEST_CASE("The whole pipeline") {
+  TEST_CASE("Test the whole pipeline") {
     auto pose_signal = PoseSignal {
       .position = [](auto t) { return Vector3d(3 * (1 - std::cos(t)), 0, 0); },
       .orientation = yawRotation([](auto t) { return atan2(1, cos(t)); }),

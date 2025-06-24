@@ -9,7 +9,7 @@
 #include <vector>
 
 /*
- * the code here is non-opencv modified version of:
+ * The code here is non-opencv modified version of:
  * https://github.com/cvlab-epfl/EPnP/tree/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e
  *
  * Copyright (c) 2009, V. Lepetit, EPFL

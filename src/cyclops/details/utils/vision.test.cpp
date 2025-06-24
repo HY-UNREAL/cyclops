@@ -13,7 +13,7 @@ namespace cyclops {
     return (h.head<2>() / h.z()).eval();
   }
 
-  TEST_CASE("Triangulation from multi-view features") {
+  TEST_CASE("Test multi-view feature triangulation") {
     auto pose_sequence =
       views::ints(0, n_frames) | views::transform([&](auto i) {
         auto t = static_cast<double>(i) / n_frames;

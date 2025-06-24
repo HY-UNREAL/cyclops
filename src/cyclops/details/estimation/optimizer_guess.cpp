@@ -119,7 +119,8 @@ namespace cyclops::estimation {
     __logger__->info("VIO bootstrap time: {}[s]", toc(tic));
 
     if (!maybe_bootstrap.has_value()) {
-      __logger__->info("Failed VIO bootstrap; skipping state guess");
+      __logger__->info(
+        "Failed to initialize the VIO; skipping optimizer solution prediction");
       return std::nullopt;
     }
 

@@ -82,7 +82,7 @@ namespace cyclops::measurement {
     auto& y_p = position_delta;
     auto& y_v = velocity_delta;
 
-    // local increments of the preintegration delta.
+    // Local increments of the preintegration delta.
     auto [dy_q, dy_p, dy_v] = propagateSingleStep(dt, a_bar, w_bar);
     auto dy_R_T = dy_q.matrix().transpose().eval();
 

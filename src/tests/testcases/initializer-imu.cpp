@@ -66,7 +66,7 @@ namespace cyclops::initializer {
       motion_timestamp_lookup, body_motions, camera_motions);
   }
 
-  TEST_CASE("IMU bootstrap solver") {
+  TEST_CASE("Test the IMU initialization") {
     auto rgen = std::make_shared<std::mt19937>(20240513007);
     auto config = makeDefaultConfig();
     auto const& extrinsic = config->extrinsics.imu_camera_transform;

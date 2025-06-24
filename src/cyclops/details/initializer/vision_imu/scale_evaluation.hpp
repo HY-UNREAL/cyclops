@@ -16,14 +16,17 @@ namespace cyclops::initializer {
     double cost;
 
     /*
-     * concatenation of gravity, acc bias error, and IMU body velocities.
+     * Concatenation of the gravity, acc bias error, and IMU body velocities,
+     *
+     *                                  [  g  ]
+     *                                  [ b_a ]
+     *                            x_I = [ v_1 ]
+     *                                  [ ... ]
+     *                                  [ v_N ].
      */
     Eigen::VectorXd inertial_solution;
 
-    /*
-     * perturbations of vision position estimation, omitting the first frame.
-     * defined exponentially ignoring scale gauge; `p_i = p_hat_i + R_i * dp_i`.
-     */
+    // Perturbations of the MSfM position estimation, omitting the first frame.
     Eigen::VectorXd visual_solution;
   };
 

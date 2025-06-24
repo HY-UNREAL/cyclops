@@ -180,7 +180,7 @@ namespace cyclops::measurement {
     };
 
     auto noise = SensorStatistics {
-      .acc_white_noise = 0.0,  // ignore all noises
+      .acc_white_noise = 0.0,  // Ignore all the noise.
       .gyr_white_noise = 0.0,
       .acc_random_walk = 0.0,
       .gyr_random_walk = 0.0,

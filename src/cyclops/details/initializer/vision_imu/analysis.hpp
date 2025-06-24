@@ -13,7 +13,8 @@ namespace cyclops::initializer {
   struct ImuMatchMotionPrior;
 
   /*
-   * represents biquadratic translational visual-inertial matching cost,
+   * Matrix and vector terms for the biquadratic translational IMU matching
+   * cost,
    *
    * p* = min || [A_I,   B_I * s] * x + [ alpha + beta * s ] ||^2
    *      s,x || [  0,       A_V]       [        0         ] ||,
@@ -34,7 +35,7 @@ namespace cyclops::initializer {
    *   v[]: body velocities
    *   dp[]: visual SLAM position estimation errors.
    *
-   *  x_V starts from dp[2] to handle global translation symmetry.
+   *  x_V starts from dp[2] to handle the MSfM translation symmetry.
    */
   struct ImuMatchAnalysis {
     size_t frames_count;

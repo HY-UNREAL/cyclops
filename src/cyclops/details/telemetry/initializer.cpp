@@ -10,7 +10,7 @@ namespace cyclops::telemetry {
   namespace views = ranges::views;
 
   void InitializerTelemetry::reset() {
-    // Nothing
+    // Nothing.
   }
 
   void InitializerTelemetry::onImageObservabilityPretest(

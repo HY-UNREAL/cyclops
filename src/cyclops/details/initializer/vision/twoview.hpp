@@ -36,7 +36,7 @@ namespace cyclops::initializer {
     virtual ~TwoViewVisionGeometrySolver() = default;
     virtual void reset() = 0;
 
-    // returns a sequence of possible solutions.
+    // Returns a sequence of possible solutions.
     virtual std::vector<TwoViewGeometry> solve(
       TwoViewCorrespondenceData const& two_view_correspondence) = 0;
 

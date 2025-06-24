@@ -55,7 +55,7 @@ namespace cyclops::initializer {
     return SE3Transform {p * scale_gauge, q};
   }
 
-  TEST_CASE("Multiview vision reconstruction") {
+  TEST_CASE("Test the multi-view geometry solver") {
     auto rgen = std::make_shared<std::mt19937>(20240513006);
 
     auto config = makeDefaultConfig();

@@ -17,15 +17,17 @@ namespace cyclops::initializer {
     ~ImuMatchAnalysisCache();
 
     /*
-     * Represents the following Schur-decomposed system of linear equations,
-     * 1. (H_I_bar + mu * C_I) * x_I + b_I_bar = 0,
-     * 2. x_V = -(F_V * x_I + z_V) * s,
+     * Represents the following Schur-decomposition of linear system of
+     * equations,
      *
-     * that is originated from the following system of linear equations,
-     *                  (H(s) + mu * C_g) * x + b(s) = 0
+     *  [H_I + mu * C_I,         F_I * s] * [ x_I ] + [ b_I(s) ]  = [ 0 ]
+     *  [F_I^T * s,      H_V + D_I * s^2]   [ x_V ]   [ b_V(s) ]    [ 0 ]
+     *
      *                                <=>
-     * [H_I + mu * C_I,           F_I * s] * [ x_I ] + [ b_I(s) ]  = [ 0 ]
-     * [F_I.T * s,        H_V + D_I * s^2]   [ x_V ]   [ b_V(s) ]    [ 0 ].
+     *
+     *            (H_I_bar + mu * C_I) * x_I + b_I_bar = 0
+     *                  x_V = -(F_V * x_I + z_V) * s
+     * .
      */
     struct PrimalCacheInflation {
       Eigen::MatrixXd H_I_bar;

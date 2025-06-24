@@ -72,10 +72,10 @@ namespace cyclops::measurement {
             }
           }
 
-          WHEN("dropped frame 0 and landmark 2, 4.") {
+          WHEN("Dropped frame 0 and landmark 2, 4.") {
             mprovider->marginalize(0, {2, 4});
 
-            THEN("measurements are correctly removed") {
+            THEN("Measurements are correctly removed") {
               auto const& imu = mprovider->imu();
               REQUIRE(imu.size() == 1);
               CHECK(imu.at(0).from == 1);

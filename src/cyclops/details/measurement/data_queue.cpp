@@ -164,11 +164,11 @@ namespace cyclops::measurement {
     _data_provider->updateFrame(
       prev_frame_id, curr_frame_id, landmark, std::move(preintegration));
 
-    // we simply treat all motion frames as a keyframe during initialization.
+    // We simply treat all motion frames as a keyframe during initialization.
     if (_state->motionFrames().empty())
       _keyframe_manager->setKeyframe(curr_frame_id);
 
-    // if keyframes are empty, force set this frame to a keyframe.
+    // If keyframes are empty, force set this frame to a keyframe.
     if (keyframes().empty())
       _keyframe_manager->setKeyframe(curr_frame_id);
 

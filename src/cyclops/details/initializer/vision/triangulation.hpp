@@ -18,15 +18,15 @@ namespace cyclops::initializer {
   struct TwoViewFeaturePair;
 
   struct TwoViewTriangulation {
-    /* failure statistics. */
+    /* Failure statistics. */
     int n_triangulation_failure;
     int n_error_probability_test_failure;
 
     double expected_inliers;
 
     /**
-     * actually accepted triangulations. i.e. triangulations that passed both
-     * reprojection test and direction test, with enough parallax.
+     * Actually accepted triangulation solutions. i.e. triangulations that
+     * passed both reprojection test and direction test, with enough parallax.
      */
     LandmarkPositions landmarks;
   };

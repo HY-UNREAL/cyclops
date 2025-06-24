@@ -61,7 +61,7 @@ namespace cyclops::initializer {
     ;
     // clang-format on
 
-    // enforce singularity constraint of E
+    // Enforce the singularity constraint of E.
     Eigen::JacobiSVD<Matrix3d> E0_svd(
       E0, Eigen::ComputeFullU | Eigen::ComputeFullV);
     Vector3d s = E0_svd.singularValues();
@@ -93,7 +93,7 @@ namespace cyclops::initializer {
       auto error_1 = std::pow(g / a1.norm() / sigma, 2);
       auto error_2 = std::pow(g / a2.norm() / sigma, 2);
 
-      // inlier probability of f1 and f2
+      // The inlier probability of f1 and f2.
       auto p1 = std::max(0., 1 - chiSquaredCdf(2, error_1));
       auto p2 = std::max(0., 1 - chiSquaredCdf(2, error_2));
 
@@ -146,7 +146,7 @@ namespace cyclops::initializer {
   }
 
   /*
-   * see: section 9.6 of [1]
+   * See: section 9.6 of [1].
    *
    * [1] R. Hartley and A. Zisserman, "Multiple View Geometry in Computer
    * Vision", 2nd ed. Cambridge: Cambridge University Press, 2004.

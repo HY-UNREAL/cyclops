@@ -161,7 +161,7 @@ namespace cyclops::estimation {
     // Compute prior factor assuming that all the landmark nodes are also being
     // marginalized. The resulting prior factor is only connected to the frame
     // nodes, enforcing the sparsity structure assumed by the Schur complement
-    // trick. Even though the information of the landmark nodes contributed from
+    // trick. Even though the information of the landmark nodes contributed by
     // the observation of `drop_frame` is lost, we correctly preserve the
     // contribution to non-dropped frames up-to-linearization.
     dropLandmarks(drop_nodes, keep_nodes);

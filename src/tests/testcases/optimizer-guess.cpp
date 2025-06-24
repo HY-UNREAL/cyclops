@@ -145,7 +145,7 @@ namespace cyclops::initializer {
     }
   }
 
-  TEST_CASE("Optimizer solution predictor") {
+  TEST_CASE("Test the optimizer solution predictor") {
     GIVEN("Well-excited body motion") {
       auto rgen = std::make_shared<std::mt19937>(20220803);
       auto landmarks_sol = generateLandmarks(

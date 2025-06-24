@@ -86,7 +86,7 @@ namespace cyclops::estimation {
   FactorID FactorGraphStateNodeMap::createPriorFactor(
     ceres::Problem& problem, FactorPtr ptr, NodeSet const& nodes) {
     if (_prior) {
-      __logger__->warn("Warning: setting prior twice");
+      __logger__->warn("Warning: setting the prior twice");
       problem.RemoveResidualBlock(_prior->ptr);
     }
     _last_factor_id++;

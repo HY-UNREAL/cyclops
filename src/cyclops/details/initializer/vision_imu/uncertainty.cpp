@@ -12,17 +12,6 @@ namespace cyclops::initializer {
   using Eigen::MatrixXd;
   using Eigen::VectorXd;
 
-  /*
-   * for positive-definite 2-by-2 block matrix H, of which components are
-   * ```
-   * (1) H = [H_a,    H_r;
-   *          H_r^T,  H_b],
-   * ```
-   * compute and return a pair of Schur-complements <H_a/H_b, H_b/H_a>.
-   *
-   * H: positive definite matrix.
-   * p: dimension of the upper left block.
-   */
   static std::optional<std::tuple<MatrixXd, MatrixXd>>
   computeMarginalInformationPair(MatrixXd const& H, int p) {
     __logger__->trace("Computing marginal information pair");

@@ -74,7 +74,7 @@ namespace cyclops::initializer {
     return MultiViewGeometry {camera_motions_estimated, landmarks_estimated};
   }
 
-  TEST_CASE("Bundle adjustment") {
+  TEST_CASE("Test the bundle adjustment logic") {
     std::mt19937 rgen(20240513007);
 
     auto timestamps = linspace(0, M_PI_2, n_frames) | ranges::to_vector;
@@ -128,7 +128,7 @@ namespace cyclops::initializer {
       // 1e-6: Margin to avoid the numerical inaccuracy
       REQUIRE(lambda.x() > -1e-6);
 
-      AND_THEN("The resulting Fisher information experiences 6-DoF symmetry") {
+      AND_THEN("The resulting Fisher information shows 6-DoF symmetry") {
         REQUIRE(lambda.head(6).norm() < 1e-6);
         REQUIRE(lambda.head(7).norm() > 1e-6);
       }

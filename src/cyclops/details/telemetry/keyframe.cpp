@@ -2,11 +2,11 @@
 
 namespace cyclops::telemetry {
   void KeyframeTelemetry::reset() {
-    // Nothing
+    // Nothing.
   }
 
   void KeyframeTelemetry::onNewMotionFrame(OnNewMotionFrame const& argument) {
-    // nothing.
+    // Nothing.
   }
 
   std::unique_ptr<KeyframeTelemetry> KeyframeTelemetry::CreateDefault() {

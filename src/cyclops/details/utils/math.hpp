@@ -18,7 +18,7 @@ namespace cyclops {
     return SE3Transform {p_a + q_a * p_b, q_a * q_b};
   }
 
-  // templatize scalar type to handle automatic differentiation
+  // Templatize scalar type to handle the automatic differentiation.
   template <typename scalar_t>
   static auto skew3d(Eigen::Matrix<scalar_t, 3, 1> const& w) {
     auto x = w.x();

@@ -102,7 +102,7 @@ namespace cyclops::initializer {
       auto r1 = ((f1 - f1_hat) / sigma).eval();
       auto r2 = ((f2 - f2_hat) / sigma).eval();
 
-      // inlier probability of f1 and f2
+      // The inlier probability of f1 and f2.
       auto p1 = std::max(0., 1 - chiSquaredCdf(2, r1.dot(r1)));
       auto p2 = std::max(0., 1 - chiSquaredCdf(2, r2.dot(r2)));
 
@@ -237,7 +237,7 @@ namespace cyclops::initializer {
   };
 
   /*
-   * extract motion hypothesis from homography as in [1]
+   * Extract motion hypothesis from the homography matrix as in [1].
    *
    * [1] O. D. Faugeras and F. Lustman, "Motion and structure from motion in a
    * piecewise planar environment", in International Journal of Pattern
@@ -257,7 +257,7 @@ namespace cyclops::initializer {
     }
     Vector3d s = svd.singularValues().normalized();
 
-    // test for multiplicity of singular values
+    // Test for the multiplicity of singular values.
     if (isclose(s.z(), s.x(), 1e-4)) {
       __logger__->warn("Undetermined homography: multiplicity = 3");
       return {};

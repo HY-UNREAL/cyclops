@@ -84,17 +84,17 @@ namespace cyclops::initializer {
 
     std::string printHistory() const {
       std::ostringstream ss;
-      ss << "initial local optimization failed." << std::endl;
-      ss << "iterations: " << _history.size() << std::endl;
-      ss << "history ";
-      ss << "(scale, cost, multiplier, gradient, hessian, radius, quality, "
-            "stepsize): [";
+      ss << "Initial local optimization failed." << std::endl;
+      ss << "  Iterations: " << _history.size() << std::endl;
+      ss << "  history:" << std::endl;
+      ss << "    scale, cost, multiplier, gradient, hessian, radius, quality, "
+            "stepsize: [";
       if (!_history.empty()) {
         ss << std::endl;
         for (auto const& step : _history) {
           auto const& [state, radius, quality, stepsize] = step;
           auto const& [s, p, mu, g, H] = state;
-          ss << "  ";
+          ss << "    ";
           ss << s << ", ";
           ss << p << ", ";
           ss << mu << ", ";
@@ -232,7 +232,7 @@ namespace cyclops::initializer {
       auto const& [s, p, mu, _, __] = _history.back().state;
 
       __logger__->debug(
-        "IMU match scale guess refinement failed. reason: {}.", reason);
+        "IMU match scale guess refinement failed. Reason: {}.", reason);
       __logger__->debug("Returning at the best effort...");
 
       __logger__->debug("Scale = {}, cost = {}, multiplier = {}", s, p, mu);
@@ -274,12 +274,12 @@ namespace cyclops::initializer {
         }
         auto maybe_step = updateStep(evaluator, state, stepsize);
         if (!maybe_step)
-          return makeFailure("step evaluation failed");
+          return makeFailure("Step evaluation failed");
 
         _history.push_back(*maybe_step);
       }
       __logger__->debug("{}", printHistory());
-      return makeFailure("exceeded max iterations");
+      return makeFailure("Exceeded max iterations");
     }
   };
 

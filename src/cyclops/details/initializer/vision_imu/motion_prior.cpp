@@ -11,7 +11,7 @@ namespace cyclops::initializer {
 
   static MatrixXd evaluateCameraPositionInformationWeight(
     BundleAdjustmentSolution const& msfm) {
-    // discount by one to handle symmetry
+    // To handle the symmetry, discount the number of keyframes by one.
     auto n = static_cast<int>(msfm.camera_motions.size() - 1);
 
     Eigen::VectorXi orientation_indices(3 * n);

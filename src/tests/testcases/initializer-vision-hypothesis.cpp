@@ -109,7 +109,7 @@ namespace cyclops::initializer {
     }
   }
 
-  TEST_CASE("Motion hypothesis selection") {
+  TEST_CASE("Test the motion hypothesis selection") {
     std::mt19937 rgen(20240513003);
 
     GIVEN("Random camera motion") {

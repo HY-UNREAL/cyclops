@@ -28,7 +28,7 @@ namespace cyclops::initializer {
     virtual ~MultiviewVisionGeometrySolver() = default;
     virtual void reset() = 0;
 
-    // returns a sequence of possible multiview geometries.
+    // Returns a sequence of possible multiview geometries.
     virtual std::vector<MultiViewGeometry> solve(
       std::map<FrameID, std::map<LandmarkID, FeaturePoint>> const& features,
       std::map<FrameID, GyroMotionConstraint> const& gyro_motions) = 0;

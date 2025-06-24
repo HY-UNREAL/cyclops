@@ -29,10 +29,10 @@ namespace cyclops::estimation {
   };
 
   struct NeighborQueryResult {
-    // neighbor nodes
+    // Neighbor nodes.
     NodeSet nodes;
 
-    // factors relating queried node set and their neighbors
+    // Factors between the queried nodes and the neighbor nodes.
     FactorSet factors;
   };
 

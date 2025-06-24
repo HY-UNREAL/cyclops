@@ -32,7 +32,7 @@ namespace cyclops::initializer {
     return x.head<2>() / x.z();
   }
 
-  TEST_CASE("Two-view vision pair reconstruction") {
+  TEST_CASE("Test the two-view geometry solver") {
     GIVEN("Random camera motion") {
       auto p = Vector3d(1.0, 0, 0);
       auto R = AngleAxisd(-M_PI / 4, Vector3d::UnitY()).matrix().eval();
