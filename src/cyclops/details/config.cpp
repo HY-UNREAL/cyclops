@@ -60,7 +60,7 @@ namespace cyclops::config::initializer {
         },
       .candidate_test =
         {
-          .cost_significance = 0.003,
+          .cost_significance = 0.001,
         },
       .acceptance_test =
         {
