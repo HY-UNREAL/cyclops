@@ -41,14 +41,14 @@ namespace cyclops::initializer {
 #define H_b (H.bottomRightCorner(q, q))
 #define H_r (H.topRightCorner(p, q))
 
-    Eigen::LLT<MatrixXd> H_b_llt(H_b);
+    Eigen::LDLT<MatrixXd> H_b_llt(H_b);
     if (H_b_llt.info() != Eigen::Success) {
       __logger__->debug("Cholesky decomposition failed.");
       return std::nullopt;
     }
     MatrixXd H_a_bar = H_a - H_r * H_b_llt.solve(H_r.transpose());
 
-    Eigen::LLT<MatrixXd> H_a_llt(H_a);
+    Eigen::LDLT<MatrixXd> H_a_llt(H_a);
     if (H_a_llt.info() != Eigen::Success) {
       __logger__->debug("Cholesky decomposition failed.");
       return std::nullopt;
@@ -60,6 +60,34 @@ namespace cyclops::initializer {
 #undef H_a
 
     return std::make_tuple(H_a_bar, H_b_bar);
+  }
+
+  static auto marginalizeOrDie(MatrixXd const& H, int dim, std::string tag) {
+    auto result = computeMarginalInformationPair(H, dim);
+    if (!result)
+      __logger__->debug("{} marginalization failed", tag);
+    return result;
+  }
+
+  static std::optional<std::vector<MatrixXd>> evaluateMarginalizationChain(
+    Eigen::MatrixXd const& matrix,
+    std::vector<std::tuple<int, std::string>> const& chain) {
+    Eigen::MatrixXd H = matrix;
+
+    std::vector<MatrixXd> result;
+    for (auto [dimension, tag] : chain) {
+      auto marginalization = marginalizeOrDie(H, dimension, tag);
+      if (!marginalization.has_value())
+        return std::nullopt;
+
+      auto const& [current, rest] = marginalization.value();
+
+      result.push_back(current);
+      H = rest;
+    }
+    result.push_back(H);
+
+    return result;
   }
 
   static std::optional<VectorXd> computePositiveEigenvalues(
@@ -82,16 +110,37 @@ namespace cyclops::initializer {
     return lambda;
   }
 
-  static bool checkHessianDimension(MatrixXd const& H, int frames) {
+  static auto eigenvalueOrDie(MatrixXd const& matrix, std::string tag) {
+    auto maybe_lambda = computePositiveEigenvalues(matrix);
+    if (!maybe_lambda)
+      __logger__->debug("{} eigenvalue computation failed.", tag);
+    return maybe_lambda;
+  };
+
+  static std::optional<std::vector<VectorXd>>
+  evaluateChainMarginalizationEigenvalues(
+    std::vector<std::tuple<MatrixXd, std::string>> const& chain) {
+    std::vector<VectorXd> result;
+    for (auto const& [H, tag] : chain) {
+      auto maybe_lambda = eigenvalueOrDie(H, tag);
+      if (!maybe_lambda.has_value())
+        return std::nullopt;
+
+      result.push_back(maybe_lambda.value());
+    }
+    return result;
+  }
+
+  static bool checkHessianDimension(MatrixXd const& H, int dimension) {
     if (H.rows() != H.cols()) {
       __logger__->error("IMU match hessian is not a square matrix");
       return false;
     }
 
     auto n = H.cols();
-    if (n != 6 * frames + 3) {
+    if (n != dimension) {
       __logger__->error("IMU match hessian dimension mismatch");
-      __logger__->debug("{} vs {}", n, 6 * frames + 3);
+      __logger__->debug("{} vs {}", n, dimension);
       return false;
     }
     return true;
@@ -107,40 +156,22 @@ namespace cyclops::initializer {
     return 1 - chiSquaredCdf(degrees_of_freedom, cost);
   }
 
-  std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
+  std::optional<ImuMatchUncertainty> analyzeImuOnlyMatchUncertainty(
     int frames_count, Eigen::MatrixXd const& H, double cost_p_value) {
-    __logger__->debug("Analyzing the uncertainty of IMU match");
+    __logger__->debug("Analyzing the uncertainty of IMU-only match");
 
-    if (!checkHessianDimension(H, frames_count))
+    if (!checkHessianDimension(H, 3 * frames_count + 6))
       return std::nullopt;
 
-    auto marginalize_or_die = [](auto const& matrix, auto dim, auto tag) {
-      auto result = computeMarginalInformationPair(matrix, dim);
-      if (!result)
-        __logger__->debug("{} marginalization failed", tag);
-      return result;
-    };
-
-    auto scale_marginalization = marginalize_or_die(H, 1, "scale");
-    if (!scale_marginalization)
+    auto chain = evaluateMarginalizationChain(
+      H, {{1, "Scale"}, {2, "Gravity"}, {3, "Bias"}});
+    if (!chain.has_value())
       return std::nullopt;
-    auto const& [H_s, H_x] = *scale_marginalization;
 
-    auto gravity_marginalization = marginalize_or_die(H_x, 2, "gravity");
-    if (!gravity_marginalization)
-      return std::nullopt;
-    auto const& [H_g, H_q] = *gravity_marginalization;
-
-    auto bias_marginalization = marginalize_or_die(H_q, 3, "bias");
-    if (!bias_marginalization)
-      return std::nullopt;
-    auto const& [H_b, H_vx] = *bias_marginalization;
-
-    auto v_dim = 3 * frames_count;
-    auto velocity_marginalization = marginalize_or_die(H_vx, v_dim, "velocity");
-    if (!velocity_marginalization)
-      return std::nullopt;
-    auto const& [H_v, H_p] = *velocity_marginalization;
+    auto const& H_s = chain->at(0);
+    auto const& H_g = chain->at(1);
+    auto const& H_b = chain->at(2);
+    auto const& H_v = chain->at(3);
 
     auto lambda_s = H_s(0, 0);
     if (lambda_s <= 0) {
@@ -148,36 +179,70 @@ namespace cyclops::initializer {
       return std::nullopt;
     }
 
-    auto eigenvalue_or_die = [](auto const& matrix, auto tag) {
-      auto maybe_lambda = computePositiveEigenvalues(matrix);
-      if (!maybe_lambda)
-        __logger__->debug("{} eigenvalue computation failed.", tag);
-      return maybe_lambda;
-    };
-    auto maybe_lambda_g = eigenvalue_or_die(H_g, "Gravity");
-    if (!maybe_lambda_g)
+    auto eigenvalues = evaluateChainMarginalizationEigenvalues(
+      {{H_g, "Gravity"}, {H_b, "Bias"}, {H_v, "Velocity"}});
+    if (!eigenvalues.has_value())
       return std::nullopt;
 
-    auto maybe_lambda_b = eigenvalue_or_die(H_b, "Bias");
-    if (!maybe_lambda_b)
-      return std::nullopt;
-
-    auto maybe_lambda_v = eigenvalue_or_die(H_v, "Velocity");
-    if (!maybe_lambda_v)
-      return std::nullopt;
-
-    auto maybe_lambda_p = eigenvalue_or_die(H_p, "Position");
-    if (!maybe_lambda_p)
-      return std::nullopt;
+    auto const& lambda_g = eigenvalues->at(0);
+    auto const& lambda_b = eigenvalues->at(1);
+    auto const& lambda_v = eigenvalues->at(2);
 
     return ImuMatchUncertainty {
       .final_cost_significant_probability = cost_p_value,
       .scale_log_deviation = 1 / std::sqrt(lambda_s),
-      .gravity_tangent_deviation = maybe_lambda_g->cwiseSqrt().cwiseInverse(),
-      .bias_deviation = maybe_lambda_b->cwiseSqrt().cwiseInverse(),
-      .body_velocity_deviation = maybe_lambda_v->cwiseSqrt().cwiseInverse(),
+      .gravity_tangent_deviation = lambda_g.cwiseSqrt().cwiseInverse(),
+      .bias_deviation = lambda_b.cwiseSqrt().cwiseInverse(),
+      .body_velocity_deviation = lambda_v.cwiseSqrt().cwiseInverse(),
       .translation_scale_symmetric_deviation =
-        maybe_lambda_p->cwiseSqrt().cwiseInverse(),
+        VectorXd::Zero(3 * frames_count - 3),
+    };
+  }
+
+  std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
+    int frames_count, Eigen::MatrixXd const& H, double cost_p_value) {
+    __logger__->debug("Analyzing the uncertainty of IMU match");
+
+    if (!checkHessianDimension(H, 6 * frames_count + 3))
+      return std::nullopt;
+
+    auto v_dim = 3 * frames_count;
+    auto chain = evaluateMarginalizationChain(
+      H, {{1, "Scale"}, {2, "Gravity"}, {3, "Bias"}, {v_dim, "Velocity"}});
+
+    if (!chain.has_value())
+      return std::nullopt;
+
+    auto const& H_s = chain->at(0);
+    auto const& H_g = chain->at(1);
+    auto const& H_b = chain->at(2);
+    auto const& H_v = chain->at(3);
+    auto const& H_p = chain->at(4);
+
+    auto lambda_s = H_s(0, 0);
+    if (lambda_s <= 0) {
+      __logger__->debug("Scale information is negative definite.");
+      return std::nullopt;
+    }
+
+    auto eigenvalues = evaluateChainMarginalizationEigenvalues(
+      {{H_g, "Gravity"}, {H_b, "Bias"}, {H_v, "Velocity"}, {H_p, "Position"}});
+    if (!eigenvalues.has_value())
+      return std::nullopt;
+
+    auto const& lambda_g = eigenvalues->at(0);
+    auto const& lambda_b = eigenvalues->at(1);
+    auto const& lambda_v = eigenvalues->at(2);
+    auto const& lambda_p = eigenvalues->at(3);
+
+    return ImuMatchUncertainty {
+      .final_cost_significant_probability = cost_p_value,
+      .scale_log_deviation = 1 / std::sqrt(lambda_s),
+      .gravity_tangent_deviation = lambda_g.cwiseSqrt().cwiseInverse(),
+      .bias_deviation = lambda_b.cwiseSqrt().cwiseInverse(),
+      .body_velocity_deviation = lambda_v.cwiseSqrt().cwiseInverse(),
+      .translation_scale_symmetric_deviation =
+        lambda_p.cwiseSqrt().cwiseInverse(),
     };
   }
 

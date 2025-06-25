@@ -24,6 +24,8 @@ namespace cyclops::initializer {
     int residual_dimension, int parameter_dimension, double cost);
   std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
     int frames_count, Eigen::MatrixXd const& hessian, double cost_p_value);
+  std::optional<ImuMatchUncertainty> analyzeImuOnlyMatchUncertainty(
+    int frames_count, Eigen::MatrixXd const& H, double cost_p_value);
 
   std::optional<ImuMatchUncertainty> analyzeImuMatchUncertainty(
     ImuMatchAnalysis const& analysis,

@@ -154,15 +154,15 @@ namespace cyclops::initializer {
     ImuOnlyMatchSolution const& match_solution) const {
     auto const& [n_frames, _1, _2, _3, _4, A_V, alpha, beta] = analysis;
     auto const& [x_I, s, cost] = match_solution;
+    auto n_I = x_I.size();
 
     auto x_V = VectorXd::Zero(A_V.cols()).eval();
-    auto n_V = x_V.size();
 
     // Since we are applying virtual constraint x_V = 0 during the IMU-only
     // match, assign high information intensity to the x_V part of the Hessian
     // matrix that will be used for the parameter observability test.
     auto H = evaluateImuMatchHessian(analysis, s, x_I, x_V);
-    H.bottomRightCorner(n_V, n_V) = 1e12 * MatrixXd::Identity(n_V, n_V);
+    auto H_I = H.topLeftCorner(n_I, n_I).eval();
 
     int residual_dimension = 3 + 6 * (n_frames - 1);
     int parameter_dimension = 6 + 3 * n_frames;
@@ -172,7 +172,7 @@ namespace cyclops::initializer {
     if (!cost_p_value.has_value())
       return std::nullopt;
 
-    return analyzeImuMatchUncertainty(n_frames, H, cost_p_value.value());
+    return analyzeImuOnlyMatchUncertainty(n_frames, H_I, cost_p_value.value());
   }
 
   std::optional<std::vector<ImuMatchResult>> ImuOnlyMatchSolverImpl::solve(
