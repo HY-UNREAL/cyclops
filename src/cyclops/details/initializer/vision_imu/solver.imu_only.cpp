@@ -9,8 +9,10 @@
 #include "cyclops/details/utils/qcqp1.hpp"
 
 #include "cyclops/details/config.hpp"
+#include "cyclops/details/logging.hpp"
 
 #include <range/v3/all.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <set>
@@ -100,10 +102,13 @@ namespace cyclops::initializer {
 
     auto rho_min = -P_dagger.selfadjointView<Eigen::Upper>().eigenvalues()[0];
     auto solution = solveNormConstrainedQcqp1(
-      P_dagger, p_dagger, gravity_norm * gravity_norm, rho_min);
+      P_dagger, p_dagger, gravity_norm * gravity_norm, rho_min, 100, 1e-5);
 
-    if (!solution.success)
+    if (!solution.success) {
+      __logger__->info(
+        "IMU-only scale initialization QCQP-1C evaluation failed.");
       return std::nullopt;
+    }
 
     VectorXd result = VectorXd(n + 1);
     result << solution.x, -Q_inv.solve(F.transpose() * solution.x + q);
