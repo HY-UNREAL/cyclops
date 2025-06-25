@@ -90,7 +90,7 @@ namespace cyclops::initializer {
     MatrixXd Q = P.bottomRightCorner(n - 2, n - 2);
 
     Vector3d p_brev = p.head(3);
-    Vector3d q = p.tail(n - 2);
+    VectorXd q = p.tail(n - 2);
 
     Eigen::JacobiSVD<MatrixXd> Q_inv(
       Q, Eigen::ComputeThinU | Eigen::ComputeThinV);
