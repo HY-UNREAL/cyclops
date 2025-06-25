@@ -239,7 +239,7 @@ namespace cyclops::initializer {
       ranges::to_vector;
 
     reportBundleAdjustmentTelemetry(
-      projectKeys(connected_tracks), successful_bundle_adjustments);
+      projectKeys(image_data_filtered), successful_bundle_adjustments);
 
     __logger__->debug("Vision bootstrap time: {}[s]", toc(tic));
     return successful_bundle_adjustments;
