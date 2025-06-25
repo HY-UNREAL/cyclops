@@ -56,6 +56,25 @@ cyclops_add_unittest(
 )
 
 cyclops_add_unittest(
+  initializer_solver_imu_only
+  SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver.imu_only.test.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/acceptance.imu_only.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/analysis_cache.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hessian.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scale_evaluation.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/uncertainty.cpp
+  ${cyclops_src_dir}/cyclops/details/measurement/preintegration.cpp
+  ${cyclops_src_dir}/cyclops/details/utils/debug.cpp
+  ${cyclops_src_dir}/cyclops/details/utils/math.cpp
+  ${cyclops_src_dir}/cyclops/details/utils/qcqp1.cpp
+
+  DEPENDS cyclops_testlib
+)
+
+
+cyclops_add_unittest(
   initializer_analysis
   SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/analysis.test.cpp
