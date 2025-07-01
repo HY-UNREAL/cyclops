@@ -5,7 +5,7 @@ namespace cyclops::config::initializer {
     return {
       .gyro_bias_prior_stddev = 0.1,
       .feature_point_isotropic_noise = 0.0075,
-      .bundle_adjustment_robust_kernel_radius = 2.0,
+      .bundle_adjustment_robust_kernel_radius = 1.0,
       .two_view =
         {
           .model_selection =
@@ -97,7 +97,7 @@ namespace cyclops::config::estimation {
         },
       .landmark_acceptance =
         {
-          .inlier_min_information_index = 30.0,
+          .inlier_min_information_index = 5.0,
           .inlier_min_depth = 0.05,
           .inlier_mahalanobis_error = 25.0,
           .mapping_acceptance_min_eigenvalue = 10.0,
