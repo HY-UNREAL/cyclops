@@ -15,6 +15,7 @@ namespace cyclops::telemetry {
       size_t landmark_observations;
       double landmark_accept_rate;
       double landmark_uninitialized_rate;
+      double landmark_information_failure_rate;
       double landmark_depth_threshold_failure_rate;
       double landmark_chi_square_test_failure_rate;
     };

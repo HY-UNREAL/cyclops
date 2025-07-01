@@ -52,6 +52,7 @@ namespace cyclops::estimation {
     double uninitialized_landmarks = landmark_sanity.uninitialized_landmarks;
     double depth_failures = landmark_sanity.depth_threshold_failures;
     double mnorm_failures = landmark_sanity.mnorm_threshold_failures;
+    double information_failures = landmark_sanity.information_strength_failures;
 
     return telemetry::OptimizerTelemetry::SanityStatistics {
       .final_cost = cost,
@@ -61,6 +62,7 @@ namespace cyclops::estimation {
       .landmark_observations = n_landmarks,
       .landmark_accept_rate = landmark_accepts / n_landmarks,
       .landmark_uninitialized_rate = uninitialized_landmarks / n_landmarks,
+      .landmark_information_failure_rate = information_failures / n_landmarks,
       .landmark_depth_threshold_failure_rate = depth_failures / n_landmarks,
       .landmark_chi_square_test_failure_rate = mnorm_failures / n_landmarks,
     };

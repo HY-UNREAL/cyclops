@@ -123,6 +123,7 @@ namespace cyclops::estimation {
       .uninitialized_landmarks = 0,
       .depth_threshold_failures = 0,
       .mnorm_threshold_failures = 0,
+      .information_strength_failures = 0,
     };
 
     for (auto const& [feature_id, track] : _data_provider->tracks()) {
@@ -144,6 +145,7 @@ namespace cyclops::estimation {
         },
         [&](LandmarkAcceptance::DeficientInformation reject) {
           result.landmark_observations += reject.observation_count;
+          result.information_strength_failures += reject.observation_count;
         },
       };
       std::visit(visitor, acceptance.variant);

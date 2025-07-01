@@ -17,6 +17,7 @@ namespace cyclops::estimation {
     size_t uninitialized_landmarks;
     size_t depth_threshold_failures;
     size_t mnorm_threshold_failures;
+    size_t information_strength_failures;
   };
 
   struct OptimizerSanityStatistics {
