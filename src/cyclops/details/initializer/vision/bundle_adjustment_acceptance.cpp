@@ -122,8 +122,6 @@ namespace cyclops::initializer {
       auto r3 = residuals.at(2 * n_features + 3 * i + 2);
 
       auto p_value = 1.0 - chiSquaredCdf(3, r1 * r1 + r2 * r2 + r3 * r3);
-      __logger__->debug("MSfM IMU rotation prior p-value: {}%", p_value * 100);
-
       if (p_value < min_p_value) {
         __logger__->info(
           "MSfM rotation mismatch to IMU prior at {}-th motion.", i);
@@ -163,11 +161,6 @@ namespace cyclops::initializer {
     auto bias_mismatch = uncertainty.gyro_bias_prior_mismatch;
     auto p_value = uncertainty.p_value;
     auto inlier_ratio = uncertainty.inlier_ratio;
-
-    __logger__->debug("MSfM solution uncertainty:");
-    __logger__->debug("  p-value: {}%", p_value * 100);
-    __logger__->debug("  inlier ratio: {}%", uncertainty.inlier_ratio * 100);
-    __logger__->debug("  Gyro motion mismatch: {}", n_mismatch);
 
     auto report = [](auto reason) {
       __logger__->info("MSfM solution rejected. Reason: {}.", reason);

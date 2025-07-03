@@ -258,10 +258,6 @@ namespace cyclops::initializer {
     auto r_V = (A_V * x_V).eval();
     auto cost = r_I.dot(r_I) + r_V.dot(r_V);
 
-    __logger__->debug("IMU match (s = {}) solution residual:", s);
-    __logger__->debug("r_I = {}", r_I.transpose());
-    __logger__->debug("r_V = {}", r_V.transpose());
-
     auto cost_p_value = analyzeImuMatchCostProbability(
       analysis.residual_dimension, analysis.parameter_dimension, cost);
     if (!cost_p_value.has_value())
