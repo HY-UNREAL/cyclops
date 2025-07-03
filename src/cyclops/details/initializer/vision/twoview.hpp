@@ -41,6 +41,7 @@ namespace cyclops::initializer {
     enum GeometryModel {
       EPIPOLAR,
       HOMOGRAPHY,
+      BOTH,
     };
 
     GeometryModel initial_selected_model;
@@ -50,7 +51,7 @@ namespace cyclops::initializer {
     double epipolar_expected_inliers;
 
     // Returns a sequence of possible solutions.
-    std::vector<TwoViewGeometry> candidates;
+    std::vector<std::tuple<GeometryModel, TwoViewGeometry>> candidates;
   };
 
   class TwoViewVisionGeometrySolver {

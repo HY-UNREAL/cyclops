@@ -13,7 +13,11 @@ namespace cyclops::initializer {
   struct BundleAdjustmentSolutionUncertainty {
     double p_value;
     double inlier_ratio;
+
+    int n_inliers;
+    int n_outliers;
     int n_gyro_motion_mismatch;
+
     bool gyro_bias_prior_mismatch;
 
     Eigen::MatrixXd motion_information;

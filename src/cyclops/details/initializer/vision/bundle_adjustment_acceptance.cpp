@@ -24,7 +24,7 @@ namespace cyclops::initializer {
     Eigen::MatrixXd getMotionInformation(
       Context& context, EigenCRSMatrix const& jacobian);
 
-    double evaluateOutlierRatio(
+    int countOutliers(
       Context& context, std::vector<double> const& residuals) const;
     int countGyroMotionMismatch(
       Context& context, std::vector<double> const& residuals) const;
@@ -86,7 +86,7 @@ namespace cyclops::initializer {
     return H_kk - H_km__H_mm__inv__H_mk;
   }
 
-  double BundleAdjustmentAcceptDiscriminatorImpl::evaluateOutlierRatio(
+  int BundleAdjustmentAcceptDiscriminatorImpl::countOutliers(
     Context& context, std::vector<double> const& residuals) const {
     int n_features = context.nLandmarkMeasurements();
 
@@ -104,7 +104,7 @@ namespace cyclops::initializer {
         n_outliers++;
     }
 
-    return static_cast<double>(n_outliers) / n_features;
+    return n_outliers;
   }
 
   int BundleAdjustmentAcceptDiscriminatorImpl::countGyroMotionMismatch(
@@ -208,7 +208,10 @@ namespace cyclops::initializer {
     auto degrees_of_freedom = n_residuals - n_parameters;
     auto p_value = 1.0 - chiSquaredCdf(degrees_of_freedom, summary.final_cost);
 
-    auto outlier_ratio = evaluateOutlierRatio(context, residuals);
+    auto n_outliers = countOutliers(context, residuals);
+    auto n_features = context.nLandmarkMeasurements();
+
+    auto outlier_ratio = static_cast<double>(n_outliers) / n_features;
     auto inlier_ratio = 1.0 - outlier_ratio;
 
     auto n_mismatch = countGyroMotionMismatch(context, residuals);
@@ -219,7 +222,11 @@ namespace cyclops::initializer {
     auto uncertainty = BundleAdjustmentSolutionUncertainty {
       .p_value = p_value,
       .inlier_ratio = inlier_ratio,
+
+      .n_inliers = n_features - n_outliers,
+      .n_outliers = n_outliers,
       .n_gyro_motion_mismatch = n_mismatch,
+
       .gyro_bias_prior_mismatch = bias_mismatch,
       .motion_information = motion_information,
     };

@@ -5,6 +5,7 @@
 
 #include "cyclops/details/telemetry/initializer.hpp"
 
+#include "cyclops/details/utils/algorithm.hpp"
 #include "cyclops/details/utils/debug.hpp"
 #include "cyclops/details/utils/vision.hpp"
 
@@ -12,6 +13,7 @@
 #include "cyclops/details/logging.hpp"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
 #include <range/v3/all.hpp>
 
 namespace cyclops::initializer {
@@ -46,6 +48,9 @@ namespace cyclops::initializer {
     bool detectCameraMotion(
       config::initializer::ObservabilityPretestThreshold const& threshold,
       KeyframeMotionStatisticsLookup const& lookup) const;
+
+    std::vector<BundleAdjustmentSolution> filterDuplicateSolutions(
+      std::vector<BundleAdjustmentSolution> const& solutions);
 
     void reportBundleAdjustmentTelemetry(
       std::set<FrameID> const& input_frames,
@@ -153,6 +158,72 @@ namespace cyclops::initializer {
     return true;
   }
 
+  std::vector<BundleAdjustmentSolution>
+  VisionInitializerImpl::filterDuplicateSolutions(
+    std::vector<BundleAdjustmentSolution> const& solutions) {
+    auto n = static_cast<int>(solutions.size());
+    if (n <= 1)
+      return solutions;
+
+    __logger__->info("Bundle adjustment solutions");
+    for (auto const& solution : solutions) {
+      for (auto const& [frame_id, motion] : solution.camera_motions) {
+        auto const& p = motion.translation;
+        __logger__->info("  {}", p.transpose());
+      }
+    }
+
+    auto const& multiview_config = _config->initialization.vision.multiview;
+    auto duplicate_max_position_error =
+      multiview_config.duplicate_solution_max_position_error;
+
+    auto partition = DisjointSetPartitionContext(
+      views::cartesian_product(views::ints(0, n), views::ints(0, n)) |
+      views::filter([&](auto pair) {
+        auto [i, j] = pair;
+        if (i > j)
+          return false;
+        if (i == j)
+          return true;
+
+        if (
+          solutions.at(i).camera_motions.size() !=
+          solutions.at(j).camera_motions.size()) {
+          throw std::length_error(
+            "Bundle adjustment solution candidates motion duration mismatch");
+        }
+
+        auto error = ranges::max(
+          views::zip(
+            solutions.at(i).camera_motions | views::values,
+            solutions.at(j).camera_motions | views::values) |
+          views::transform([](auto const& pair) {
+            auto const& [motion_1, motion_2] = pair;
+            auto const& p1 = motion_1.translation;
+            auto const& p2 = motion_2.translation;
+            return (p2 - p1).norm();
+          }));
+        return error < duplicate_max_position_error;
+      }) |
+      views::transform([](auto pair) {
+        auto [i, j] = pair;
+        return std::set<int> {i, j};
+      }) |
+      ranges::to_vector);
+    auto duplicate_solution_index_sets = partition();
+
+    return  //
+      duplicate_solution_index_sets |
+      views::filter([](auto const& set) { return !set.empty(); }) |
+      views::transform([&](auto const& set) {
+        auto best = ranges::max(set, std::less<int> {}, [&](auto const& i) {
+          return solutions.at(i).n_inliers;
+        });
+        return solutions.at(best);
+      }) |
+      ranges::to_vector;
+  }
+
   void VisionInitializerImpl::reportBundleAdjustmentTelemetry(
     std::set<FrameID> const& input_frames,
     std::vector<BundleAdjustmentSolution> const& solutions) {
@@ -235,11 +306,11 @@ namespace cyclops::initializer {
       }) |
       ranges::to_vector;
 
-    auto successful_bundle_adjustments =  //
+    auto successful_bundle_adjustments = filterDuplicateSolutions(
       maybe_bundle_adjustments |
       views::filter([](auto const& maybe_x) { return maybe_x.has_value(); }) |
       views::transform([](auto const& maybe_x) { return maybe_x.value(); }) |
-      ranges::to_vector;
+      ranges::to_vector);
 
     reportBundleAdjustmentTelemetry(
       projectKeys(image_data_filtered), successful_bundle_adjustments);

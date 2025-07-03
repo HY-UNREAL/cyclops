@@ -49,10 +49,10 @@ namespace cyclops::initializer {
       EpipolarAnalysis const& epipolar,
       HomographyAnalysis const& homography) const;
 
-    vector<TwoViewGeometry> solveHomography(
+    vector<std::tuple<GeometryModel, TwoViewGeometry>> solveHomography(
       HomographyAnalysis const& homography, TwoViewData const& features,
       TwoViewImuRotationData const& rotation_prior);
-    vector<TwoViewGeometry> solveEpipolar(
+    vector<std::tuple<GeometryModel, TwoViewGeometry>> solveEpipolar(
       EpipolarAnalysis const& epipolar, TwoViewData const& features,
       TwoViewImuRotationData const& rotation_prior);
 
@@ -102,19 +102,24 @@ namespace cyclops::initializer {
     }
 
     auto R_H = S_H / (S_H + S_E);
-    auto const& model_selection_config =
+    auto const& selection_config =
       _config->initialization.vision.two_view.model_selection;
+    __logger__->debug("Model selection score: {}", R_H);
 
-    if (R_H > model_selection_config.homography_selection_score_threshold) {
+    if (R_H > selection_config.homography_selection_score_threshold) {
       __logger__->debug("Selecting homography model");
       return GeometryModel::HOMOGRAPHY;
-    } else {
+    } else if (R_H < selection_config.epipolar_selection_score_threshold) {
       __logger__->debug("Selecting epipolar model");
       return GeometryModel::EPIPOLAR;
     }
+
+    __logger__->debug("Selecting both homography and epipolar model");
+    return GeometryModel::BOTH;
   }
 
-  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solveHomography(
+  vector<std::tuple<GeometryModel, TwoViewGeometry>>
+  TwoViewVisionGeometrySolverImpl::solveHomography(
     HomographyAnalysis const& homography, TwoViewData const& data,
     TwoViewImuRotationData const& rotation_prior) {
     auto const& [expected_inliers, H, inliers] = homography;
@@ -125,11 +130,17 @@ namespace cyclops::initializer {
     if (hypotheses.size() != 8)
       return {};
 
-    return _motion_selector->selectPossibleMotions(
+    auto motions = _motion_selector->selectPossibleMotions(
       hypotheses, data, inliers, rotation_prior);
+    return  //
+      motions | views::transform([](auto const& motion) {
+        return std::make_tuple(GeometryModel::HOMOGRAPHY, motion);
+      }) |
+      ranges::to_vector;
   }
 
-  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solveEpipolar(
+  vector<std::tuple<GeometryModel, TwoViewGeometry>>
+  TwoViewVisionGeometrySolverImpl::solveEpipolar(
     EpipolarAnalysis const& epipolar, TwoViewData const& data,
     TwoViewImuRotationData const& rotation_prior) {
     auto const& [expected_inliers, E, inliers] = epipolar;
@@ -140,17 +151,24 @@ namespace cyclops::initializer {
     if (hypotheses.size() != 4)
       return {};
 
-    return _motion_selector->selectPossibleMotions(
+    auto motions = _motion_selector->selectPossibleMotions(
       hypotheses, data, inliers, rotation_prior);
+    return  //
+      motions | views::transform([](auto const& motion) {
+        return std::make_tuple(GeometryModel::EPIPOLAR, motion);
+      }) |
+      ranges::to_vector;
   }
 
   static bool isTwoViewGeometryAcceptable(
-    vector<TwoViewGeometry> const& candidates) {
+    vector<std::tuple<GeometryModel, TwoViewGeometry>> const& candidates) {
     if (candidates.empty())
       return false;
 
-    return ranges::any_of(
-      candidates, [](auto const& geometry) { return geometry.acceptable; });
+    return ranges::any_of(candidates, [](auto const& pair) {
+      auto const& [_, geometry] = pair;
+      return geometry.acceptable;
+    });
   }
 
   std::optional<TwoViewGeometrySolverResult>
@@ -225,6 +243,17 @@ namespace cyclops::initializer {
       return result(
         GeometryModel::HOMOGRAPHY, GeometryModel::EPIPOLAR,
         solveEpipolar(epipolar, features, rotation_prior));
+    }
+
+    case GeometryModel::BOTH: {
+      auto homography_solutions =
+        solveHomography(homography, features, rotation_prior);
+      auto epipolar_solutions =
+        solveEpipolar(epipolar, features, rotation_prior);
+      auto solutions = views::concat(homography_solutions, epipolar_solutions) |
+        ranges::to_vector;
+
+      return result(GeometryModel::BOTH, GeometryModel::BOTH, solutions);
     }
     }
   }

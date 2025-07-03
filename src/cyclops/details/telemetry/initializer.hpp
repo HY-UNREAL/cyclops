@@ -71,7 +71,7 @@ namespace cyclops::telemetry {
     virtual void onTwoViewMotionHypothesis(
       TwoViewMotionHypothesis const& hypothesis);
 
-    enum TwoViewGeometryModel { EPIPOLAR, HOMOGRAPHY };
+    enum TwoViewGeometryModel { EPIPOLAR, HOMOGRAPHY, BOTH };
 
     struct TwoViewSolverSuccess {
       std::set<FrameID> frames;

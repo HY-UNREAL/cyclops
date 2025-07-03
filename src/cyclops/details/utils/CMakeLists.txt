@@ -1,5 +1,8 @@
 target_sources(cyclops
   PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/algorithm.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/algorithm.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/block_meta.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/debug.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/debug.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/debug.ipp

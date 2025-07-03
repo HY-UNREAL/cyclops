@@ -30,6 +30,7 @@ namespace cyclops::initializer {
 
   using TwoViewSolution =
     std::tuple<std::optional<FrameID>, std::vector<TwoViewGeometry>>;
+  using GeometryModel = TwoViewGeometrySolverResult::GeometryModel;
 
   class MultiviewVisionGeometrySolverImpl:
       public MultiviewVisionGeometrySolver {
@@ -54,7 +55,7 @@ namespace cyclops::initializer {
       std::set<FrameID> frame_ids, FrameID best_frame_id);
     void reportTwoViewHypothesis(
       std::set<FrameID> frame_ids, FrameID best_frame_id,
-      std::vector<TwoViewGeometry> const& hypothesis);
+      std::vector<std::tuple<GeometryModel, TwoViewGeometry>> const& motions);
     void reportTwoViewSolverSuccess(
       std::set<FrameID> frame_ids, TwoViewCorrespondenceData const& view,
       TwoViewGeometrySolverResult const& solution);
@@ -171,7 +172,6 @@ namespace cyclops::initializer {
     for (auto const& [frame_id, view_frame] : correspondences.view_frames) {
       auto maybe_camera_pose = solve_pnp(view_frame);
       if (!maybe_camera_pose) {
-        __logger__->info("EPnP camera pose reconstruction failed.");
         __logger__->debug("Frame id: {}", frame_id);
         return std::nullopt;
       }
@@ -214,11 +214,16 @@ namespace cyclops::initializer {
     _two_view_solver->reset();
   }
 
-  static auto geometryModelAsTelemetry(
-    TwoViewGeometrySolverResult::GeometryModel model) {
-    return model == TwoViewGeometrySolverResult::EPIPOLAR
-      ? InitializerTelemetry::EPIPOLAR
-      : InitializerTelemetry::HOMOGRAPHY;
+  static auto geometryModelAsTelemetry(GeometryModel model) {
+    switch (model) {
+    case GeometryModel::EPIPOLAR:
+      return InitializerTelemetry::EPIPOLAR;
+    case GeometryModel::HOMOGRAPHY:
+      return InitializerTelemetry::HOMOGRAPHY;
+    case GeometryModel::BOTH:
+      return InitializerTelemetry::BOTH;
+    };
+    return InitializerTelemetry::BOTH;
   }
 
   static auto twoViewGeometryAsTelemetry(TwoViewGeometry const& geometry) {
@@ -233,6 +238,13 @@ namespace cyclops::initializer {
     };
   }
 
+  static auto twoViewHypothesisAsTelemetry(
+    std::vector<std::tuple<GeometryModel, TwoViewGeometry>> const& hypothesis) {
+    return hypothesis |
+      views::transform([](auto const& _) { return std::get<1>(_); }) |
+      views::transform(twoViewGeometryAsTelemetry) | ranges::to_vector;
+  }
+
   void MultiviewVisionGeometrySolverImpl::reportBestTwoViewSelection(
     std::set<FrameID> frame_ids, FrameID best_frame_id) {
     _telemetry->onBestTwoViewSelection({
@@ -244,13 +256,12 @@ namespace cyclops::initializer {
 
   void MultiviewVisionGeometrySolverImpl::reportTwoViewHypothesis(
     std::set<FrameID> frame_ids, FrameID best_frame_id,
-    std::vector<TwoViewGeometry> const& hypothesis) {
+    std::vector<std::tuple<GeometryModel, TwoViewGeometry>> const& hypothesis) {
     _telemetry->onTwoViewMotionHypothesis({
       .frames = frame_ids,
       .frame_id_1 = *frame_ids.rbegin(),
       .frame_id_2 = best_frame_id,
-      .candidates = hypothesis | views::transform(twoViewGeometryAsTelemetry) |
-        ranges::to_vector,
+      .candidates = twoViewHypothesisAsTelemetry(hypothesis),
     });
   }
 
@@ -266,8 +277,7 @@ namespace cyclops::initializer {
       .landmarks_count = static_cast<int>(view.features.size()),
       .homography_expected_inliers = solution.homography_expected_inliers,
       .epipolar_expected_inliers = solution.epipolar_expected_inliers,
-      .candidates = solution.candidates |
-        views::transform(twoViewGeometryAsTelemetry) | ranges::to_vector,
+      .candidates = twoViewHypothesisAsTelemetry(solution.candidates),
     });
   }
 
@@ -296,12 +306,16 @@ namespace cyclops::initializer {
     reportTwoViewHypothesis(frame_ids, best_frame_id, solution->candidates);
 
     auto solutions = solution->candidates |
-      views::filter([](auto const& _) { return _.acceptable; }) |
+      views::filter([](auto const& _) { return std::get<1>(_).acceptable; }) |
       ranges::to_vector;
 
     if (!solutions.empty())
       reportTwoViewSolverSuccess(frame_ids, best_view, *solution);
-    return std::make_tuple(best_frame_id, solutions);
+    return std::make_tuple(
+      best_frame_id,
+      solutions |
+        views::transform([](auto const& pair) { return std::get<1>(pair); }) |
+        ranges::to_vector);
   }
 
   std::vector<MultiViewGeometry> MultiviewVisionGeometrySolverImpl::solve(

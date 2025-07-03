@@ -78,10 +78,13 @@ namespace cyclops::initializer {
 
           AND_WHEN(
             "Polled the solution with the maximum landmark reconstruction") {
-            auto const& result = *std::max_element(
+            auto const& [_, result] = *std::max_element(
               possible_solutions.begin(), possible_solutions.end(),
-              [](auto const& a, auto const& b) {
-                return a.landmarks.size() < b.landmarks.size();
+              [](auto const& _1, auto const& _2) {
+                auto const& [model_1, motion1] = _1;
+                auto const& [model_2, motion_2] = _2;
+
+                return motion1.landmarks.size() < motion_2.landmarks.size();
               });
             REQUIRE(result.landmarks.size() >= 50);
 

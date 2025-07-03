@@ -23,6 +23,9 @@ namespace cyclops::initializer {
     double solution_significant_probability;
     double measurement_inlier_ratio;
 
+    int n_inliers;
+    int n_outliers;
+
     std::map<FrameID, SE3Transform> camera_motions;
     Eigen::MatrixXd motion_information_weight;
     Eigen::Vector3d gyro_bias;

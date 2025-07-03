@@ -24,6 +24,7 @@ namespace cyclops::config::initializer::vision {
   struct TwoViewGeometryModelSelectionConfig {
     int ransac_batch_size;
     double homography_selection_score_threshold;
+    double epipolar_selection_score_threshold;
   };
 
   struct TwoViewTriangulationSuccessThreshold {
@@ -46,6 +47,8 @@ namespace cyclops::config::initializer::vision {
     int bundle_adjustment_max_iterations;
     double bundle_adjustment_max_solver_time;
     double scale_gauge_soft_constraint_deviation;
+
+    double duplicate_solution_max_position_error;
   };
 
   struct SolutionAcceptanceThreshold {

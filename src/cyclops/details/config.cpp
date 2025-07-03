@@ -12,6 +12,7 @@ namespace cyclops::config::initializer {
             {
               .ransac_batch_size = 200,
               .homography_selection_score_threshold = 0.45,
+              .epipolar_selection_score_threshold = 0.35,
             },
           .triangulation_acceptance =
             {
@@ -29,6 +30,7 @@ namespace cyclops::config::initializer {
           .bundle_adjustment_max_iterations = 20,
           .bundle_adjustment_max_solver_time = 0.06,
           .scale_gauge_soft_constraint_deviation = 0.001,
+          .duplicate_solution_max_position_error = 0.10,
         },
       .acceptance_test =
         {
