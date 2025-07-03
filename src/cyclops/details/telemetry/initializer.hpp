@@ -187,6 +187,8 @@ namespace cyclops::telemetry {
     virtual void onFailure(OnFailure const& argument);
 
     struct OnSuccess {
+      int vision_solution_index;
+
       FrameID initial_motion_frame_id;
       Timestamp initial_motion_frame_timestamp;
       std::map<FrameID, SE3Transform> sfm_camera_pose;

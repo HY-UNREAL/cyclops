@@ -225,6 +225,9 @@ namespace cyclops::initializer {
     if (multiview_solutions.empty())
       return {};
 
+    __logger__->debug(
+      "Obtained {} multi-view solutions", multiview_solutions.size());
+
     auto maybe_bundle_adjustments =
       multiview_solutions | views::transform([&](auto const& solution) {
         return _bundle_adjustment_solver->solve(

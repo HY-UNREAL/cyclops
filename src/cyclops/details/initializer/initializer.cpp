@@ -126,6 +126,7 @@ namespace cyclops::initializer {
       _keyframe_manager->keyframes().at(initial_motion_frame_id);
 
     _telemetry->onSuccess({
+      .vision_solution_index = candidate.msfm_solution_index,
       .initial_motion_frame_id = initial_motion_frame_id,
       .initial_motion_frame_timestamp = initial_motion_frame_timestamp,
       .sfm_camera_pose = vision_solution.camera_motions,
