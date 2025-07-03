@@ -50,8 +50,12 @@ namespace cyclops::telemetry {
     };
     virtual void onBestTwoViewSelection(BestTwoViewSelection const& selection);
 
-    struct TwoViewMotionHypothesisTest {
+    struct TwoViewGeometry {
+      bool acceptable;
       bool rotation_prior_test_passed;
+      bool triangulation_test_passed;
+
+      double rotation_prior_p_value;
       int triangulation_success_count;
 
       SE3Transform motion;
@@ -62,17 +66,12 @@ namespace cyclops::telemetry {
       FrameID frame_id_1;
       FrameID frame_id_2;
 
-      std::vector<TwoViewMotionHypothesisTest> candidates;
+      std::vector<TwoViewGeometry> candidates;
     };
     virtual void onTwoViewMotionHypothesis(
       TwoViewMotionHypothesis const& hypothesis);
 
     enum TwoViewGeometryModel { EPIPOLAR, HOMOGRAPHY };
-
-    struct TwoViewGeometry {
-      SE3Transform motion;
-      int triangulation_successes;
-    };
 
     struct TwoViewSolverSuccess {
       std::set<FrameID> frames;
@@ -84,7 +83,7 @@ namespace cyclops::telemetry {
       double homography_expected_inliers;
       double epipolar_expected_inliers;
 
-      std::vector<TwoViewGeometry> motion_hypothesis;
+      std::vector<TwoViewGeometry> candidates;
     };
     virtual void onTwoViewSolverSuccess(TwoViewSolverSuccess const& success);
 

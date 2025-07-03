@@ -28,6 +28,9 @@ namespace cyclops::initializer {
     std::map<FrameID, std::map<LandmarkID, FeaturePoint>>;
   using MultiViewGyroMotionData = std::map<FrameID, GyroMotionConstraint>;
 
+  using TwoViewSolution =
+    std::tuple<std::optional<FrameID>, std::vector<TwoViewGeometry>>;
+
   class MultiviewVisionGeometrySolverImpl:
       public MultiviewVisionGeometrySolver {
   private:
@@ -35,22 +38,29 @@ namespace cyclops::initializer {
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<InitializerTelemetry> _telemetry;
 
-    void logFailure(std::string const& reason);
-    void logFatal(std::string const& reason);
-
     MultiViewCorrespondences makeMultiViewCorrespondences(
       MultiViewImageData const& features,
       MultiViewGyroMotionData const& gyro_motions);
 
-    template <typename landmark_range_t>
-    LandmarkPositions triangulateUnknownLandmarks(
-      landmark_range_t const& known_landmarks,
-      std::map<LandmarkID, TwoViewFeaturePair> const& features,
-      RotationPositionPair const& camera_pose);
+    TwoViewSolution solveTwoView(
+      std::set<FrameID> frame_ids,
+      MultiViewCorrespondences const& correspondences);
 
     std::optional<MultiViewGeometry> solveMultiview(
       FrameID twoview_frame_id, TwoViewGeometry const& twoview_solution,
       MultiViewCorrespondences const& multiview_correspondences);
+
+    void reportBestTwoViewSelection(
+      std::set<FrameID> frame_ids, FrameID best_frame_id);
+    void reportTwoViewHypothesis(
+      std::set<FrameID> frame_ids, FrameID best_frame_id,
+      std::vector<TwoViewGeometry> const& hypothesis);
+    void reportTwoViewSolverSuccess(
+      std::set<FrameID> frame_ids, TwoViewCorrespondenceData const& view,
+      TwoViewGeometrySolverResult const& solution);
+    void reportVisionFailure(
+      std::set<FrameID> frame_ids,
+      InitializerTelemetry::VisionBootstrapFailureReason reason);
 
   public:
     MultiviewVisionGeometrySolverImpl(
@@ -64,16 +74,6 @@ namespace cyclops::initializer {
       MultiViewImageData const& features,
       MultiViewGyroMotionData const& gyro_motions) override;
   };
-
-  void MultiviewVisionGeometrySolverImpl::logFailure(
-    std::string const& reason) {
-    __logger__->info("Vision initialization failed. Reason: {}", reason);
-  }
-
-  void MultiviewVisionGeometrySolverImpl::logFatal(std::string const& reason) {
-    __logger__->error(
-      "Internal error during vision initialization: {}", reason);
-  }
 
   static std::optional<TwoViewImuRotationData> makeTwoViewRotationPrior(
     MultiViewGyroMotionData const& gyro_motions, FrameID reference_view_frame,
@@ -124,7 +124,7 @@ namespace cyclops::initializer {
       auto maybe_rotation_prior =
         makeTwoViewRotationPrior(gyro_motions, frame1_id, frame2_id);
       if (!maybe_rotation_prior) {
-        logFatal("Two view rotation prior generation failed");
+        __logger__->error("Two view rotation prior generation failed");
         return {};
       }
 
@@ -142,20 +142,6 @@ namespace cyclops::initializer {
       }
     }
     return result;
-  }
-
-  template <typename landmark_range_t>
-  LandmarkPositions
-  MultiviewVisionGeometrySolverImpl::triangulateUnknownLandmarks(
-    landmark_range_t const& known_landmarks,
-    std::map<LandmarkID, TwoViewFeaturePair> const& features,
-    RotationPositionPair const& camera_pose) {
-    auto unknown_landmarks =
-      views::set_difference(features | views::keys, known_landmarks) |
-      ranges::to<std::set>;
-    auto triangulation = triangulateTwoViewFeaturePairs(
-      _config->initialization.vision, features, unknown_landmarks, camera_pose);
-    return triangulation.landmarks;
   }
 
   std::optional<MultiViewGeometry>
@@ -185,7 +171,7 @@ namespace cyclops::initializer {
     for (auto const& [frame_id, view_frame] : correspondences.view_frames) {
       auto maybe_camera_pose = solve_pnp(view_frame);
       if (!maybe_camera_pose) {
-        logFailure("EPnP camera pose reconstruction failed.");
+        __logger__->info("EPnP camera pose reconstruction failed.");
         __logger__->debug("Frame id: {}", frame_id);
         return std::nullopt;
       }
@@ -194,8 +180,16 @@ namespace cyclops::initializer {
       auto const& [R, p] = camera_pose;
       motions.emplace(frame_id, SE3Transform {p, Quaterniond(R)});
 
-      auto new_landmarks = triangulateUnknownLandmarks(
-        landmarks | views::keys, view_frame.features, camera_pose);
+      auto const& features = view_frame.features;
+      auto const& vision_config = _config->initialization.vision;
+
+      auto unknown_landmarks =
+        views::set_difference(features | views::keys, landmarks | views::keys) |
+        ranges::to<std::set>;
+      auto triangulation = triangulateTwoViewFeaturePairs(
+        vision_config, features, unknown_landmarks, camera_pose);
+      auto new_landmarks = triangulation.landmarks;
+
       landmarks.insert(new_landmarks.begin(), new_landmarks.end());
     }
     return MultiViewGeometry {
@@ -220,42 +214,120 @@ namespace cyclops::initializer {
     _two_view_solver->reset();
   }
 
+  static auto geometryModelAsTelemetry(
+    TwoViewGeometrySolverResult::GeometryModel model) {
+    return model == TwoViewGeometrySolverResult::EPIPOLAR
+      ? InitializerTelemetry::EPIPOLAR
+      : InitializerTelemetry::HOMOGRAPHY;
+  }
+
+  static auto twoViewGeometryAsTelemetry(TwoViewGeometry const& geometry) {
+    return InitializerTelemetry::TwoViewGeometry {
+      .acceptable = geometry.acceptable,
+      .rotation_prior_test_passed = geometry.gyro_prior_test_passed,
+      .triangulation_test_passed = geometry.triangulation_test_passed,
+      .rotation_prior_p_value = geometry.gyro_prior_p_value,
+      .triangulation_success_count =
+        static_cast<int>(geometry.landmarks.size()),
+      .motion = geometry.camera_motion,
+    };
+  }
+
+  void MultiviewVisionGeometrySolverImpl::reportBestTwoViewSelection(
+    std::set<FrameID> frame_ids, FrameID best_frame_id) {
+    _telemetry->onBestTwoViewSelection({
+      .frames = frame_ids,
+      .frame_id_1 = *frame_ids.rbegin(),
+      .frame_id_2 = best_frame_id,
+    });
+  }
+
+  void MultiviewVisionGeometrySolverImpl::reportTwoViewHypothesis(
+    std::set<FrameID> frame_ids, FrameID best_frame_id,
+    std::vector<TwoViewGeometry> const& hypothesis) {
+    _telemetry->onTwoViewMotionHypothesis({
+      .frames = frame_ids,
+      .frame_id_1 = *frame_ids.rbegin(),
+      .frame_id_2 = best_frame_id,
+      .candidates = hypothesis | views::transform(twoViewGeometryAsTelemetry) |
+        ranges::to_vector,
+    });
+  }
+
+  void MultiviewVisionGeometrySolverImpl::reportTwoViewSolverSuccess(
+    std::set<FrameID> frame_ids, TwoViewCorrespondenceData const& view,
+    TwoViewGeometrySolverResult const& solution) {
+    _telemetry->onTwoViewSolverSuccess({
+      .frames = frame_ids,
+      .initial_selected_model =
+        geometryModelAsTelemetry(solution.initial_selected_model),
+      .final_selected_model =
+        geometryModelAsTelemetry(solution.final_selected_model),
+      .landmarks_count = static_cast<int>(view.features.size()),
+      .homography_expected_inliers = solution.homography_expected_inliers,
+      .epipolar_expected_inliers = solution.epipolar_expected_inliers,
+      .candidates = solution.candidates |
+        views::transform(twoViewGeometryAsTelemetry) | ranges::to_vector,
+    });
+  }
+
+  void MultiviewVisionGeometrySolverImpl::reportVisionFailure(
+    std::set<FrameID> frame_ids,
+    InitializerTelemetry::VisionBootstrapFailureReason reason) {
+    _telemetry->onVisionFailure({frame_ids, reason});
+  }
+
+  TwoViewSolution MultiviewVisionGeometrySolverImpl::solveTwoView(
+    std::set<FrameID> frame_ids,
+    MultiViewCorrespondences const& correspondences) {
+    auto maybe_best_view = selectBestTwoViewPair(correspondences);
+    if (!maybe_best_view) {
+      return std::make_tuple(std::nullopt, std::vector<TwoViewGeometry> {});
+    }
+
+    auto const& [best_frame_id, best_view] = maybe_best_view->get();
+    reportBestTwoViewSelection(frame_ids, best_frame_id);
+
+    auto solution = _two_view_solver->solve(best_view);
+    if (!solution.has_value())
+      return std::make_tuple(best_frame_id, std::vector<TwoViewGeometry> {});
+
+    auto const& hypotheses = solution->candidates;
+    reportTwoViewHypothesis(frame_ids, best_frame_id, solution->candidates);
+
+    auto solutions = solution->candidates |
+      views::filter([](auto const& _) { return _.acceptable; }) |
+      ranges::to_vector;
+
+    if (!solutions.empty())
+      reportTwoViewSolverSuccess(frame_ids, best_view, *solution);
+    return std::make_tuple(best_frame_id, solutions);
+  }
+
   std::vector<MultiViewGeometry> MultiviewVisionGeometrySolverImpl::solve(
     MultiViewImageData const& features,
     MultiViewGyroMotionData const& gyro_motions) {
     if (features.empty())
       return {};
     auto frame_ids = features | views::keys | ranges::to<std::set>;
-
     auto correspondences = makeMultiViewCorrespondences(features, gyro_motions);
 
-    auto maybe_best_view = selectBestTwoViewPair(correspondences);
-    if (!maybe_best_view) {
-      _telemetry->onVisionFailure({
-        .frames = frame_ids,
-        .reason = InitializerTelemetry::BEST_TWO_VIEW_SELECTION_FAILED,
-      });
+    auto [maybe_best_frame_id, twoview_solutions] =
+      solveTwoView(frame_ids, correspondences);
+    if (!maybe_best_frame_id.has_value()) {
+      reportVisionFailure(
+        frame_ids, InitializerTelemetry::BEST_TWO_VIEW_SELECTION_FAILED);
       return {};
     }
-    auto const& [best_frame_id, best_view] = maybe_best_view->get();
 
-    _telemetry->onBestTwoViewSelection({
-      .frames = frame_ids,
-      .frame_id_1 = *frame_ids.rbegin(),
-      .frame_id_2 = best_frame_id,
-    });
-
-    auto twoview_solutions = _two_view_solver->solve(best_view);
     if (twoview_solutions.empty()) {
-      _telemetry->onVisionFailure({
-        .frames = frame_ids,
-        .reason = InitializerTelemetry::TWO_VIEW_GEOMETRY_FAILED,
-      });
+      reportVisionFailure(
+        frame_ids, InitializerTelemetry::TWO_VIEW_GEOMETRY_FAILED);
       return {};
     }
 
-    auto multiview_solutions =  //
-      twoview_solutions |
+    auto best_frame_id = maybe_best_frame_id.value();
+    auto multiview_solutions = twoview_solutions |
       views::transform(std::bind(
         &MultiviewVisionGeometrySolverImpl::solveMultiview, this, best_frame_id,
         std::placeholders::_1, correspondences)) |
@@ -266,10 +338,8 @@ namespace cyclops::initializer {
       views::transform([](auto const& maybe) { return maybe.value(); }) |
       ranges::to_vector;
     if (multiview_solutions_successful.empty()) {
-      _telemetry->onVisionFailure({
-        .frames = frame_ids,
-        .reason = InitializerTelemetry::MULTI_VIEW_GEOMETRY_FAILED,
-      });
+      reportVisionFailure(
+        frame_ids, InitializerTelemetry::MULTI_VIEW_GEOMETRY_FAILED);
       return {};
     }
 

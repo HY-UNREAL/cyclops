@@ -70,7 +70,10 @@ namespace cyclops::initializer {
         WHEN("Solved for possible motion geometry") {
           auto config = makeDefaultConfig();
           auto solver = TwoViewVisionGeometrySolver::Create(config, rgen);
-          auto possible_solutions = solver->solve(correspondence);
+          auto solution = solver->solve(correspondence);
+          REQUIRE(solution.has_value());
+
+          auto const& possible_solutions = solution->candidates;
           REQUIRE_FALSE(possible_solutions.empty());
 
           AND_WHEN(

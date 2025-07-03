@@ -27,8 +27,30 @@ namespace cyclops::initializer {
   };
 
   struct TwoViewGeometry {
+    bool acceptable;
+    bool gyro_prior_test_passed;
+    bool triangulation_test_passed;
+
+    double gyro_prior_p_value;
+
     SE3Transform camera_motion;
     LandmarkPositions landmarks;
+  };
+
+  struct TwoViewGeometrySolverResult {
+    enum GeometryModel {
+      EPIPOLAR,
+      HOMOGRAPHY,
+    };
+
+    GeometryModel initial_selected_model;
+    GeometryModel final_selected_model;
+
+    double homography_expected_inliers;
+    double epipolar_expected_inliers;
+
+    // Returns a sequence of possible solutions.
+    std::vector<TwoViewGeometry> candidates;
   };
 
   class TwoViewVisionGeometrySolver {
@@ -36,8 +58,7 @@ namespace cyclops::initializer {
     virtual ~TwoViewVisionGeometrySolver() = default;
     virtual void reset() = 0;
 
-    // Returns a sequence of possible solutions.
-    virtual std::vector<TwoViewGeometry> solve(
+    virtual std::optional<TwoViewGeometrySolverResult> solve(
       TwoViewCorrespondenceData const& two_view_correspondence) = 0;
 
     static std::unique_ptr<TwoViewVisionGeometrySolver> Create(

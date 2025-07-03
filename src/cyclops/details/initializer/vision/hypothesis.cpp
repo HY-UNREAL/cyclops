@@ -19,7 +19,7 @@ namespace cyclops::initializer {
   private:
     std::shared_ptr<CyclopsConfig const> _config;
 
-    bool testMotionIMURotationPrior(
+    std::tuple<bool, double> testMotionIMURotationPrior(
       RotationPositionPair const& motion,
       TwoViewImuRotationData const& imu_prior) const;
     bool testTriangulationSuccess(
@@ -49,7 +49,8 @@ namespace cyclops::initializer {
     return w.angle() * w.axis();
   }
 
-  bool TwoViewMotionHypothesisSelectorImpl::testMotionIMURotationPrior(
+  std::tuple<bool, double>
+  TwoViewMotionHypothesisSelectorImpl::testMotionIMURotationPrior(
     RotationPositionPair const& motion,
     TwoViewImuRotationData const& imu_prior) const {
     auto const& vision_config = _config->initialization.vision;
@@ -64,7 +65,7 @@ namespace cyclops::initializer {
 
     auto p_value = 1.0 - chiSquaredCdf(3, error);
 
-    return p_value > min_p_value;
+    return std::make_tuple(p_value > min_p_value, p_value);
   }
 
   bool TwoViewMotionHypothesisSelectorImpl::testTriangulationSuccess(
@@ -88,44 +89,55 @@ namespace cyclops::initializer {
     __logger__->debug("Selecting best two-view motion hypothesis");
     __logger__->debug("Motion candidates: {}", motions.size());
 
-    auto motions_filtered =  //
-      motions | views::filter([&](auto const& motion) {
+    auto gyro_tests =  //
+      motions | views::transform([&](auto const& motion) {
         return testMotionIMURotationPrior(motion, prior);
       }) |
       ranges::to_vector;
 
-    if (motions_filtered.empty()) {
+    auto _1 = [&](auto const& pair) { return std::get<0>(pair); };
+    if (!ranges::any_of(gyro_tests, _1)) {
       __logger__->warn("Visual motion does not align with the IMU rotation");
       __logger__->info(
         "Suggestion: ensure that the IMU-camera extrinsic is correct.");
     }
     __logger__->debug(
-      "Candidates that match IMU rotation: {}", motions_filtered.size());
+      "Candidates that match IMU rotation: {}",
+      ranges::count_if(gyro_tests, _1));
 
-    auto motion_triangulations =
-      motions_filtered | views::transform([&](auto const& motion) {
-        auto triangulation = triangulateTwoViewFeaturePairs(
-          _config->initialization.vision, features, inliers, motion);
-        return std::make_tuple(motion, triangulation);
-      }) |
-      ranges::to_vector;
+    auto triangulations =
+      views::zip(motions, gyro_tests) |
+      views::transform(
+        [&](auto const& pair) -> std::optional<TwoViewTriangulation> {
+          auto const& [motion, test] = pair;
+          auto const& [acceptable, _] = test;
 
-    auto successed_motion_triangulations =
-      motion_triangulations | views::filter([&](auto const& pair) {
-        auto const& [motion, triangulation] = pair;
-        return testTriangulationSuccess(triangulation, inliers.size());
-      }) |
+          if (!acceptable)
+            return std::nullopt;
+          return triangulateTwoViewFeaturePairs(
+            _config->initialization.vision, features, inliers, motion);
+        }) |
       ranges::to_vector;
-    __logger__->debug(
-      "Triangulation successes: {}", successed_motion_triangulations.size());
 
     return  //
-      successed_motion_triangulations | views::transform([](auto const& pair) {
-        auto const& [motion, triangulation] = pair;
+      views::zip(motions, gyro_tests, triangulations) |
+      views::transform([&](auto const& pair) {
+        auto const& [motion, gyro_test, triangulation] = pair;
         auto const& [R, p] = motion;
+        auto [gyro_acceptable, gyro_p_value] = gyro_test;
+
+        auto triangulation_acceptable = triangulation.has_value() &&
+          testTriangulationSuccess(*triangulation, inliers.size());
+
         return TwoViewGeometry {
+          .acceptable = gyro_acceptable && triangulation_acceptable,
+          .gyro_prior_test_passed = gyro_acceptable,
+          .triangulation_test_passed = triangulation_acceptable,
+          .gyro_prior_p_value = gyro_p_value,
+
           .camera_motion = SE3Transform {p, Eigen::Quaterniond(R)},
-          .landmarks = triangulation.landmarks,
+          .landmarks =
+            triangulation ? triangulation->landmarks : LandmarkPositions {},
         };
       }) |
       ranges::to_vector;

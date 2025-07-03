@@ -24,6 +24,7 @@ namespace cyclops::initializer {
   using Eigen::Matrix3d;
 
   using TwoViewData = std::map<LandmarkID, TwoViewFeaturePair>;
+  using GeometryModel = TwoViewGeometrySolverResult::GeometryModel;
 
   static vector<set<LandmarkID>> makeRansacBatch(
     int size, set<LandmarkID> const& features, std::mt19937& rgen) {
@@ -37,12 +38,6 @@ namespace cyclops::initializer {
       ranges::to_vector;
   }
 
-  enum GeometryModelSelection {
-    FAILURE,
-    EPIPOLAR,
-    HOMOGRAPHY,
-  };
-
   class TwoViewVisionGeometrySolverImpl: public TwoViewVisionGeometrySolver {
   private:
     std::unique_ptr<TwoViewMotionHypothesisSelector> _motion_selector;
@@ -50,7 +45,7 @@ namespace cyclops::initializer {
     std::shared_ptr<CyclopsConfig const> _config;
     std::shared_ptr<std::mt19937> _rgen;
 
-    GeometryModelSelection selectGeometryModel(
+    std::optional<GeometryModel> selectGeometryModel(
       EpipolarAnalysis const& epipolar,
       HomographyAnalysis const& homography) const;
 
@@ -61,9 +56,6 @@ namespace cyclops::initializer {
       EpipolarAnalysis const& epipolar, TwoViewData const& features,
       TwoViewImuRotationData const& rotation_prior);
 
-    vector<TwoViewGeometry> solveGeometry(
-      TwoViewCorrespondenceData const& correspondence);
-
   public:
     TwoViewVisionGeometrySolverImpl(
       std::unique_ptr<TwoViewMotionHypothesisSelector> motion_selector,
@@ -72,7 +64,7 @@ namespace cyclops::initializer {
     ~TwoViewVisionGeometrySolverImpl();
     void reset() override;
 
-    vector<TwoViewGeometry> solve(
+    std::optional<TwoViewGeometrySolverResult> solve(
       TwoViewCorrespondenceData const& correspondence) override;
   };
 
@@ -91,7 +83,8 @@ namespace cyclops::initializer {
     _motion_selector->reset();
   }
 
-  GeometryModelSelection TwoViewVisionGeometrySolverImpl::selectGeometryModel(
+  std::optional<GeometryModel>
+  TwoViewVisionGeometrySolverImpl::selectGeometryModel(
     EpipolarAnalysis const& epipolar,
     HomographyAnalysis const& homography) const {
     auto S_H = homography.expected_inliers;
@@ -105,7 +98,7 @@ namespace cyclops::initializer {
       // both of them failed. abort
       __logger__->debug(
         "Initialization model selection failed; S_H: {}, S_E: {}", S_H, S_E);
-      return FAILURE;
+      return std::nullopt;
     }
 
     auto R_H = S_H / (S_H + S_E);
@@ -114,10 +107,10 @@ namespace cyclops::initializer {
 
     if (R_H > model_selection_config.homography_selection_score_threshold) {
       __logger__->debug("Selecting homography model");
-      return HOMOGRAPHY;
+      return GeometryModel::HOMOGRAPHY;
     } else {
       __logger__->debug("Selecting epipolar model");
-      return EPIPOLAR;
+      return GeometryModel::EPIPOLAR;
     }
   }
 
@@ -151,7 +144,17 @@ namespace cyclops::initializer {
       hypotheses, data, inliers, rotation_prior);
   }
 
-  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solveGeometry(
+  static bool isTwoViewGeometryAcceptable(
+    vector<TwoViewGeometry> const& candidates) {
+    if (candidates.empty())
+      return false;
+
+    return ranges::any_of(
+      candidates, [](auto const& geometry) { return geometry.acceptable; });
+  }
+
+  std::optional<TwoViewGeometrySolverResult>
+  TwoViewVisionGeometrySolverImpl::solve(
     TwoViewCorrespondenceData const& correspondence) {
     auto tic = std::chrono::steady_clock::now();
     auto const& vision_config = _config->initialization.vision;
@@ -174,42 +177,56 @@ namespace cyclops::initializer {
     auto epipolar = analyzeTwoViewEpipolar(
       vision_config.feature_point_isotropic_noise, ransac_batch, features);
 
-    auto model_selection = selectGeometryModel(epipolar, homography);
+    auto model = selectGeometryModel(epipolar, homography);
     auto toc = std::chrono::steady_clock::now();
     auto dt = std::chrono::duration<double>(toc - tic).count();
 
     __logger__->debug(
       "Two-view geometry model selection complete. duration: {}", dt);
 
-    switch (model_selection) {
-    case FAILURE:
-      return {};
+    if (!model.has_value())  // Selection failure.
+      return std::nullopt;
 
-    case EPIPOLAR: {
+    auto result =
+      [&](auto initial_model, auto final_model, auto const& solutions) {
+        return TwoViewGeometrySolverResult {
+          .initial_selected_model = initial_model,
+          .final_selected_model = final_model,
+          .homography_expected_inliers = homography.expected_inliers,
+          .epipolar_expected_inliers = epipolar.expected_inliers,
+          .candidates = solutions,
+        };
+      };
+
+    switch (*model) {
+    case GeometryModel::EPIPOLAR: {
       auto solutions = solveEpipolar(epipolar, features, rotation_prior);
-      if (!solutions.empty())
-        return solutions;
+      if (isTwoViewGeometryAcceptable(solutions)) {
+        return result(
+          GeometryModel::EPIPOLAR, GeometryModel::EPIPOLAR, solutions);
+      }
 
       __logger__->debug(
         "Epipolar reconstruction failed. Fallback to homography model");
-      return solveHomography(homography, features, rotation_prior);
+      return result(
+        GeometryModel::EPIPOLAR, GeometryModel::HOMOGRAPHY,
+        solveHomography(homography, features, rotation_prior));
     }
 
-    case HOMOGRAPHY: {
+    case GeometryModel::HOMOGRAPHY: {
       auto solutions = solveHomography(homography, features, rotation_prior);
-      if (!solutions.empty())
-        return solutions;
+      if (isTwoViewGeometryAcceptable(solutions)) {
+        return result(
+          GeometryModel::HOMOGRAPHY, GeometryModel::HOMOGRAPHY, solutions);
+      }
 
       __logger__->debug(
         "Homography reconstruction failed. Fallback to epipolar model");
-      return solveEpipolar(epipolar, features, rotation_prior);
+      return result(
+        GeometryModel::HOMOGRAPHY, GeometryModel::EPIPOLAR,
+        solveEpipolar(epipolar, features, rotation_prior));
     }
     }
-  }
-
-  vector<TwoViewGeometry> TwoViewVisionGeometrySolverImpl::solve(
-    TwoViewCorrespondenceData const& correspondence) {
-    return solveGeometry(correspondence);
   }
 
   std::unique_ptr<TwoViewVisionGeometrySolver>
