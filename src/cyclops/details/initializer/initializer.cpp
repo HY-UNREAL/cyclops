@@ -96,6 +96,23 @@ namespace cyclops::initializer {
     auto solution = _candidate_solver->solve();
     __logger__->debug("Initialization solution obtained.");
 
+    __logger__->debug("Vision solutions");
+    for (auto const& vision : solution.msfm_solutions) {
+      __logger__->debug(
+        "{}, Landmarks: {}, P-value: {}%, Inlier ratio: {}%",
+        vision.acceptable ? "Acceptable" : "Unacceptable",
+        vision.landmarks.size(), vision.solution_significant_probability * 100,
+        vision.measurement_inlier_ratio * 100);
+    }
+
+    __logger__->debug("IMU solutions");
+    for (auto const& imu : solution.imu_match_solutions) {
+      __logger__->debug(
+        "{}, MSfM index: {}, Scale: {}",
+        imu.acceptance ? "Acceptable" : "Unacceptable", imu.msfm_solution_index,
+        imu.scale);
+    }
+
     if (solution.imu_match_solutions.empty()) {
       reportFailureTelemetry(solution);
       return std::nullopt;
