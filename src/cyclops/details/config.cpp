@@ -20,7 +20,7 @@ namespace cyclops::config::initializer {
             },
           .motion_hypothesis =
             {
-              .min_triangulation_success = 25,
+              .min_triangulation_success = 10,
               .min_imu_rotation_consistency_p_value = 0.05,
             },
         },
