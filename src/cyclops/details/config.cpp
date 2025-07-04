@@ -11,7 +11,7 @@ namespace cyclops::config::initializer {
           .model_selection =
             {
               .ransac_batch_size = 200,
-              .homography_selection_score_threshold = 0.45,
+              .homography_selection_score_threshold = 0.55,
               .epipolar_selection_score_threshold = 0.35,
             },
           .triangulation_acceptance =
