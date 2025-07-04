@@ -8,7 +8,9 @@
 #include "cyclops/details/telemetry/initializer.hpp"
 
 #include "cyclops/details/config.hpp"
+#include "cyclops/details/logging.hpp"
 
+#include <spdlog/spdlog.h>
 #include <range/v3/all.hpp>
 
 namespace cyclops::initializer {
@@ -187,10 +189,14 @@ namespace cyclops::initializer {
 
     auto n_msfm_solutions = result.msfm_solutions.size();
     for (int msfm_index = 0; msfm_index < n_msfm_solutions; msfm_index++) {
+      __logger__->debug("Solving MSfM solution {}", msfm_index);
+
       auto const& msfm_solution = result.msfm_solutions.at(msfm_index);
       auto matches = _imu_solver->solve(msfm_solution, imu_motions);
-      if (!matches.has_value())
+      if (!matches.has_value()) {
+        __logger__->warn("IMU match failed");
         continue;
+      }
 
       for (auto const& match : *matches) {
         result.imu_match_solutions.push_back(
