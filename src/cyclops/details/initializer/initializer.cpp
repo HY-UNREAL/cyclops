@@ -117,7 +117,9 @@ namespace cyclops::initializer {
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
-    if (solution.imu_match_solutions.size() > 1) {
+    if (
+      solution.msfm_solutions.size() > 1 ||
+      solution.imu_match_solutions.size() > 1) {
       reportFailureTelemetry(solution);
       return std::nullopt;
     }
