@@ -118,7 +118,10 @@ namespace cyclops::initializer {
     std::vector<ImuMotionRef> const& imu_motions,
     ImuMatchMotionPrior const& camera_prior) {
     auto const& extrinsic = _config->extrinsics.imu_camera_transform;
-    auto acc_bias_prior_weight = 1 / _config->noise.acc_bias_prior_stddev;
+    auto imu_only = _config->initialization.imu.imu_only;
+
+    auto acc_bias_prior_weight =
+      imu_only ? 1e4 : 1 / _config->noise.acc_bias_prior_stddev;
 
     auto n = imu_motions.size() + 1;
 
