@@ -50,42 +50,37 @@ namespace cyclops::initializer {
     ImuMatchScaleSampleSolution const& solution) {
     auto const& extrinsic = config.extrinsics.imu_camera_transform;
 
-    auto keyframes =
-      camera_prior.camera_positions | views::keys | ranges::to<std::set>;
-    auto keyvalue_reverse_transform = views::transform(
-      [](auto const& kv) { return std::make_pair(kv.second, kv.first); });
-    auto keyframe_indexmap = views::enumerate(keyframes) |
-      keyvalue_reverse_transform | ranges::to<std::map<FrameID, int>>;
-
-    auto keyframe_index_transform = views::transform(
-      [&](auto frame_id) { return keyframe_indexmap.at(frame_id); });
-
     auto const& x_I = solution.inertial_state;
     auto const& x_V = solution.visual_state;
 
-    auto body_velocities =
-      keyframes | keyframe_index_transform | views::transform([&](auto i) {
-        return static_cast<Vector3d>(x_I.segment(6 + 3 * i, 3));
-      });
-    auto camera_orientations =
-      keyframes | views::transform([&](auto frame_id) -> Eigen::Quaterniond {
-        return camera_prior.imu_orientations.at(frame_id) * extrinsic.rotation;
-      });
+    auto body_velocities =  //
+      views::enumerate(camera_prior.camera_positions | views::keys) |
+      views::transform([&](auto const& element) {
+        auto [n, frame_id] = element;
+        auto v_n = x_I.segment(6 + 3 * n, 3).eval();
 
-    auto camera_position_perturbation_transform =
-      keyframe_index_transform | views::transform([&](auto i) -> Vector3d {
-        if (i == 0)
-          return Vector3d::Zero();
-        return x_V.segment(3 * (i - 1), 3);
-      });
-    auto camera_positions_corrected =
-      views::zip(
-        camera_orientations, camera_prior.camera_positions | views::values,
-        keyframes | camera_position_perturbation_transform) |
-      views::transform([](auto const& pair) -> Vector3d {
-        auto const& [q_c, p_c, delta_p] = pair;
-        return p_c + q_c * delta_p;
-      });
+        return std::make_pair(frame_id, v_n);
+      }) |
+      ranges::to<std::map<FrameID, Vector3d>>;
+
+    auto camera_position_delta = [&](auto n) -> Vector3d {
+      if (n == 0)
+        return Vector3d::Zero();
+      return x_V.segment(3 * (n - 1), 3);
+    };
+
+    auto camera_positions =  //
+      views::enumerate(camera_prior.camera_positions) |
+      views::transform([&](auto const& enumeration) {
+        auto const& [n, element] = enumeration;
+        auto const& [frame_id, p_c] = element;
+        auto const& q_b = camera_prior.imu_orientations.at(frame_id);
+        auto q_c = q_b * extrinsic.rotation;
+
+        auto delta_p = camera_position_delta(n);
+        return std::make_pair(frame_id, (p_c + q_c * delta_p).eval());
+      }) |
+      ranges::to<std::map<FrameID, Vector3d>>;
 
     return ImuMatchSolution {
       .scale = solution.scale,
@@ -93,11 +88,9 @@ namespace cyclops::initializer {
       .gravity = x_I.head(3),
       .acc_bias = x_I.segment(3, 3),
       .gyr_bias = camera_prior.gyro_bias,
-      .body_velocities = views::zip(keyframes, body_velocities) |
-        ranges::to<std::map<FrameID, Vector3d>>,
+      .body_velocities = body_velocities,
       .body_orientations = camera_prior.imu_orientations,
-      .sfm_positions = views::zip(keyframes, camera_positions_corrected) |
-        ranges::to<std::map<FrameID, Vector3d>>,
+      .sfm_positions = camera_positions,
     };
   }
 
